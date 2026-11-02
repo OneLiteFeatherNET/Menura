@@ -23,6 +23,13 @@ application {
     mainClass.set("net.onelitefeather.menura.server.Application")
 }
 
+// The served contract is the file in contracts/openapi, copied unchanged into the classpath (see OpenApiController).
+tasks.named<ProcessResources>("processResources") {
+    from(rootProject.file("contracts/openapi/menura.yaml")) {
+        into("openapi")
+    }
+}
+
 micronaut {
     runtime("netty")
     testRuntime("junit5")
