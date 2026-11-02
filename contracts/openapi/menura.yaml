@@ -16,6 +16,8 @@ servers:
 tags:
   - name: Health
     description: Anonymous liveness and readiness.
+  - name: Calendar
+    description: Calendar feed tokens for read-only calendar subscriptions.
 paths:
   /health:
     get:
@@ -40,6 +42,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /calendar-feed-token:
+    post:
+      tags:
+        - Calendar
+      operationId: issueCalendarFeedToken
+      summary: Issue the signed-in person's calendar feed token.
+      description: |
+        Shows a new 256-bit token once. Issuing replaces the person's previous token, which is refused at once. The
+        response is never cached.
+      responses:
+        "201":
+          description: The new token. It cannot be shown again.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuedCalendarFeedToken"
+        "401":
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags:
+        - Calendar
+      operationId: revokeCalendarFeedToken
+      summary: Revoke the signed-in person's calendar feed token.
+      responses:
+        "204":
+          description: The token is revoked; calendar clients using it are refused from now on.
+        "401":
+          $ref: "#/components/responses/Problem"
+  /calendar/feed/{token}:
+    get:
+      tags:
+        - Calendar
+      operationId: getCalendarFeed
+      summary: The calendar feed of a token holder, as iCalendar.
+      description: |
+        Read-only. The token in the path is the credential, so the route needs no session. Unknown, revoked and rotated
+        tokens are refused. The body is a placeholder until the iCalendar change lands.
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: The calendar feed token shown once when it was issued.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The calendar feed.
+          content:
+            text/calendar:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     Limit:
@@ -115,6 +177,15 @@ components:
       format: uuid
       description: A random RFC 9562 version 4 UUID. Identifiers carry no creation time and no sequence.
       example: 4f0c7a52-9d1e-4b8a-8e3f-2a6c5d7b9e10
+    IssuedCalendarFeedToken:
+      type: object
+      description: A calendar feed token, shown once. The server keeps only its hash.
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: The token as "<identifier>.<secret>"; the secret is 256 random bits.
     HealthStatus:
       type: object
       description: Overall status and database readiness. Nothing else is revealed.
