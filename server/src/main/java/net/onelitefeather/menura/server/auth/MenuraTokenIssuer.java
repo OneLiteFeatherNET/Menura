@@ -10,12 +10,14 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import net.onelitefeather.menura.core.auth.Role;
 
+import java.text.ParseException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -80,6 +82,19 @@ public final class MenuraTokenIssuer {
     /** The public half of the signing key, for the verifier and for any published key set. */
     public JWKSet publicKeys() {
         return new JWKSet(signingKey.toPublicJWK());
+    }
+
+    /** The roles named in the claims of a verified token. Unknown names grant nothing. */
+    static Set<Role> rolesOf(JWTClaimsSet claims) {
+        try {
+            List<String> names = claims.getStringListClaim(ROLES_CLAIM);
+            if (names == null) {
+                return Set.of();
+            }
+            return names.stream().map(Role::parse).flatMap(Optional::stream).collect(Collectors.toUnmodifiableSet());
+        } catch (ParseException e) {
+            return Set.of();
+        }
     }
 
     /** A verifier that accepts exactly the tokens this issuer signs, for this issuer and audience. */

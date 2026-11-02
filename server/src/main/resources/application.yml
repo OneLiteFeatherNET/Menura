@@ -14,3 +14,27 @@ datasources:
     # instead of crash-looping; a probe waits at most two seconds for a connection.
     initialization-fail-timeout: -1
     connection-timeout: 2000
+
+# Menura's authorization server and the web sign-in (see net.onelitefeather.menura.server.auth). Every value is an
+# environment variable. Empty Entra ID settings keep the server running and answer sign-in with 503. Entra ID app
+# registration: a web application whose redirect URI is MENURA_ENTRA_REDIRECT_URI, delegated openid and profile
+# permissions, and the groups claim in the ID token. Role group ids are comma-separated lists of object ids.
+menura:
+  auth:
+    issuer: ${MENURA_AUTH_ISSUER:`https://api-menura.onelitefeather.net`}
+    audience: ${MENURA_AUTH_AUDIENCE:`https://api-menura.onelitefeather.net`}
+    web-app-url: ${MENURA_AUTH_WEB_APP_URL:`http://localhost:5173/`}
+    token-lifetime: ${MENURA_AUTH_TOKEN_LIFETIME:`PT8H`}
+    # Private RSA key as a JWK (JSON). Empty uses an ephemeral key, which is for local development only.
+    signing-key: ${MENURA_AUTH_SIGNING_KEY:}
+    entra:
+      issuer: ${MENURA_ENTRA_ISSUER:}
+      client-id: ${MENURA_ENTRA_CLIENT_ID:}
+      client-secret: ${MENURA_ENTRA_CLIENT_SECRET:}
+      redirect-uri: ${MENURA_ENTRA_REDIRECT_URI:`http://localhost:8080/auth/callback`}
+    role-groups:
+      viewer: ${MENURA_AUTH_ROLE_VIEWER_GROUPS:}
+      editor: ${MENURA_AUTH_ROLE_EDITOR_GROUPS:}
+      publisher: ${MENURA_AUTH_ROLE_PUBLISHER_GROUPS:}
+      operator: ${MENURA_AUTH_ROLE_OPERATOR_GROUPS:}
+      admin: ${MENURA_AUTH_ROLE_ADMIN_GROUPS:}

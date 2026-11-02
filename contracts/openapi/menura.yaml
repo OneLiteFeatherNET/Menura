@@ -16,6 +16,8 @@ servers:
 tags:
   - name: Health
     description: Anonymous liveness and readiness.
+  - name: Auth
+    description: Web sign-in through Menura's authorization server (backend-for-frontend session).
 paths:
   /health:
     get:
@@ -40,7 +42,145 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/login:
+    get:
+      tags:
+        - Auth
+      operationId: startSignIn
+      summary: Starts a web sign-in with Entra ID.
+      description: |
+        Anonymous. Records the sign-in transaction on the server (state, nonce and PKCE verifier, kept as digests or
+        server-side only) and redirects the browser to the Entra ID authorization endpoint. No token is issued here.
+      security: []
+      responses:
+        "302":
+          description: Redirect to Entra ID.
+          headers:
+            Location:
+              description: The Entra ID authorization URL with state, nonce and an S256 code challenge.
+              schema:
+                type: string
+                format: uri
+          content: {}
+        "503":
+          description: Sign-in with Entra ID is not configured.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /auth/callback:
+    get:
+      tags:
+        - Auth
+      operationId: completeSignIn
+      summary: Completes a web sign-in and sets the session cookie.
+      description: |
+        Anonymous, reached through the redirect of Entra ID. The state must belong to a live sign-in transaction, which
+        is used up by this call. On success the server holds the Menura access token and the browser receives only
+        the `__Host-menura-session` cookie: Secure, HttpOnly, SameSite=Strict, Path=/ and no Domain.
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          description: Set by Entra ID when the person refused or the sign-in failed.
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Signed in; redirect to the web app.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+            Set-Cookie:
+              description: The __Host-menura-session cookie.
+              schema:
+                type: string
+          content: {}
+        "400":
+          description: The sign-in is unknown, expired or was already used.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "401":
+          description: Entra ID refused the sign-in or the identity could not be verified.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "403":
+          description: The person holds no Menura role.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "502":
+          description: Entra ID could not be reached or answered incorrectly.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /auth/session:
+    get:
+      tags:
+        - Auth
+      operationId: getSession
+      summary: The signed-in person and their roles.
+      description: |
+        Answers the person of the session cookie. Returns the subject and the Menura roles, never a token. Anonymous
+        callers receive 401; the web app sends them to sign in.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The signed-in person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionView"
+        "401":
+          description: No valid session.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      operationId: endSession
+      summary: Ends the web session on the server and clears the cookie.
+      security:
+        - sessionCookie: []
+      responses:
+        "204":
+          description: The session is gone; the cookie is cleared.
+          headers:
+            Set-Cookie:
+              description: The cleared __Host-menura-session cookie (Max-Age=0).
+              schema:
+                type: string
+          content: {}
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-menura-session
+      description: The web session cookie set by the sign-in. Its value is an opaque secret, never a token.
   parameters:
     Limit:
       name: limit
@@ -132,3 +272,23 @@ components:
           enum:
             - UP
             - DOWN
+    SessionView:
+      type: object
+      description: The signed-in person. Carries no token; roles are the Menura roles the person holds.
+      required:
+        - subject
+        - roles
+      properties:
+        subject:
+          type: string
+          description: The stable subject of the person, as issued by the authorization server.
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+              - VIEWER
+              - EDITOR
+              - PUBLISHER
+              - OPERATOR
+              - ADMIN
