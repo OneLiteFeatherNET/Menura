@@ -1,0 +1,17 @@
+{
+  // Generated and not maintained prose: the OpenSpec agent commands and skills, and the
+  // release-please changelog, whose compare links point at tags that do not exist yet.
+  "ignores": [
+    ".claude/**",
+    "CHANGELOG.md",
+    "node_modules/**"
+  ],
+  "config": {
+    "default": true,
+    // The proposals and designs keep wrapped prose; the line length is not enforced.
+    "MD013": false,
+    // The OpenSpec templates write headings and lists without blank lines around them.
+    "MD022": false,
+    "MD032": false
+  }
+}

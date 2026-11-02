@@ -1,0 +1,19 @@
+name: markdown-lint
+
+# Markdown of the README, the OpenSpec proposals and designs, and the component documents. The rules
+# and the generated files that are not linted are in .markdownlint-cli2.jsonc.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    uses: OneLiteFeatherNET/workflows/.github/workflows/markdown-lint.yml@v2.9.1
+    with:
+      glob: "*.md **/*.md"
+      config-file: .markdownlint-cli2.jsonc
+      # lychee does not read the markdownlint config, so the generated CHANGELOG.md is excluded here too.
+      lychee-args: "--max-redirects 5 --accept 200..=204,429 --no-progress --exclude-loopback --exclude-path CHANGELOG.md"

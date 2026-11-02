@@ -1,0 +1,91 @@
+name: build
+
+# Pull request checks. The Gradle modules run their unit tests without the integration tests, the
+# integration tests run after them in their own job, and the web app runs its checks. The chart,
+# compose and image checks are in chart.yml.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gradle:
+    name: Gradle
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    # One Gradle run covers core, server and jobs. verifyLayout and the contract tests are part of check.
+    uses: OneLiteFeatherNET/workflows/.github/workflows/gradle-build-pr.yml@v2.9.1
+    with:
+      java-version: "25.0.3"
+      java-distribution: "temurin"
+      run-tests: true
+      gradle-task: "check -PexcludeTags=integration"
+      runs-on: '["ubuntu-latest"]'
+
+  integration:
+    name: Integration tests
+    needs: gradle
+    # After the unit tests, and skipped only when they failed. It still runs when the Gradle job was
+    # skipped by its path filter, because the integration tests cover the same modules.
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25.0.3"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Testcontainers starts PostgreSQL 17 on the Docker daemon of the runner. The integration tests
+      # are selected by class name, as the README describes; the tag is what check excludes.
+      - name: Run integration tests
+        run: ./gradlew :jobs:test --tests '*IntegrationTest'
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 26
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          package-manager-cache: false
+
+      # The pnpm version of web/package.json `packageManager`, as the web image installs it.
+      - name: Install pnpm
+        run: npm install --global pnpm@10.33.4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

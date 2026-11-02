@@ -1,0 +1,17 @@
+name: pr-lint
+
+# Conventional Commits on the pull request title, which is the squash commit that lands on main, and
+# on every commit of the branch. release-please reads the commit types for the version and the
+# changelog. The commit rules are in commitlint.config.mjs, which the reusable workflow reads.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pr-lint:
+    uses: OneLiteFeatherNET/workflows/.github/workflows/pr-lint.yml@v2.9.1
