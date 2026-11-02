@@ -1,3 +1,7 @@
+plugins {
+    base
+}
+
 // gradle.properties' `version` line carries a `# x-release-please-version` marker comment that
 // release-please rewrites on every release. Java .properties keeps the trailing comment, so strip it here.
 allprojects {
@@ -49,7 +53,7 @@ subprojects {
 }
 
 // Asserts the repository layout of the skeleton (task 1.1 of add-project-skeleton).
-tasks.register("verifyLayout") {
+val verifyLayout = tasks.register("verifyLayout") {
     group = "verification"
     description = "Asserts that the Menura modules and placeholder directories exist."
     doLast {
@@ -67,4 +71,8 @@ tasks.register("verifyLayout") {
             throw GradleException("Repository layout is incomplete:\n - " + problems.joinToString("\n - "))
         }
     }
+}
+
+tasks.named("check") {
+    dependsOn(verifyLayout)
 }
