@@ -17,6 +17,10 @@ dependencies {
     testImplementation("io.micronaut.test:micronaut-test-junit5")
     testImplementation("io.micronaut:micronaut-http-client")
     testImplementation(libs.swagger.parser)
+    testImplementation(libs.postgresql)
+    testImplementation(platform(libs.testcontainers.bom))
+    testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.testcontainers.junit.jupiter)
 }
 
 application {
