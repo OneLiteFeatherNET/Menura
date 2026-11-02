@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "menura.fullname" . }}-jobs
+  labels:
+    {{- include "menura.componentLabels" (dict "root" . "component" "jobs") | nindent 4 }}
+spec:
+  replicas: {{ .Values.jobs.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "menura.componentSelectorLabels" (dict "root" . "component" "jobs") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "menura.componentLabels" (dict "root" . "component" "jobs") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- include "menura.podSecurity" . | nindent 6 }}
+      containers:
+        - name: jobs
+          image: {{ include "menura.image" (dict "root" . "component" "jobs") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.jobs.command | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.httpPort }}
+              protocol: TCP
+          env:
+            {{- include "menura.databaseEnv" . | nindent 12 }}
+            {{- range $name, $value := .Values.jobs.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- include "menura.databaseEnvFrom" . | nindent 10 }}
+          {{- include "menura.containerSecurity" . | nindent 10 }}
+          {{- with .Values.jobs.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

@@ -1,0 +1,96 @@
+# Default values for the Menura chart.
+#
+# Holds no secrets. Credentials are read from Secrets that exist before the
+# release (database.existingSecret), and every other setting is an environment
+# variable with a value here or a local default in the application.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Images are built from this repository and pushed to the OLF Harbor. An empty
+# tag means the chart's appVersion, so a chart release deploys images built
+# from the same release. Each component sets its own repository below.
+image:
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Every component listens on this port inside its container.
+httpPort: 8080
+
+database:
+  # JDBC URL of the PostgreSQL 17 cluster (OLF CloudNativePG). No credentials.
+  url: jdbc:postgresql://menura-postgres-rw:5432/menura
+  # Existing Secret with DATASOURCES_DEFAULT_USERNAME and
+  # DATASOURCES_DEFAULT_PASSWORD, created outside this chart. Empty means the
+  # pods get no credentials and the database cannot be reached.
+  existingSecret: ""
+
+# The server: REST API, backend-for-frontend, OAuth authorization server,
+# SSE feeds and the MCP endpoint. It never transcodes or renders video.
+server:
+  image:
+    repository: harbor.onelitefeather.dev/menura/server
+  replicaCount: 1
+  # Empty uses the image's own entrypoint.
+  command: []
+  env:
+    # Production profile: Flyway does not run at server start (migrate hook).
+    MICRONAUT_ENVIRONMENTS: prod
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# The web app: the Vue 3 single-page app as static files, served separately
+# from the server.
+web:
+  image:
+    repository: harbor.onelitefeather.dev/menura/web
+  replicaCount: 1
+  command: []
+  env: {}
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+# Jobs: the same codebase as Kubernetes CronJob entry points. Each run names one
+# job (`jobs run <name>`). The skeleton has only `ping`, and the deployment
+# stays at zero replicas until a long-running job exists; scheduled jobs come
+# with the changes that add them.
+jobs:
+  image:
+    repository: harbor.onelitefeather.dev/menura/jobs
+  replicaCount: 0
+  command:
+    - jobs
+    - run
+    - ping
+  env: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# Gateway API routes attach to the shared Envoy Gateway listener (the `eg`
+# Gateway in namespace `envoy` of the cluster repository).
+gateway:
+  parentRefs:
+    - name: eg
+      namespace: envoy
+      sectionName: https
+
+# Exactly three public routes. Each host forwards to one Service: the web app
+# to `web`, the API and the MCP endpoint to `server`.
+routes:
+  web:
+    hostname: menura.onelitefeather.net
+    service: web
+  api:
+    hostname: api-menura.onelitefeather.net
+    service: server
+  mcp:
+    hostname: mcp-menura.onelitefeather.net
+    service: server

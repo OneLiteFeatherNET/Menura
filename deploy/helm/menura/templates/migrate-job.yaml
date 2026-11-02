@@ -1,0 +1,41 @@
+{{- /*
+The migrate hook: applies the Flyway migrations of core (`jobs run migrate`)
+before the Deployments of a release roll out. Hook weight -5 puts it before the
+default-weight resources of the same hook phase.
+*/ -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "menura.fullname" . }}-migrate
+  labels:
+    {{- include "menura.componentLabels" (dict "root" . "component" "migrate") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "menura.componentLabels" (dict "root" . "component" "migrate") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- include "menura.podSecurity" . | nindent 6 }}
+      containers:
+        - name: migrate
+          image: {{ include "menura.image" (dict "root" . "component" "jobs") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - jobs
+            - run
+            - migrate
+          env:
+            {{- include "menura.databaseEnv" . | nindent 12 }}
+          {{- include "menura.databaseEnvFrom" . | nindent 10 }}
+          {{- include "menura.containerSecurity" . | nindent 10 }}
