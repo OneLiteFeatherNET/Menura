@@ -1,0 +1,134 @@
+openapi: 3.1.0
+info:
+  title: Menura API
+  version: 0.1.0
+  summary: Content and stream tooling of OneLiteFeather.
+  description: |
+    Source of truth for every REST endpoint of Menura. The server serves this file unchanged on the anonymous
+    documentation path /openapi/menura.yaml. Conventions for errors, identifiers, paging and timestamps are in
+    CONVENTIONS.md next to this file. The skeleton defines only the health endpoint; product endpoints are added
+    by their own changes.
+servers:
+  - url: https://api-menura.onelitefeather.net
+    description: Production, behind the shared Envoy Gateway.
+  - url: http://localhost:8080
+    description: Local development server.
+tags:
+  - name: Health
+    description: Anonymous liveness and readiness.
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      operationId: getHealth
+      summary: Liveness and readiness of the server and its database.
+      description: |
+        Anonymous. Answers 200 when the database is reachable and 503 when it is not. The body reveals only the
+        overall status and the database readiness: no version, host or configuration.
+      security: []
+      responses:
+        "200":
+          description: The server is ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: The database is unreachable; the server is not ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+components:
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of items per page. Values above 200 are reduced to 200.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor taken from nextCursor of the previous page. Omit it for the first page.
+      required: false
+      schema:
+        type: string
+  responses:
+    Problem:
+      description: An error, described by RFC 9457 Problem Details.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+  schemas:
+    ProblemDetails:
+      type: object
+      description: RFC 9457 problem details. Every error response carries these five members.
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: A URI that identifies the problem type; about:blank when no specific type applies.
+          default: about:blank
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type.
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+          description: The HTTP status code of the response.
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence. It never contains internal details.
+        instance:
+          type: string
+          description: The path of the request that failed.
+    CursorPage:
+      type: object
+      description: Envelope of every cursor-paged list. nextCursor is null on the last page.
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items: {}
+        nextCursor:
+          type:
+            - string
+            - "null"
+    Identifier:
+      type: string
+      format: uuid
+      description: A random RFC 9562 version 4 UUID. Identifiers carry no creation time and no sequence.
+      example: 4f0c7a52-9d1e-4b8a-8e3f-2a6c5d7b9e10
+    HealthStatus:
+      type: object
+      description: Overall status and database readiness. Nothing else is revealed.
+      required:
+        - status
+        - database
+      properties:
+        status:
+          type: string
+          enum:
+            - UP
+            - DOWN
+        database:
+          type: string
+          enum:
+            - UP
+            - DOWN

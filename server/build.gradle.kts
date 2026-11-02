@@ -16,6 +16,7 @@ dependencies {
 
     testImplementation("io.micronaut.test:micronaut-test-junit5")
     testImplementation("io.micronaut:micronaut-http-client")
+    testImplementation(libs.swagger.parser)
 }
 
 application {
