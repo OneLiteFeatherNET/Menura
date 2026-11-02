@@ -2,8 +2,6 @@ package net.onelitefeather.menura.server.problem;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import jakarta.inject.Singleton;
 import net.onelitefeather.menura.core.problem.ProblemDetails;
@@ -21,11 +19,10 @@ public class UnexpectedErrorHandler implements ExceptionHandler<Throwable, HttpR
 
     @Override
     public HttpResponse<ProblemResponse> handle(HttpRequest request, Throwable exception) {
-        LOG.error("Unexpected error while handling {}", request.getPath(), exception);
+        String instance = ProblemResponses.instance(request);
+        LOG.error("Unexpected error while handling {}", instance, exception);
         ProblemDetails details = ProblemDetails.of(500, "Internal Server Error",
-                "An unexpected error occurred.", request.getPath());
-        return HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .contentType(MediaType.of(ProblemDetails.MEDIA_TYPE))
-                .body(ProblemResponse.from(details));
+                "An unexpected error occurred.", instance);
+        return ProblemResponses.of(request, details);
     }
 }

@@ -16,6 +16,10 @@ servers:
 tags:
   - name: Health
     description: Anonymous liveness and readiness.
+  - name: Auth
+    description: Web sign-in through Menura's authorization server (backend-for-frontend session).
+  - name: Calendar
+    description: Calendar feed tokens for read-only calendar subscriptions.
 paths:
   /health:
     get:
@@ -40,7 +44,210 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/login:
+    get:
+      tags:
+        - Auth
+      operationId: startSignIn
+      summary: Starts a web sign-in with Entra ID.
+      description: |
+        Anonymous. Records the sign-in transaction on the server (state, nonce and PKCE verifier, kept as digests or
+        server-side only) and redirects the browser to the Entra ID authorization endpoint. No token is issued here.
+      security: []
+      responses:
+        "302":
+          description: Redirect to Entra ID.
+          headers:
+            Location:
+              description: The Entra ID authorization URL with state, nonce and an S256 code challenge.
+              schema:
+                type: string
+                format: uri
+          content: {}
+        "503":
+          description: Sign-in with Entra ID is not configured.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /auth/callback:
+    get:
+      tags:
+        - Auth
+      operationId: completeSignIn
+      summary: Completes a web sign-in and sets the session cookie.
+      description: |
+        Anonymous, reached through the redirect of Entra ID. The state must belong to a live sign-in transaction, which
+        is used up by this call. On success the server holds the Menura access token and the browser receives only
+        the `__Host-menura-session` cookie: Secure, HttpOnly, SameSite=Strict, Path=/ and no Domain.
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          description: Set by Entra ID when the person refused or the sign-in failed.
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Signed in; redirect to the web app.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+            Set-Cookie:
+              description: The __Host-menura-session cookie.
+              schema:
+                type: string
+          content: {}
+        "400":
+          description: The sign-in is unknown, expired or was already used.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "401":
+          description: Entra ID refused the sign-in or the identity could not be verified.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "403":
+          description: The person holds no Menura role.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "502":
+          description: Entra ID could not be reached or answered incorrectly.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /auth/session:
+    get:
+      tags:
+        - Auth
+      operationId: getSession
+      summary: The signed-in person and their roles.
+      description: |
+        Answers the person of the session cookie. Returns the subject and the Menura roles, never a token. Anonymous
+        callers receive 401; the web app sends them to sign in.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The signed-in person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionView"
+        "401":
+          description: No valid session.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      operationId: endSession
+      summary: Ends the web session on the server and clears the cookie.
+      description: |
+        Anonymous: it works without a session too, and then only clears the cookie.
+      security: []
+      responses:
+        "204":
+          description: The session is gone; the cookie is cleared.
+          headers:
+            Set-Cookie:
+              description: The cleared __Host-menura-session cookie (Max-Age=0).
+              schema:
+                type: string
+          content: {}
+  /calendar-feed-token:
+    post:
+      tags:
+        - Calendar
+      operationId: issueCalendarFeedToken
+      summary: Issue the signed-in person's calendar feed token.
+      description: |
+        Shows a new 256-bit token once. Issuing replaces the person's previous token, which is refused at once. The
+        response is never cached.
+      security:
+        - sessionCookie: []
+      responses:
+        "201":
+          description: The new token. It cannot be shown again.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuedCalendarFeedToken"
+        "401":
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags:
+        - Calendar
+      operationId: revokeCalendarFeedToken
+      summary: Revoke the signed-in person's calendar feed token.
+      security:
+        - sessionCookie: []
+      responses:
+        "204":
+          description: The token is revoked; calendar clients using it are refused from now on.
+        "401":
+          $ref: "#/components/responses/Problem"
+  /calendar/feed/{token}:
+    get:
+      tags:
+        - Calendar
+      operationId: getCalendarFeed
+      summary: The calendar feed of a token holder, as iCalendar.
+      description: |
+        Read-only. The token in the path is the credential, so the route needs no session. Unknown, revoked and rotated
+        tokens are refused. The body is a placeholder until the iCalendar change lands.
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: The calendar feed token shown once when it was issued.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The calendar feed.
+          content:
+            text/calendar:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Problem"
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-menura-session
+      description: The web session cookie set by the sign-in. Its value is an opaque secret, never a token.
   parameters:
     Limit:
       name: limit
@@ -115,6 +322,15 @@ components:
       format: uuid
       description: A random RFC 9562 version 4 UUID. Identifiers carry no creation time and no sequence.
       example: 4f0c7a52-9d1e-4b8a-8e3f-2a6c5d7b9e10
+    IssuedCalendarFeedToken:
+      type: object
+      description: A calendar feed token, shown once. The server keeps only its hash.
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: The token as "<identifier>.<secret>"; the secret is 256 random bits.
     HealthStatus:
       type: object
       description: Overall status and database readiness. Nothing else is revealed.
@@ -132,3 +348,23 @@ components:
           enum:
             - UP
             - DOWN
+    SessionView:
+      type: object
+      description: The signed-in person. Carries no token; roles are the Menura roles the person holds.
+      required:
+        - subject
+        - roles
+      properties:
+        subject:
+          type: string
+          description: The stable subject of the person, as issued by the authorization server.
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+              - VIEWER
+              - EDITOR
+              - PUBLISHER
+              - OPERATOR
+              - ADMIN

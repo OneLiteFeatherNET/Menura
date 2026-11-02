@@ -2,8 +2,6 @@ package net.onelitefeather.menura.server.problem;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import jakarta.inject.Singleton;
 import net.onelitefeather.menura.core.problem.ProblemDetails;
@@ -15,9 +13,7 @@ public class ProblemExceptionHandler implements ExceptionHandler<ProblemExceptio
 
     @Override
     public HttpResponse<ProblemResponse> handle(HttpRequest request, ProblemException exception) {
-        ProblemDetails details = exception.toDetails(request.getPath());
-        return HttpResponse.status(HttpStatus.valueOf(details.status()))
-                .contentType(MediaType.of(ProblemDetails.MEDIA_TYPE))
-                .body(ProblemResponse.from(details));
+        ProblemDetails details = exception.toDetails(ProblemResponses.instance(request));
+        return ProblemResponses.of(request, details);
     }
 }
