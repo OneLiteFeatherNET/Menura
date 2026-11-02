@@ -1,0 +1,25 @@
+# Build context of the web image (the repository root). The server and jobs contexts are prepared by Gradle
+# under build/ and have their own, so this file does not apply to them.
+# Version control and CI configuration.
+.git
+.github
+
+# Local tooling and agent state.
+.claude
+.idea
+*.iml
+.DS_Store
+
+# Build output and dependencies, rebuilt inside the images.
+.gradle
+**/build
+**/node_modules
+web/dist
+web/coverage
+
+# Documentation, specs and components that no image contains.
+docs
+openspec
+desktop
+obs-plugin
+overlay

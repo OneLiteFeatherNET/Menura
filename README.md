@@ -111,8 +111,38 @@ deploy/check-helm.sh
 
 `check-compose.sh` parses `docker-compose.yml` and asserts pinned image tags and PostgreSQL 17.
 `check-helm.sh` lints the Helm chart in `deploy/helm/menura`, renders it, and asserts the three
-public hosts, the database settings, the migrate hook and the probes. Neither script needs a
-running cluster or stack.
+public hosts, the database settings, the migrate hook and the probes. `check-images.sh` asserts
+that the Dockerfile of each image exists (server's is generated, so run the Gradle prepare step
+first), pins every base image to a tag other than `latest`, and ends in a non-root `USER`. None of the scripts needs a running cluster or stack.
+
+### Container images
+
+The server and jobs images are built in two steps. Gradle prepares a Docker build context on the
+host, and `docker build` builds that context. Gradle never runs inside `docker build`, so the image
+build needs no network access to Gradle's distribution or to Maven.
+
+```sh
+# 1. Gradle prepares the contexts.
+./gradlew :server:buildLayers :server:dockerfile :jobs:installDist
+
+# 2. docker builds them.
+docker build -t menura/server server/build/docker/main
+docker build -f jobs/Dockerfile -t menura/jobs jobs/build/install/jobs
+docker build -f web/Dockerfile -t menura/web .
+```
+
+- `server`: Gradle writes `server/build/docker/main/` (the Micronaut `dockerfile` task). The base
+  is pinned to `eclipse-temurin:25.0.5_8-jre-noble` in `server/build.gradle.kts`. The image runs
+  the Micronaut server on port 8080 as uid 10001, with the JVM as the main process (exec form).
+- `jobs`: `jobs/Dockerfile` copies `build/install/jobs` (the start script and the jars) onto the
+  same pinned base, as uid 10001. `jobs` is on the PATH, so `docker run --rm menura/jobs run ping`
+  runs the same entry point as the Helm migrate hook (`jobs run migrate`).
+- `web`: a multi-stage build. Node 26 and the pnpm version of `packageManager` build `web/dist`,
+  and unprivileged nginx on port 8080 serves it with a fallback to `index.html`. Its context is
+  the repository root, so it is built in one step.
+
+The chart deploys these images from `harbor.onelitefeather.dev/menura/{server,jobs,web}`. The
+CI change that builds and pushes them is separate and reuses the two steps above.
 
 ### OpenSpec
 
