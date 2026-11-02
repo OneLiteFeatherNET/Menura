@@ -11,7 +11,8 @@ dependencies {
     implementation("io.micronaut.serde:micronaut-serde-jackson")
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
     runtimeOnly(libs.postgresql)
-    runtimeOnly("ch.qos.logback:logback-classic")
+    // Compile-time too: the log redaction converter extends the logback pattern API.
+    implementation("ch.qos.logback:logback-classic")
     runtimeOnly("org.yaml:snakeyaml")
 
     testImplementation("io.micronaut.test:micronaut-test-junit5")

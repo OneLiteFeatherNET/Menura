@@ -1,0 +1,15 @@
+<configuration>
+    <!-- %redact(...) passes the enclosed text through LogRedaction, so no session cookie, Authorization header,
+         feed or scene token and no token-bearing query value reaches the log (principle 11). -->
+    <conversionRule conversionWord="redact" converterClass="net.onelitefeather.menura.server.logging.RedactingConverter"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %redact(%msg%n%ex)%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
