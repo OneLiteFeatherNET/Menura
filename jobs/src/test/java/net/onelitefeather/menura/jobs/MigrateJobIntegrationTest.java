@@ -25,8 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Testcontainers
 class MigrateJobIntegrationTest {
 
+    // The role and database names are the production ones (the compose stack uses them too). Flyway's history
+    // table follows the role's schema search path, so a role named like the baseline schema must not change where
+    // the history is read from.
     @Container
-    PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:17.11"));
+    PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:17.11"))
+            .withDatabaseName("menura")
+            .withUsername("menura")
+            .withPassword("menura");
 
     @Test
     void migrateJobCreatesTheMenuraSchemaInAnEmptyDatabase() throws SQLException {
@@ -40,12 +46,12 @@ class MigrateJobIntegrationTest {
     @Test
     void secondMigrateRunChangesNothing() throws SQLException {
         assertEquals(JobDispatcher.EXIT_OK, runMigrate(), "the first run must succeed");
-        int historyAfterFirstRun = scalar("select count(*) from flyway_schema_history");
+        int historyAfterFirstRun = scalar("select count(*) from public.flyway_schema_history");
 
         int exitCode = runMigrate();
 
         assertEquals(JobDispatcher.EXIT_OK, exitCode, "a second run must also exit 0");
-        assertEquals(historyAfterFirstRun, scalar("select count(*) from flyway_schema_history"),
+        assertEquals(historyAfterFirstRun, scalar("select count(*) from public.flyway_schema_history"),
                 "a second run must not apply any migration again");
     }
 
