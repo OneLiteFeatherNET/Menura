@@ -6,7 +6,12 @@
 #     the API and MCP endpoint),
 #   - the migrate Helm hook runs `jobs run migrate`,
 #   - the server, jobs and migrate pods get MENURA_DB_URL (not DATASOURCES_*),
-#   - the server liveness probe is a TCP check and readiness is /health.
+#   - the server liveness probe is a TCP check and readiness is /health,
+#   - every route sets HSTS, Referrer-Policy no-referrer and nosniff,
+#   - the rate limits: per IP and per Authorization token, local, per minute, with a 429 answer as Problem
+#     Details and Retry-After,
+#   - TLS 1.3 only on the gateway listener (ClientTrafficPolicy), client address from CF-Connecting-IP,
+#   - credentialed CORS only for https://menura.onelitefeather.net, only on the API route, and no wildcard.
 # Requires: helm (v3), yq (mikefarah v4), jq is not needed.
 set -euo pipefail
 
@@ -104,6 +109,96 @@ if [[ "$liveness_tcp_port" != "http" || -n "$liveness_http_path" ]]; then
 fi
 if [[ "$readiness_http_path" != "/health" ]]; then
   report "the server readiness probe must be httpGet /health (found '$readiness_http_path')"
+fi
+
+# Edge policies on the shared Envoy Gateway (principles 11 and 14). The gateway itself belongs to the cluster
+# repository; the chart renders the policies that attach to its routes and to its https listener.
+count_kind() {
+  yq -N "select(.kind == \"$1\") | .kind" "$rendered" | grep -c . || true
+}
+
+# Security response headers: every route sends HSTS, no referrer and nosniff, the web route included because
+# the static web pod does not pass through the server's filter.
+expected_headers="$(for route in api mcp web; do
+  printf '%s\n' \
+    "$release-$route Referrer-Policy no-referrer" \
+    "$release-$route Strict-Transport-Security max-age=31536000" \
+    "$release-$route X-Content-Type-Options nosniff"
+done | sort)"
+actual_headers="$(yq -N 'select(.kind == "HTTPRoute") | .metadata.name as $r | .spec.rules[].filters[]? | select(.type == "ResponseHeaderModifier") | .responseHeaderModifier.set[] | $r + " " + .name + " " + .value' "$rendered" | sort)"
+if [[ "$actual_headers" != "$expected_headers" ]]; then
+  report "the HTTPRoutes must set exactly the three security response headers on every route"
+  echo "expected:" >&2
+  echo "$expected_headers" >&2
+  echo "actual:" >&2
+  echo "$actual_headers" >&2
+fi
+
+# Rate limits per IP (IPv4 and IPv6 as separate Distinct rules) on every route, and per Authorization token on the
+# API and the MCP endpoint. Every budget is per minute with at least one request.
+expected_limits="$(printf '%s\n' \
+  "$release-api header Distinct Authorization" \
+  "$release-api ip Distinct 0.0.0.0/0" \
+  "$release-api ip Distinct ::/0" \
+  "$release-mcp header Distinct Authorization" \
+  "$release-mcp ip Distinct 0.0.0.0/0" \
+  "$release-mcp ip Distinct ::/0" \
+  "$release-web ip Distinct 0.0.0.0/0" \
+  "$release-web ip Distinct ::/0" | sort)"
+actual_limits="$({
+  yq -N 'select(.kind == "BackendTrafficPolicy") | .spec.targetRefs[0].name as $t | .spec.rateLimit.local.rules[].clientSelectors[] | select(.sourceCIDR != null) | $t + " ip " + .sourceCIDR.type + " " + .sourceCIDR.value' "$rendered"
+  yq -N 'select(.kind == "BackendTrafficPolicy") | .spec.targetRefs[0].name as $t | .spec.rateLimit.local.rules[].clientSelectors[] | select(.headers != null) | .headers[] | $t + " header " + .type + " " + .name' "$rendered"
+} | sort)"
+if [[ "$actual_limits" != "$expected_limits" ]]; then
+  report "the rate limits differ from the per-IP and per-client selectors of the routes"
+  echo "expected:" >&2
+  echo "$expected_limits" >&2
+  echo "actual:" >&2
+  echo "$actual_limits" >&2
+fi
+if [[ "$(count_kind BackendTrafficPolicy)" -ne 3 ]]; then
+  report "expected exactly 3 BackendTrafficPolicy resources, one per route"
+fi
+if yq -N 'select(.kind == "BackendTrafficPolicy") | select(.spec.rateLimit.type != "Local")' "$rendered" | grep -q .; then
+  report "the rate limits must be Envoy Gateway local rate limits (no rate limit service runs in the cluster)"
+fi
+if yq -N 'select(.kind == "BackendTrafficPolicy") | .spec.rateLimit.local.rules[].limit | select(.unit != "Minute" or .requests < 1)' "$rendered" | grep -q .; then
+  report "every rate limit must be per minute with at least one request"
+fi
+# The gateway's own 429 answers Problem Details with Retry-After (principle 11), on every route.
+override_summary="$(yq -N 'select(.kind == "BackendTrafficPolicy") | .spec.responseOverride[0] | .match.statusCodes[0].value | tostring' "$rendered" | sort -u)"
+if [[ "$override_summary" != "429" || "$(yq -N 'select(.kind == "BackendTrafficPolicy") | .spec.responseOverride[0].response | select(.contentType == "application/problem+json" and .header.set[0].name == "Retry-After" and .header.set[0].value != null) | .contentType' "$rendered" | grep -c . || true)" -ne 3 ]]; then
+  report "every rate-limit policy must answer 429 as application/problem+json with a Retry-After header"
+fi
+
+# TLS 1.3 only on the shared https listener, with the client address taken from the Cloudflare header.
+gateway_namespace="$(yq -r '.gateway.parentRefs[0].namespace' "$chart/values.yaml")"
+gateway_name="$(yq -r '.gateway.parentRefs[0].name' "$chart/values.yaml")"
+gateway_listener="$(yq -r '.gateway.parentRefs[0].sectionName' "$chart/values.yaml")"
+if [[ "$(count_kind ClientTrafficPolicy)" -ne 1 ]]; then
+  report "expected exactly 1 ClientTrafficPolicy (TLS 1.3 on the gateway listener)"
+fi
+client_policy="$(yq -N 'select(.kind == "ClientTrafficPolicy") | .metadata.namespace + " " + .spec.targetRefs[0].kind + " " + .spec.targetRefs[0].name + " " + .spec.targetRefs[0].sectionName + " " + .spec.tls.minVersion + " " + .spec.tls.maxVersion + " " + .spec.clientIPDetection.customHeader.name' "$rendered")"
+expected_client_policy="$gateway_namespace Gateway $gateway_name $gateway_listener 1.3 1.3 CF-Connecting-IP"
+if [[ "$client_policy" != "$expected_client_policy" ]]; then
+  report "the ClientTrafficPolicy must allow only TLS 1.3 on the gateway listener and read CF-Connecting-IP"
+  echo "expected: $expected_client_policy" >&2
+  echo "actual:   $client_policy" >&2
+fi
+
+# Credentialed CORS only for the web app host, and only on the API route.
+if [[ "$(count_kind SecurityPolicy)" -ne 1 ]]; then
+  report "expected exactly 1 SecurityPolicy (the credentialed CORS of the API)"
+fi
+cors_policy="$(yq -N 'select(.kind == "SecurityPolicy") | .spec.targetRefs[0].name + " " + (.spec.cors.allowOrigins | join(",")) + " " + (.spec.cors.allowCredentials | tostring)' "$rendered")"
+expected_cors_policy="$release-api https://menura.onelitefeather.net true"
+if [[ "$cors_policy" != "$expected_cors_policy" ]]; then
+  report "the CORS SecurityPolicy must allow credentials from the web app host only, on the API route"
+  echo "expected: $expected_cors_policy" >&2
+  echo "actual:   $cors_policy" >&2
+fi
+if grep -qE '(^|[^A-Za-z0-9_.*/-])\*([^A-Za-z0-9_.*/-]|$)' "$rendered"; then
+  report "no edge policy may use a wildcard"
 fi
 
 # Nothing outside the three public hosts may appear as a host in the rendered chart.

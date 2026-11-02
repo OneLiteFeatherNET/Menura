@@ -1,0 +1,123 @@
+{{- $name := include "menura.fullname" . -}}
+{{- $gateway := first .Values.gateway.parentRefs -}}
+{{- /*
+TLS 1.3 only on the shared https listener. Envoy Gateway requires a policy to live in the namespace of the
+Gateway it targets, so this one is rendered into the gateway namespace, not the release namespace. It applies to
+every host on that listener (see README.md, "Edge policies").
+*/ -}}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: {{ $name }}-edge-tls
+  namespace: {{ $gateway.namespace }}
+  labels:
+    {{- include "menura.componentLabels" (dict "root" $ "component" "edge") | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ $gateway.name }}
+      sectionName: {{ $gateway.sectionName }}
+  clientIPDetection:
+    customHeader:
+      name: {{ $.Values.edge.clientIPHeader }}
+  tls:
+    minVersion: "1.3"
+    maxVersion: "1.3"
+{{- range $route, $cfg := .Values.routes }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ $name }}-{{ $route }}-ratelimit
+  labels:
+    {{- include "menura.componentLabels" (dict "root" $ "component" $route) | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ $name }}-{{ $route }}
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        # One Distinct rule per address family: every client address gets its own budget.
+        - clientSelectors:
+            - sourceCIDR:
+                type: Distinct
+                value: "0.0.0.0/0"
+          limit:
+            requests: {{ $cfg.rateLimit.perIPPerMinute }}
+            unit: Minute
+        - clientSelectors:
+            - sourceCIDR:
+                type: Distinct
+                value: "::/0"
+          limit:
+            requests: {{ $cfg.rateLimit.perIPPerMinute }}
+            unit: Minute
+        {{- if $cfg.rateLimit.perClientPerMinute }}
+        # One budget per Authorization token: the client of the API and of the MCP endpoint.
+        - clientSelectors:
+            - headers:
+                - name: Authorization
+                  type: Distinct
+          limit:
+            requests: {{ $cfg.rateLimit.perClientPerMinute }}
+            unit: Minute
+        {{- end }}
+  # Envoy's own refusal (plain text) becomes Problem Details with Retry-After. The server's refusals of the person
+  # budget already carry their own Problem Details and Retry-After, and do not match this rule.
+  responseOverride:
+    - match:
+        statusCodes:
+          - type: Value
+            value: 429
+        responseHeaders:
+          - name: content-type
+            type: Exact
+            value: text/plain
+      response:
+        contentType: application/problem+json
+        body:
+          type: Inline
+          inline: '{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"The request rate of this client is over its limit."}'
+        header:
+          set:
+            - name: Retry-After
+              value: "60"
+{{- if $cfg.cors }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: {{ $name }}-{{ $route }}-cors
+  labels:
+    {{- include "menura.componentLabels" (dict "root" $ "component" $route) | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ $name }}-{{ $route }}
+  cors:
+    allowOrigins:
+      {{- toYaml $.Values.edge.corsAllowOrigins | nindent 6 }}
+    allowMethods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    allowHeaders:
+      - Content-Type
+      - Accept
+      - If-Match
+    exposeHeaders:
+      - ETag
+      - Location
+      - Retry-After
+    allowCredentials: true
+{{- end }}
+{{- end }}
