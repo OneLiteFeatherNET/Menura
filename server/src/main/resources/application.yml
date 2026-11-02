@@ -1,0 +1,16 @@
+micronaut:
+  application:
+    name: menura-server
+
+# Every value comes from an environment variable with a local-development default that points at the
+# docker-compose services. The same names and defaults are used by the jobs (see core MenuraSettings).
+datasources:
+  default:
+    url: ${MENURA_DB_URL:`jdbc:postgresql://localhost:5432/menura`}
+    username: ${MENURA_DB_USER:`menura`}
+    password: ${MENURA_DB_PASSWORD:`menura`}
+    driver-class-name: org.postgresql.Driver
+    # The server starts without a reachable database and reports it through /health (readiness down)
+    # instead of crash-looping; a probe waits at most two seconds for a connection.
+    initialization-fail-timeout: -1
+    connection-timeout: 2000
