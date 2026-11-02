@@ -1,0 +1,23 @@
+[versions]
+# Micronaut 5.0.2 and its platform (Quelea uses the same versions).
+micronaut = "5.0.2"
+flyway = "12.6.1"
+postgresql = "42.7.14"
+junit = "6.0.3"
+testcontainers = "2.0.5"
+swagger-parser = "2.1.48"
+
+[libraries]
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+swagger-parser = { module = "io.swagger.parser.v3:swagger-parser", version.ref = "swagger-parser" }
+
+[plugins]
+micronaut-application = { id = "io.micronaut.application", version.ref = "micronaut" }

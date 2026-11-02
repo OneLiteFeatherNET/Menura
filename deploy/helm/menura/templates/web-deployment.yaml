@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "menura.fullname" . }}-web
+  labels:
+    {{- include "menura.componentLabels" (dict "root" . "component" "web") | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "menura.componentSelectorLabels" (dict "root" . "component" "web") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "menura.componentLabels" (dict "root" . "component" "web") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- include "menura.podSecurity" . | nindent 6 }}
+      containers:
+        - name: web
+          image: {{ include "menura.image" (dict "root" . "component" "web") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.web.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.httpPort }}
+              protocol: TCP
+          {{- with .Values.web.env }}
+          env:
+            {{- range $name, $value := . }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          {{- include "menura.containerSecurity" . | nindent 10 }}
+          # Static files only: the page is served from the index, no API call is made here.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          {{- with .Values.web.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

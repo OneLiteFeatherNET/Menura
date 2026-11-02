@@ -1,0 +1,23 @@
+### Gradle ###
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+out/
+
+### Environment ###
+.env
+
+### Claude Code ###
+.claude/worktrees/
+
+### Web ###
+node_modules/
+web/dist/
+web/coverage/
+
+### macOS ###
+.DS_Store

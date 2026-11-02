@@ -1,0 +1,99 @@
+# Local development stack for Menura: PostgreSQL 17 for metadata and an
+# S3-compatible Garage node for media, with a private development bucket
+# created at start.
+#
+# No password is needed locally. PostgreSQL trusts local connections, and its
+# port is bound to 127.0.0.1 only. This is local-dev only: never use this
+# file, or trust authentication, for anything reachable from a network.
+#
+# The Garage secrets (RPC secret, admin token and development S3 key) are
+# generated once, at first start, into the garage-secrets volume by
+# deploy/dev/garage-secrets.sh. Nothing secret is committed here.
+#
+# Image tags are pinned; `latest` is never used (deploy/check-compose.sh).
+
+services:
+  postgres:
+    image: postgres:17.11
+    environment:
+      POSTGRES_DB: menura
+      POSTGRES_USER: menura
+      # Local-dev only: trust authentication for every connection (no password). The port is
+      # bound to 127.0.0.1 below, and deploy/check-compose.sh fails if that binding changes.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U menura -d menura"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  # One-shot: creates the development secrets in the garage-secrets volume when they are missing.
+  # Existing values are kept, so re-running it changes nothing. It runs as root because the
+  # volume is created root-owned.
+  garage-secrets:
+    image: curlimages/curl:8.23.0
+    user: "0:0"
+    entrypoint: ["sh", "/init/garage-secrets.sh"]
+    volumes:
+      - ./deploy/dev/garage-secrets.sh:/init/garage-secrets.sh:ro
+      - garage-secrets:/run/secrets/garage
+    restart: "no"
+
+  garage:
+    image: dxflrs/garage:v2.5.0
+    command: ["/garage", "-c", "/etc/garage.toml", "server"]
+    depends_on:
+      garage-secrets:
+        condition: service_completed_successfully
+    environment:
+      GARAGE_RPC_SECRET_FILE: /run/secrets/garage/rpc_secret
+      GARAGE_ADMIN_TOKEN_FILE: /run/secrets/garage/admin_token
+    ports:
+      - "127.0.0.1:3900:3900"
+    volumes:
+      - ./deploy/dev/garage.toml:/etc/garage.toml:ro
+      - garage-secrets:/run/secrets/garage:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    # The image has no shell or curl; `garage status` talks to the local node.
+    healthcheck:
+      test: ["CMD", "/garage", "-c", "/etc/garage.toml", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  garage-init:
+    image: curlimages/curl:8.23.0
+    # Runs as root to read the root-owned secrets volume.
+    user: "0:0"
+    entrypoint: ["sh", "/init/garage-init.sh"]
+    depends_on:
+      garage:
+        condition: service_healthy
+    environment:
+      GARAGE_ADMIN_URL: http://garage:3903
+      GARAGE_BUCKET: menura-dev
+      GARAGE_SECRETS_DIR: /run/secrets/garage
+    volumes:
+      - ./deploy/dev/garage-init.sh:/init/garage-init.sh:ro
+      - garage-secrets:/run/secrets/garage:ro
+    # Healthy once the bucket and the development key exist; a failed bootstrap exits the container.
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/garage-bootstrap-done"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 2s
+    restart: "no"
+
+volumes:
+  postgres-data:
+  garage-secrets:
+  garage-meta:
+  garage-data:
