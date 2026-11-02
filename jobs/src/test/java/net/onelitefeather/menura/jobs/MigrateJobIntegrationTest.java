@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class MigrateJobIntegrationTest {
 
     @Container
-    PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
+    PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:17.11"));
 
     @Test
     void migrateJobCreatesTheMenuraSchemaInAnEmptyDatabase() throws SQLException {
