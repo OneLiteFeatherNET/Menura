@@ -75,6 +75,15 @@ context: |
   12. Setup is one signed installer per OS (Windows, macOS, Linux) for the OBS plugin and one for
      the desktop app, with signed auto-update; first start signs in and checks the toolchain, and
      anything to download needs one click of consent, never a silent install.
+  13. Platforms are integrated natively: every channel talks to the platform's official API through
+     its own adapter (first stage: YouTube, Twitch, TikTok, Instagram); no third-party aggregator
+     (Buffer, Ayrshare, Postiz or similar) sits between Menura and a platform. Accounts are connected
+     through the platform's own OAuth consent in the web app, never by pasting credentials; Menura
+     requests the minimal scopes, refreshes tokens, detects expired or revoked connections and shows
+     them. Each adapter exposes the platform's own features (e.g. YouTube chapters, playlists and
+     scheduled publishing; Twitch VOD/clip import and stream schedule; TikTok privacy options;
+     Instagram Reels) and its native analytics; platform quotas, audits and rate limits are respected
+     and visible.
 
   Commits and PR titles follow Conventional Commits (release-please).
 
