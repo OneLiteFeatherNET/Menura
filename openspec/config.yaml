@@ -93,6 +93,10 @@ context: |
      - s3.onelitefeather.net: shared Ceph RGW; clients only ever receive presigned URLs for it.
      Cross-origin requests to the API are allowed only from the web app host; cookies are host-only
      (__Host-) on the API host; no other origin, wildcard or credentialed CORS is allowed.
+  15. All public hosts sit behind the Cloudflare proxy: request bodies stay below 100 MB (upload parts
+     of at most 95 MB), and every SSE or MCP stream sends a heartbeat at least every 30 seconds so the
+     proxy never closes it as idle. Serving large amounts of video through the proxy needs a check
+     against Cloudflare's terms before it is relied on.
 
   Commits and PR titles follow Conventional Commits (release-please).
 
