@@ -11,5 +11,13 @@ out/
 ### Environment ###
 .env
 
+### Claude Code ###
+.claude/worktrees/
+
+### Web ###
+node_modules/
+web/dist/
+web/coverage/
+
 ### macOS ###
 .DS_Store
