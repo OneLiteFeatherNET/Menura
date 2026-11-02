@@ -1,6 +1,27 @@
 micronaut:
   application:
     name: menura-server
+  server:
+    # Credentialed cross-origin requests only from the web app host (principle 14). Local development overrides
+    # MENURA_WEB_ORIGIN with the Vite dev server origin. The gateway enforces the same rule (deploy/helm/menura).
+    cors:
+      enabled: true
+      configurations:
+        web:
+          allowed-origins:
+            - ${MENURA_WEB_ORIGIN:`https://menura.onelitefeather.net`}
+          allow-credentials: true
+          allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          allowed-headers: [Content-Type, Accept, If-Match]
+          exposed-headers: [ETag, Location, Retry-After]
+          max-age: 600
+
+# Person budget of the server (see PersonRateLimiter). Anonymous requests are limited per IP at the gateway.
+menura:
+  ratelimit:
+    person:
+      requests: 600
+      window-seconds: 60
 
 # Every value comes from an environment variable with a local-development default that points at the
 # docker-compose services. The same names and defaults are used by the jobs (see core MenuraSettings).
