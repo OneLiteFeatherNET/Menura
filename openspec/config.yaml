@@ -1,0 +1,93 @@
+schema: spec-driven
+
+# Project context: the architecture and product principles of Menura. A proposal, spec, design or
+# task list must not contradict these. Changing a principle is itself an OpenSpec change that edits
+# this block and says why.
+context: |
+  Menura is the content and stream tooling of OneLiteFeather. The cluster is the shared hub: it
+  stores and indexes content (recordings, transcripts, clips, finished assets), owns the marketing
+  organisation (brand kit with colour palette, fonts, logos and layout templates; channels; the
+  distribution calendar), distributes approved content centrally to external platforms, analyses
+  how published content performs, manages the modular stream overlay, and exposes all of it over
+  MCP, including the editing playbook (rules, required local toolchain, workflow prompts) that lets
+  any team member simply tell Claude Code or Claude Desktop to cut content. Video editing does NOT
+  happen on the cluster: transcription, cutting and rendering run only on team PCs with a GPU, which
+  claim media jobs from the hub's job queue (also for recordings made on PCs without a GPU), work
+  through the desktop app's local MCP server (ffmpeg) with source media and brand kit from the hub,
+  and upload every result (clips, finished assets, timelines, transcripts) back. From there content
+  is scheduled, optimised and published only through the hub, by small Kubernetes jobs. Overlays,
+  brand and design are central: the OBS plugin pulls them from the hub, so a central change reaches
+  every streamer at once, while each person may keep an individual variant of the OLF standard.
+
+  Components (one repository, released together through release-please):
+  - server: Micronaut 5, Java 25, Gradle. REST API (OpenAPI), backend-for-frontend for the web app,
+    OAuth authorization server (Entra ID as upstream identity provider), MCP endpoint (Streamable
+    HTTP), Server-Sent-Events feeds, media job queue, iCalendar feeds. Runs on the OLF Kubernetes
+    cluster, deployed by Helm chart via Flux. It never transcodes or renders video.
+  - jobs: Java 25 Kubernetes CronJobs/Jobs from the same codebase for distribution to channels,
+    analytics collection and rollups, and retention.
+  - web: Vue 3 + TypeScript single-page app (Material Design 3), served separately from the server:
+    library, brand kit, layouts, distribution calendar and approval, overlay management.
+  - desktop: Tauri 2 app (Rust core, Vue 3 UI shared with web), installed only on PCs with a usable
+    GPU (NVIDIA, AMD, Intel or Apple Silicon): claims media jobs, transcribes with a whisper model,
+    and runs a local MCP server (stdio) through which Claude edits and renders video with ffmpeg.
+  - obs-plugin: native OBS Studio plugin (C++, libobs) for Windows, macOS and Linux, installed on
+    every streaming PC: own sign-in, uploads finished recordings, keeps the central overlay scenes,
+    brand and per-person profile in sync inside OBS, and relays Claude Code hook events.
+  - overlay: Vue 3 browser-source scenes and modules for OBS, fed by the server's SSE feeds.
+
+  Principles (non-negotiable unless a change explicitly amends this block):
+  1. Media lives in S3-compatible object storage (MinIO on the cluster); metadata, transcripts and
+     the search index live in PostgreSQL (the OLF CloudNativePG cluster, PostgreSQL 17, no
+     extensions beyond its standard image); analytics metric points live there too, in time-
+     partitioned tables with precomputed rollups. No further database. Uploads are resumable (S3 multipart, presigned URLs);
+     the server never proxies media bytes.
+  2. Compute-heavy media work (transcription, cutting, rendering) runs only in the desktop app on
+     PCs with a GPU; the cluster needs no GPU and runs no ffmpeg. The cluster does what need not be local: storage,
+     index, brand kit, layouts, distribution, overlay, MCP.
+  3. Every client (web, overlay, desktop, OBS plugin) holds its own SSE stream; no relay through OBS, chat bots
+     or Minecraft plugin messaging. After a reconnect a client resynchronises by reading state.
+  4. Nothing leaves OLF without a human: AI agents (MCP) may search, draft, cut and propose
+     schedules, but publishing to an external platform requires an explicit approval by a person.
+  5. Privacy by default: agent-activity events carry no prompt text, file contents or paths
+     outside an allowlist of project roots; overlays never show unapproved private data.
+  6. People sign in with Entra ID through Menura's own OAuth authorization server. Desktop app and
+     OBS plugin each sign in via authorization code + PKCE with loopback redirect (RFC 8252,
+     RFC 7636), keep tokens in the OS keychain and bind them to the device (DPoP, RFC 9449). The web
+     app is a backend-for-frontend: the browser holds only a __Host- session cookie, never a token.
+     MCP clients follow the MCP authorization spec (RFC 9728, RFC 8414, RFC 8707). Only health and
+     API docs are anonymous.
+  7. Errors are RFC 9457 Problem Details. OpenTelemetry traces and metrics over OTLP, JSON logs
+     with trace ids; errors also go to Sentry without personal data.
+  8. Config is env-var driven with local-dev defaults.
+  9. Tests follow F.I.R.S.T.: injected java.time.Clock, in-memory fakes in unit tests, Testcontainers
+     only in tests tagged `integration`, no sleeps.
+  10. The lab prototypes `content-pipeline` (Python: transcription, timeline, 9:16 shorts, output
+      profiles, editing rules, upload schedule) and its `overlay` (Vue 3 scenes, live state daemon,
+      Claude Code hook with privacy filter) are the reference for domain rules; Menura replaces them.
+  11. Standards first, so nothing leaks and nothing can be brute-forced: TLS 1.3 (RFC 8446,
+     RFC 9325), HSTS (RFC 6797), HTTP semantics (RFC 9110), OAuth security BCP (RFC 9700), JWT BCP
+     (RFC 8725), token revocation (RFC 7009), 429 + Retry-After (RFC 6585) with rate limits in Envoy
+     Gateway per IP, person and client; secrets are 256-bit CSPRNG values stored hashed and compared
+     in constant time; objects a caller may not see answer 404; ids are non-sequential (RFC 9562);
+     secrets never appear in logs, traces, Sentry or API/MCP output; nothing on a PC listens on a
+     network port (stdio and OS-permissioned local IPC only).
+  12. Setup is one signed installer per OS (Windows, macOS, Linux) for the OBS plugin and one for
+     the desktop app, with signed auto-update; first start signs in and checks the toolchain, and
+     anything to download needs one click of consent, never a silent install.
+
+  Commits and PR titles follow Conventional Commits (release-please).
+
+rules:
+  proposal:
+    - Name the Conventional Commits type and scope the change ships under; a change mixing types is two changes.
+    - State which strand the change belongs to (content, overlay or platform) and which changes it depends on.
+  specs:
+    - Write requirements in EARS form (Ubiquitous / When / While / If-then / Where) with SHALL and Given/When/Then scenarios.
+    - Mark each requirement with a MoSCoW priority (Must, Should, Could) in its first sentence.
+  design:
+    - Record rejected alternatives.
+  tasks:
+    - Test tasks come before the production code they cover (red, then green).
+    - The last task opens the code pull request under the proposal's Conventional Commits title.
+    - Checkboxes are ticked in a follow-up pull request, never in the code pull request.
