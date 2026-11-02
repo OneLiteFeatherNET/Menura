@@ -78,10 +78,10 @@ Without Docker, skip the integration tests:
 ./gradlew test -PexcludeTags=integration
 ```
 
-Run only the integration tests:
+Run only the integration tests, which are in the `jobs` module today:
 
 ```sh
-./gradlew test --tests '*IntegrationTest'
+./gradlew :jobs:test --tests '*IntegrationTest'
 ```
 
 ### Web app
@@ -92,7 +92,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The Vite dev server listens on `http://localhost:5173`. The theme tokens are generated from
+The Vite dev server starts on `http://localhost:5173`, or on the next free port, and prints the URL it uses. The theme tokens are generated from
 `web/src/theme/seed.json` with `pnpm generate:theme`. The web checks are:
 
 ```sh
