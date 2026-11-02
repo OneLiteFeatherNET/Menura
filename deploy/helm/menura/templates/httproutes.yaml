@@ -1,0 +1,23 @@
+{{- $name := include "menura.fullname" . -}}
+{{- range $route, $cfg := .Values.routes }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $name }}-{{ $route }}
+  labels:
+    {{- include "menura.componentLabels" (dict "root" $ "component" $route) | nindent 4 }}
+spec:
+  parentRefs:
+    {{- toYaml $.Values.gateway.parentRefs | nindent 4 }}
+  hostnames:
+    - {{ $cfg.hostname | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ $name }}-{{ $cfg.service }}
+          port: {{ $.Values.httpPort }}
+{{- end }}

@@ -1,0 +1,19 @@
+{{- $name := include "menura.fullname" . -}}
+{{- range $component := list "server" "web" "jobs" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-{{ $component }}
+  labels:
+    {{- include "menura.componentLabels" (dict "root" $ "component" $component) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "menura.componentSelectorLabels" (dict "root" $ "component" $component) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $.Values.httpPort }}
+      targetPort: http
+      protocol: TCP
+{{- end }}

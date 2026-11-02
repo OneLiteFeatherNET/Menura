@@ -1,0 +1,66 @@
+# Local development stack for Menura: PostgreSQL 17 for metadata and an
+# S3-compatible Garage node for media, with a private development bucket
+# created at start. Every password, token and key below is a public
+# development value; none of them is used outside this file.
+#
+# Image tags are pinned; `latest` is never used (deploy/check-compose.sh).
+
+services:
+  postgres:
+    image: postgres:17.11
+    environment:
+      POSTGRES_DB: menura
+      POSTGRES_USER: menura
+      POSTGRES_PASSWORD: menura-dev
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U menura -d menura"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  garage:
+    image: dxflrs/garage:v2.5.0
+    command: ["/garage", "-c", "/etc/garage.toml", "server"]
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:-3f1c9a7e5b2d4f60817a93c4e2d5b6f7a8c9d0e1f2a3b4c5d6e7f8091a2b3c4d}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:-menura-dev-admin-token}
+    ports:
+      - "127.0.0.1:3900:3900"
+    volumes:
+      - ./deploy/dev/garage.toml:/etc/garage.toml:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    # The image has no shell or curl; `garage status` talks to the local node.
+    healthcheck:
+      test: ["CMD", "/garage", "-c", "/etc/garage.toml", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  garage-init:
+    image: curlimages/curl:8.23.0
+    entrypoint: ["sh", "/init/garage-init.sh"]
+    depends_on:
+      garage:
+        condition: service_healthy
+    environment:
+      GARAGE_ADMIN_URL: http://garage:3903
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:-menura-dev-admin-token}
+      GARAGE_BUCKET: menura-dev
+      # Development S3 key: GK + 24 hex characters, and a 64 hex secret.
+      GARAGE_ACCESS_KEY_ID: GK6d656e7572612d6465760000
+      GARAGE_SECRET_ACCESS_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    volumes:
+      - ./deploy/dev/garage-init.sh:/init/garage-init.sh:ro
+    restart: "no"
+
+volumes:
+  postgres-data:
+  garage-meta:
+  garage-data:
