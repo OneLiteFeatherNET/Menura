@@ -37,7 +37,8 @@ context: |
   - overlay: Vue 3 browser-source scenes and modules for OBS, fed by the server's SSE feeds.
 
   Principles (non-negotiable unless a change explicitly amends this block):
-  1. Media lives in S3-compatible object storage (MinIO on the cluster); metadata, transcripts and
+  1. Media lives in the OLF Ceph object storage (Rook-Ceph RGW, S3 API, shared, public endpoint
+     s3.onelitefeather.net) in private Menura buckets; metadata, transcripts and
      the search index live in PostgreSQL (the OLF CloudNativePG cluster, PostgreSQL 17, no
      extensions beyond its standard image); analytics metric points live there too, in time-
      partitioned tables with precomputed rollups. No further database. Uploads are resumable (S3 multipart, presigned URLs);
@@ -84,6 +85,14 @@ context: |
      scheduled publishing; Twitch VOD/clip import and stream schedule; TikTok privacy options;
      Instagram Reels) and its native analytics; platform quotas, audits and rate limits are respected
      and visible.
+  14. Hosts (HTTPRoutes on the shared Envoy Gateway, TLS per host):
+     - menura.onelitefeather.net: web app (static files only).
+     - api-menura.onelitefeather.net: REST API, backend-for-frontend, OAuth authorization server,
+       SSE feeds, media job queue, iCalendar feeds.
+     - mcp-menura.onelitefeather.net: hub MCP endpoint and its protected resource metadata.
+     - s3.onelitefeather.net: shared Ceph RGW; clients only ever receive presigned URLs for it.
+     Cross-origin requests to the API are allowed only from the web app host; cookies are host-only
+     (__Host-) on the API host; no other origin, wildcard or credentialed CORS is allowed.
 
   Commits and PR titles follow Conventional Commits (release-please).
 
