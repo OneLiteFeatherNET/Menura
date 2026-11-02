@@ -58,6 +58,13 @@ services:
       GARAGE_SECRET_ACCESS_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     volumes:
       - ./deploy/dev/garage-init.sh:/init/garage-init.sh:ro
+    # Healthy once the bucket and the development key exist; a failed bootstrap exits the container.
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/garage-bootstrap-done"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 2s
     restart: "no"
 
 volumes:

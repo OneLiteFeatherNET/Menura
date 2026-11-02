@@ -103,3 +103,9 @@ fi
 api POST /v2/AllowBucketKey \
   "{\"bucketId\":\"$bucket_id\",\"accessKeyId\":\"$KEY_ID\",\"permissions\":{\"read\":true,\"write\":true,\"owner\":true}}" >/dev/null
 echo "garage bootstrap done: bucket $BUCKET"
+
+# Stay up after a successful bootstrap: `docker compose up --wait` reports a container
+# that has exited as a failure, and the healthcheck of garage-init passes only on this marker.
+touch /tmp/garage-bootstrap-done
+trap 'exit 0' TERM INT
+while :; do sleep 3600 & wait $!; done
