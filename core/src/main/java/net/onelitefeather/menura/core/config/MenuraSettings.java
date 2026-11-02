@@ -4,8 +4,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Settings shared by the server and the jobs. Each value is read from an environment variable and falls back
- * to a local-development default that points at the docker-compose services.
+ * Settings shared by the server and the jobs. Each value is read from an environment variable. The database URL
+ * and user fall back to local-development defaults that point at the docker-compose services. The database
+ * password has no default: when MENURA_DB_PASSWORD is unset it is empty, so no literal password can reach a
+ * production server.
  */
 public record MenuraSettings(String databaseUrl, String databaseUser, String databasePassword) {
 
@@ -15,7 +17,6 @@ public record MenuraSettings(String databaseUrl, String databaseUser, String dat
 
     static final String DEFAULT_DATABASE_URL = "jdbc:postgresql://localhost:5432/menura";
     static final String DEFAULT_DATABASE_USER = "menura";
-    static final String DEFAULT_DATABASE_PASSWORD = "menura";
 
     public MenuraSettings {
         Objects.requireNonNull(databaseUrl, "databaseUrl");
@@ -28,6 +29,6 @@ public record MenuraSettings(String databaseUrl, String databaseUser, String dat
         return new MenuraSettings(
                 environment.getOrDefault(DATABASE_URL_VARIABLE, DEFAULT_DATABASE_URL),
                 environment.getOrDefault(DATABASE_USER_VARIABLE, DEFAULT_DATABASE_USER),
-                environment.getOrDefault(DATABASE_PASSWORD_VARIABLE, DEFAULT_DATABASE_PASSWORD));
+                environment.getOrDefault(DATABASE_PASSWORD_VARIABLE, ""));
     }
 }

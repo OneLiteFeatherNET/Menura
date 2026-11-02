@@ -17,6 +17,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -25,12 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Testcontainers
 class MigrateJobIntegrationTest {
 
-    // The role and database names are the production ones (the compose stack uses them too).
+    // The role and database names are the production ones (the compose stack uses them too). The password is
+    // generated per class, so no credential literal lives in the source.
     @Container
     PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:17.11"))
             .withDatabaseName("menura")
             .withUsername("menura")
-            .withPassword("menura");
+            .withPassword("test-" + UUID.randomUUID());
 
     @Test
     void firstMigrateRunAppliesTheBaseline() throws SQLException {

@@ -36,10 +36,12 @@ before any code is written.
 docker compose up -d --wait
 ```
 
-This starts PostgreSQL 17 on `localhost:5432` (database, user and password `menura`) and a
-Garage S3 node on `localhost:3900` with the development bucket `menura-dev`. The passwords and
-keys in `docker-compose.yml` are public development values. Stop the stack with
-`docker compose down`; add `-v` to delete the data volumes as well.
+This starts PostgreSQL 17 on `localhost:5432` (database and user `menura`, no password) and a
+Garage S3 node on `localhost:3900` with the development bucket `menura-dev`. No password is needed
+locally: PostgreSQL trusts connections from this machine, and its port is bound to `127.0.0.1`
+only. The Garage secrets are generated at first start into a Docker volume, not stored in the
+repository. Stop the stack with `docker compose down`; add `-v` to delete the data volumes and
+the generated Garage secrets as well.
 
 ### Run the server
 

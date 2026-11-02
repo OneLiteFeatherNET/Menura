@@ -6,10 +6,12 @@
 set -eu
 
 ADMIN_URL="${GARAGE_ADMIN_URL:-http://garage:3903}"
-ADMIN_TOKEN="${GARAGE_ADMIN_TOKEN:?GARAGE_ADMIN_TOKEN must be set}"
 BUCKET="${GARAGE_BUCKET:-menura-dev}"
-KEY_ID="${GARAGE_ACCESS_KEY_ID:?GARAGE_ACCESS_KEY_ID must be set}"
-KEY_SECRET="${GARAGE_SECRET_ACCESS_KEY:?GARAGE_SECRET_ACCESS_KEY must be set}"
+# The secrets are written once by garage-secrets.sh into the shared volume.
+SECRETS_DIR="${GARAGE_SECRETS_DIR:-/run/secrets/garage}"
+ADMIN_TOKEN="$(cat "$SECRETS_DIR/admin_token")"
+KEY_ID="$(cat "$SECRETS_DIR/s3_access_key_id")"
+KEY_SECRET="$(cat "$SECRETS_DIR/s3_secret_access_key")"
 ZONE="dc1"
 CAPACITY=1073741824 # 1 GiB, development only
 

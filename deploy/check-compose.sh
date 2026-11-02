@@ -2,7 +2,9 @@
 # Checks the development compose file at the repository root:
 #   - it parses (docker compose config --quiet),
 #   - no service image is unpinned or uses the `latest` tag,
-#   - PostgreSQL is major version 17.
+#   - PostgreSQL is major version 17,
+#   - PostgreSQL sets no POSTGRES_PASSWORD, and when it uses trust authentication its
+#     port is bound to 127.0.0.1 only.
 # Requires: docker (with compose v2), jq.
 set -euo pipefail
 
@@ -50,6 +52,25 @@ done <<<"$images"
 
 if [[ "$postgres_seen" -eq 0 ]]; then
   report "no PostgreSQL service found"
+fi
+
+# Local-dev PostgreSQL trusts local connections without a password. That is only acceptable
+# while the port stays on loopback, so trust and the 127.0.0.1 binding are checked together.
+if jq -e '.services.postgres.environment | has("POSTGRES_PASSWORD")' <<<"$config_json" >/dev/null; then
+  report "postgres must not set POSTGRES_PASSWORD (local development uses trust)"
+fi
+
+pg_auth="$(jq -r '.services.postgres.environment.POSTGRES_HOST_AUTH_METHOD // empty' <<<"$config_json")"
+if [[ "$pg_auth" == "trust" ]]; then
+  pg_port_count="$(jq -r '.services.postgres.ports | length' <<<"$config_json")"
+  if [[ "$pg_port_count" -eq 0 ]]; then
+    report "postgres uses trust but publishes no port; expected 127.0.0.1 only"
+  fi
+  while IFS= read -r host_ip; do
+    if [[ "$host_ip" != "127.0.0.1" ]]; then
+      report "postgres uses trust but its port is bound to '${host_ip:-all interfaces}' instead of 127.0.0.1"
+    fi
+  done < <(jq -r '.services.postgres.ports[]? | .host_ip // "0.0.0.0"' <<<"$config_json")
 fi
 
 if [[ "$fail" -ne 0 ]]; then

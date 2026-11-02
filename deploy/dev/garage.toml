@@ -1,6 +1,6 @@
 # Garage single-node configuration for the local development stack.
-# Secrets are not kept here: the compose file passes GARAGE_RPC_SECRET and
-# GARAGE_ADMIN_TOKEN as environment variables, which override this file.
+# Secrets are not kept here: the compose file points GARAGE_RPC_SECRET_FILE and
+# GARAGE_ADMIN_TOKEN_FILE at the garage-secrets volume, written by garage-secrets.sh.
 
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
