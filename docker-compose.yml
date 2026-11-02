@@ -11,7 +11,7 @@ services:
     environment:
       POSTGRES_DB: menura
       POSTGRES_USER: menura
-      POSTGRES_PASSWORD: menura-dev
+      POSTGRES_PASSWORD: menura
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
