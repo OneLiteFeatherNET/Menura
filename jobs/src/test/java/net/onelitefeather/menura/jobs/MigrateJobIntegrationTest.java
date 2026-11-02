@@ -25,9 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Testcontainers
 class MigrateJobIntegrationTest {
 
-    // The role and database names are the production ones (the compose stack uses them too). Flyway's history
-    // table follows the role's schema search path, so a role named like the baseline schema must not change where
-    // the history is read from.
+    // The role and database names are the production ones (the compose stack uses them too).
     @Container
     PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:17.11"))
             .withDatabaseName("menura")
@@ -35,24 +33,43 @@ class MigrateJobIntegrationTest {
             .withPassword("menura");
 
     @Test
-    void migrateJobCreatesTheMenuraSchemaInAnEmptyDatabase() throws SQLException {
+    void firstMigrateRunAppliesTheBaseline() throws SQLException {
         int exitCode = runMigrate();
 
         assertEquals(JobDispatcher.EXIT_OK, exitCode, "jobs run migrate must exit 0 on an empty database");
+        assertEquals(1, scalar("select count(*) from menura.flyway_schema_history where version = '1' and success"),
+                "the first run must apply the baseline V1 exactly once");
         assertEquals(1, scalar("select count(*) from information_schema.schemata where schema_name = 'menura'"),
-                "the baseline migration must create the menura schema");
+                "the first run must create the menura schema");
     }
 
     @Test
     void secondMigrateRunChangesNothing() throws SQLException {
         assertEquals(JobDispatcher.EXIT_OK, runMigrate(), "the first run must succeed");
-        int historyAfterFirstRun = scalar("select count(*) from public.flyway_schema_history");
+        int historyAfterFirstRun = scalar("select count(*) from menura.flyway_schema_history");
 
         int exitCode = runMigrate();
 
         assertEquals(JobDispatcher.EXIT_OK, exitCode, "a second run must also exit 0");
-        assertEquals(historyAfterFirstRun, scalar("select count(*) from public.flyway_schema_history"),
+        assertEquals(historyAfterFirstRun, scalar("select count(*) from menura.flyway_schema_history"),
                 "a second run must not apply any migration again");
+    }
+
+    @Test
+    void flywayHistoryTableLivesInTheMenuraSchema() throws SQLException {
+        assertEquals(JobDispatcher.EXIT_OK, runMigrate(), "the migrate run must succeed");
+
+        assertEquals(1, scalar("select count(*) from information_schema.tables "
+                        + "where table_schema = 'menura' and table_name = 'flyway_schema_history'"),
+                "Flyway's history table must be menura.flyway_schema_history");
+    }
+
+    @Test
+    void migrateRunCreatesNoTableInThePublicSchema() throws SQLException {
+        assertEquals(JobDispatcher.EXIT_OK, runMigrate(), "the migrate run must succeed");
+
+        assertEquals(0, scalar("select count(*) from pg_tables where schemaname = 'public'"),
+                "nothing may be created in the public schema");
     }
 
     private int runMigrate() {

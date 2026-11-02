@@ -11,10 +11,10 @@ public final class Migrations {
     static final String LOCATION = "classpath:db/migration";
 
     /**
-     * The schema of Flyway's history table. Pinned, because without it Flyway uses the first schema on the role's
-     * search path, which changes once the baseline has created the {@code menura} schema.
+     * The application schema. Flyway creates it if it is missing and keeps its history table
+     * ({@code menura.flyway_schema_history}) there, so nothing lands in {@code public}.
      */
-    static final String HISTORY_SCHEMA = "public";
+    static final String SCHEMA = "menura";
 
     private Migrations() {
     }
@@ -36,6 +36,6 @@ public final class Migrations {
     }
 
     private static FluentConfiguration configure(FluentConfiguration configuration) {
-        return configuration.locations(LOCATION).defaultSchema(HISTORY_SCHEMA);
+        return configuration.locations(LOCATION).schemas(SCHEMA).defaultSchema(SCHEMA).createSchemas(true);
     }
 }

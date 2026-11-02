@@ -1,2 +1,1 @@
--- Baseline of the Menura schema. Later changes add versioned migrations (V2__..., V3__...) next to this file.
-CREATE SCHEMA menura;
+-- Baseline of the Menura schema. Flyway creates the schema and its history table. Later changes add versioned migrations (V2__..., V3__...) next to this file.
