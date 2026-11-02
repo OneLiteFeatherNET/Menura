@@ -1,3 +1,4 @@
+{{- if .Values.httpRoute.enabled }}
 {{- $name := include "menura.fullname" . -}}
 {{- range $route, $cfg := .Values.routes }}
 ---
@@ -20,4 +21,5 @@ spec:
       backendRefs:
         - name: {{ $name }}-{{ $cfg.service }}
           port: {{ $.Values.httpPort }}
+{{- end }}
 {{- end }}

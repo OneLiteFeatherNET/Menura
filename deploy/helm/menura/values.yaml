@@ -14,6 +14,9 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
+# Names of existing image pull Secrets, applied to every pod (server, jobs, web
+# and the migrate hook). The OLF Harbor project needs `harbor-pull`. Empty means
+# the pods pull without credentials, which works only for public images.
 imagePullSecrets: []
 
 # Every component listens on this port inside its container.
@@ -31,7 +34,7 @@ database:
 # SSE feeds and the MCP endpoint. It never transcodes or renders video.
 server:
   image:
-    repository: harbor.onelitefeather.dev/menura/server
+    repository: harbor.onelitefeather.dev/onelitefeather/menura-server
   replicaCount: 1
   # Empty uses the image's own entrypoint.
   command: []
@@ -47,7 +50,7 @@ server:
 # from the server.
 web:
   image:
-    repository: harbor.onelitefeather.dev/menura/web
+    repository: harbor.onelitefeather.dev/onelitefeather/menura-web
   replicaCount: 1
   command: []
   env: {}
@@ -62,7 +65,7 @@ web:
 # with the changes that add them.
 jobs:
   image:
-    repository: harbor.onelitefeather.dev/menura/jobs
+    repository: harbor.onelitefeather.dev/onelitefeather/menura-jobs
   replicaCount: 0
   command:
     - jobs
@@ -82,8 +85,14 @@ gateway:
       namespace: envoy
       sectionName: https
 
-# Exactly three public routes. Each host forwards to one Service: the web app
-# to `web`, the API and the MCP endpoint to `server`.
+# HTTPRoutes for the public hosts. Set enabled to false when the hosts are
+# exposed another way (for example by a Cloudflare Tunnel Ingress in the cluster
+# overlay); then the chart renders no HTTPRoute at all. When enabled, exactly
+# three routes are rendered: each host forwards to one Service, the web app to
+# `web`, the API and the MCP endpoint to `server`.
+httpRoute:
+  enabled: true
+
 routes:
   web:
     hostname: menura.onelitefeather.net

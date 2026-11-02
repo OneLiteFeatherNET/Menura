@@ -6,7 +6,11 @@
 #     the API and MCP endpoint),
 #   - the migrate Helm hook runs `jobs run migrate`,
 #   - the server, jobs and migrate pods get MENURA_DB_URL (not DATASOURCES_*),
-#   - the server liveness probe is a TCP check and readiness is /health.
+#   - the server liveness probe is a TCP check and readiness is /health,
+#   - the images come from harbor.onelitefeather.dev/onelitefeather/menura-*,
+#   - with httpRoute.enabled=false the chart renders no HTTPRoute at all,
+#   - with imagePullSecrets set, every pod spec (server, jobs, web and the
+#     migrate hook) carries them.
 # Requires: helm (v3), yq (mikefarah v4), jq is not needed.
 set -euo pipefail
 
@@ -24,7 +28,9 @@ report() {
 helm lint "$chart"
 
 rendered="$(mktemp)"
-trap 'rm -f "$rendered"' EXIT
+rendered_disabled="$(mktemp)"
+rendered_pull="$(mktemp)"
+trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull"' EXIT
 helm template "$release" "$chart" >"$rendered"
 
 # Hosts across all HTTPRoutes, one per line, sorted.
@@ -111,6 +117,34 @@ other_hosts="$(grep -oE '[a-z0-9-]+\.onelitefeather\.net' "$rendered" | sort -u 
   | grep -vxE 'menura\.onelitefeather\.net|api-menura\.onelitefeather\.net|mcp-menura\.onelitefeather\.net' || true)"
 if [[ -n "$other_hosts" ]]; then
   report "unexpected host(s) in the rendered chart: $other_hosts"
+fi
+
+# The images: every component pulls from the OLF Harbor project under its menura-* name.
+bad_images="$(yq -N 'select(.kind == "Deployment" or .kind == "Job") | .spec.template.spec.containers[].image' "$rendered" \
+  | grep -vE '^harbor\.onelitefeather\.dev/onelitefeather/menura-(server|jobs|web):' || true)"
+if [[ -n "$bad_images" ]]; then
+  report "images outside harbor.onelitefeather.dev/onelitefeather/menura-*: $bad_images"
+fi
+
+# httpRoute.enabled=false: no HTTPRoute is rendered, the workloads still are.
+helm template "$release" "$chart" --set httpRoute.enabled=false >"$rendered_disabled"
+disabled_routes="$(yq -N 'select(.kind == "HTTPRoute") | .metadata.name' "$rendered_disabled" | grep -c . || true)"
+if [[ "$disabled_routes" -ne 0 ]]; then
+  report "with httpRoute.enabled=false expected 0 HTTPRoutes, found $disabled_routes"
+fi
+if [[ "$(yq -N 'select(.kind == "Deployment") | .metadata.name' "$rendered_disabled" | grep -c . || true)" -eq 0 ]]; then
+  report "with httpRoute.enabled=false the Deployments must still be rendered"
+fi
+
+# imagePullSecrets set: every pod spec carries the secret, including the migrate hook Job.
+helm template "$release" "$chart" --set 'imagePullSecrets[0].name=harbor-pull' >"$rendered_pull"
+pod_count="$(yq -N 'select(.kind == "Deployment" or .kind == "Job") | .spec.template.spec | select(. != null) | .containers[0].name' "$rendered_pull" | grep -c . || true)"
+pull_count="$(yq -N 'select(.kind == "Deployment" or .kind == "Job") | .spec.template.spec | select(. != null) | select((.imagePullSecrets[]?.name) == "harbor-pull") | .containers[0].name' "$rendered_pull" | grep -c . || true)"
+if [[ "$pod_count" -ne 4 ]]; then
+  report "expected 4 pod specs (server, jobs, web, migrate), found $pod_count"
+fi
+if [[ "$pull_count" -ne "$pod_count" ]]; then
+  report "every pod spec must carry imagePullSecrets harbor-pull ($pull_count of $pod_count do)"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

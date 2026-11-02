@@ -141,7 +141,7 @@ docker build -f web/Dockerfile -t menura/web .
   and unprivileged nginx on port 8080 serves it with a fallback to `index.html`. Its context is
   the repository root, so it is built in one step.
 
-The chart deploys these images from `harbor.onelitefeather.dev/menura/{server,jobs,web}`. The
+The chart deploys these images from `harbor.onelitefeather.dev/onelitefeather/menura-{server,jobs,web}`. The
 CI change that builds and pushes them is separate and reuses the two steps above.
 
 ### OpenSpec
