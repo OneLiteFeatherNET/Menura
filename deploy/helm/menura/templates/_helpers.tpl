@@ -62,10 +62,11 @@ when empty, the chart's appVersion. Call with a dict: (dict "root" $ "component"
 
 {{/*
 Database environment every server, job and migrate container gets. The URL is
-plain configuration; the credentials come from the existing Secret.
+plain configuration (MENURA_DB_URL, read by core MenuraSettings and the server's
+application.yml); the user and password come from the existing Secret.
 */}}
 {{- define "menura.databaseEnv" -}}
-- name: DATASOURCES_DEFAULT_URL
+- name: MENURA_DB_URL
   value: {{ .Values.database.url | quote }}
 {{- end }}
 

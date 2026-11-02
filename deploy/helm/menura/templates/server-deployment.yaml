@@ -39,11 +39,10 @@ spec:
             {{- end }}
           {{- include "menura.databaseEnvFrom" . | nindent 10 }}
           {{- include "menura.containerSecurity" . | nindent 10 }}
-          # /health is anonymous and answers both probes (principle 7 and
-          # the health endpoint of add-project-skeleton).
+          # Liveness only checks that the process accepts connections. /health reports
+          # the database, so a database outage must not restart the server pods.
           livenessProbe:
-            httpGet:
-              path: /health
+            tcpSocket:
               port: http
             periodSeconds: 10
           readinessProbe:

@@ -22,9 +22,9 @@ httpPort: 8080
 database:
   # JDBC URL of the PostgreSQL 17 cluster (OLF CloudNativePG). No credentials.
   url: jdbc:postgresql://menura-postgres-rw:5432/menura
-  # Existing Secret with DATASOURCES_DEFAULT_USERNAME and
-  # DATASOURCES_DEFAULT_PASSWORD, created outside this chart. Empty means the
-  # pods get no credentials and the database cannot be reached.
+  # Existing Secret with the keys MENURA_DB_USER and MENURA_DB_PASSWORD, created
+  # outside this chart and injected into every server, jobs and migrate pod.
+  # Empty means the pods get no credentials and the database cannot be reached.
   existingSecret: ""
 
 # The server: REST API, backend-for-frontend, OAuth authorization server,
