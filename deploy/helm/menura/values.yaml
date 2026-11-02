@@ -85,11 +85,12 @@ gateway:
       namespace: envoy
       sectionName: https
 
-# HTTPRoutes for the public hosts. Set enabled to false when the hosts are
+# HTTPRoutes for the public hosts. Set httpRoute.enabled to false when the hosts are
 # exposed another way (for example by a Cloudflare Tunnel Ingress in the cluster
-# overlay); then the chart renders no HTTPRoute at all. When enabled, exactly
+# overlay); then the chart renders no HTTPRoute and no edge policy. When enabled, exactly
 # three routes are rendered: each host forwards to one Service, the web app to
-# `web`, the API and the MCP endpoint to `server`.
+# `web`, the API and the MCP endpoint to `server`. The rate limits of each route
+# come from its own keys below; see README.md.
 httpRoute:
   enabled: true
 
@@ -97,9 +98,28 @@ routes:
   web:
     hostname: menura.onelitefeather.net
     service: web
+    rateLimit:
+      # Requests per minute from one client address.
+      perIPPerMinute: 600
   api:
     hostname: api-menura.onelitefeather.net
     service: server
+    rateLimit:
+      perIPPerMinute: 300
+      # Requests per minute per Authorization token (the client).
+      perClientPerMinute: 120
   mcp:
     hostname: mcp-menura.onelitefeather.net
     service: server
+    rateLimit:
+      perIPPerMinute: 300
+      perClientPerMinute: 120
+
+# Edge headers on the shared Envoy Gateway (principles 11, 14 and 15). CORS is answered by the server only, and
+# TLS 1.3 and the client address are set on the shared listener by the cluster (see README.md).
+edge:
+  # Sent on every route: HSTS, no referrer, no MIME sniffing.
+  responseHeaders:
+    Strict-Transport-Security: max-age=31536000
+    Referrer-Policy: no-referrer
+    X-Content-Type-Options: nosniff

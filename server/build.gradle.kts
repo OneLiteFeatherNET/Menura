@@ -10,13 +10,20 @@ dependencies {
     implementation("io.micronaut:micronaut-http-server-netty")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    implementation("com.nimbusds:nimbus-jose-jwt")
     runtimeOnly(libs.postgresql)
-    runtimeOnly("ch.qos.logback:logback-classic")
+    // Compile-time too: the log redaction converter extends the logback pattern API.
+    implementation("ch.qos.logback:logback-classic")
     runtimeOnly("org.yaml:snakeyaml")
 
     testImplementation("io.micronaut.test:micronaut-test-junit5")
     testImplementation("io.micronaut:micronaut-http-client")
     testImplementation(libs.swagger.parser)
+    // Integration tests (@Tag("integration")) run the sign-in store against PostgreSQL 17 in a container.
+    testImplementation(platform(libs.testcontainers.bom))
+    testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.testcontainers.junit.jupiter)
+    testImplementation(libs.postgresql)
 }
 
 application {

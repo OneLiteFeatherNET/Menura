@@ -18,6 +18,14 @@ spec:
         - path:
             type: PathPrefix
             value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              {{- range $header, $value := $.Values.edge.responseHeaders }}
+              - name: {{ $header }}
+                value: {{ $value | quote }}
+              {{- end }}
       backendRefs:
         - name: {{ $name }}-{{ $cfg.service }}
           port: {{ $.Values.httpPort }}
