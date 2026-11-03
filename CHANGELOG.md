@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/OneLiteFeatherNET/Menura/compare/v0.2.0...v0.2.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **jobs:** make the jobs launcher executable in the image ([#32](https://github.com/OneLiteFeatherNET/Menura/issues/32)) ([0fe5d8e](https://github.com/OneLiteFeatherNET/Menura/commit/0fe5d8ef8366fc610930534573ca43fb445cbf85))
+
 ## [0.2.0](https://github.com/OneLiteFeatherNET/Menura/compare/v0.1.0...v0.2.0) (2026-11-02)
 
 
