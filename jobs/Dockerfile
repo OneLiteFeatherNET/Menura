@@ -14,6 +14,8 @@ RUN groupadd --system --gid 10001 menura \
 WORKDIR /app
 COPY bin ./bin
 COPY lib ./lib
+# The context can arrive without the executable bit (a GitHub artifact drops it), so the launcher is made executable here.
+RUN chmod 0755 /app/bin/jobs
 
 # `jobs` is on PATH, so the chart's `command: [jobs, run, ping]` and `docker run <image> run ping` reach the same entry point.
 ENV PATH="/app/bin:${PATH}"

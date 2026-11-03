@@ -70,6 +70,14 @@ else
   done
 fi
 
+# The jobs context reaches the push job as a GitHub artifact, which drops the executable bit. The launcher
+# must be made executable in the image itself, so a COPY of bin needs a chmod of its entry point.
+if [[ -f jobs/Dockerfile ]] && grep -qE '^[[:space:]]*COPY[[:space:]]+bin([[:space:]]|$)' jobs/Dockerfile; then
+  if ! grep -qE '^[[:space:]]*RUN[[:space:]]+chmod[[:space:]]+0?[0-7]?[157][157][157][[:space:]]+/app/bin/jobs([[:space:]]|$)' jobs/Dockerfile; then
+    report "jobs/Dockerfile copies bin without making /app/bin/jobs executable (RUN chmod 0755 /app/bin/jobs)"
+  fi
+fi
+
 if [[ "$fail" -ne 0 ]]; then
   exit 1
 fi
