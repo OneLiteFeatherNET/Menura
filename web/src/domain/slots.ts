@@ -34,6 +34,18 @@ export function isSlotVisible(
   return atSecond >= from && beforeEnd;
 }
 
+/** The time window of a slot as the editors read it, for example "0–3 s" or "letzte 2 s". */
+export function slotWindowLabel(slot: SlotDefinition): string {
+  if (slot.lastSeconds !== null) {
+    return `letzte ${slot.lastSeconds} s`;
+  }
+  const from = slot.fromSeconds ?? 0;
+  if (slot.toSeconds === null) {
+    return from === 0 ? 'immer' : `ab ${from} s`;
+  }
+  return `${from}–${slot.toSeconds} s`;
+}
+
 export interface PreviewRect {
   left: number;
   top: number;
