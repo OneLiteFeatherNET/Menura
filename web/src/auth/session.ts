@@ -1,5 +1,5 @@
 import type { ComputedRef, InjectionKey } from 'vue';
-import type { FetchLike } from '../api/client';
+import { api, type FetchLike } from '../api/client';
 import type { Session } from '../api/types';
 
 export type SessionState =
@@ -57,4 +57,14 @@ export async function loadSession(fetcher: FetchLike = defaultFetch): Promise<Se
 /** Editors and admins may create series and assign posts; viewers read only. */
 export function canEditSeries(roles: readonly string[]): boolean {
   return roles.includes('EDITOR') || roles.includes('ADMIN');
+}
+
+/** Ends the server session and reloads, so the gate shows the state the server now reports. */
+export async function signOut(): Promise<void> {
+  try {
+    await api.logout();
+  } catch {
+    // The reload shows the real state either way.
+  }
+  window.location.reload();
 }
