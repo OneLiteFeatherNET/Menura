@@ -18,7 +18,7 @@ Principle 2 applies: Menura does not cut or render video. The external renderer 
 **Non-Goals:**
 - No video rendering, cutting, transcription or overlay in Menura (principle 2).
 - No writing to playlists in phase 1.
-- No join attribution in this change; the join host is only passed through to the bundle (see `add-join-attribution`).
+- No join attribution in this change; the join domain is only passed through to the bundle (see `add-join-attribution`).
 - No voice cloning or intro audio. An intro with a cloned voice is a possible later option and is not in scope.
 - No decision on which recognition effect the series has. That is a hypothesis to test, not an acceptance criterion (see Risks).
 
@@ -65,4 +65,4 @@ The first series to load into the catalogue, to be confirmed by the maintainer:
 
 - **Public name of the Survival series for players.** Open. The series stays out of the initial data until the name is decided.
 - **Preferred posting slot.** The maintainer confirms that the preferred slot is a hint for planning and that the random slot assignment stays the rule for comparisons.
-- **Join host in the render bundle.** The bundle carries the join host only where `add-join-attribution` is available. There is no dependency edge from this change to that one, so the two changes do not form a cycle.
+- **Join domain in the render bundle.** The bundle carries the join domain only where `add-join-attribution` is available. There is no dependency edge from this change to that one, so the two changes do not form a cycle.

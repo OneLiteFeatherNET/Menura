@@ -148,22 +148,22 @@ Content series make the shorts of OneLiteFeather recognisable as one series: eac
 - **THEN** the warning is shown
 
 ### Requirement: Series in the render bundle
-(Must) The render bundle endpoint SHALL return, for an authorised machine client of the external renderer, every active series with its badge text, series colour token, opening formula and hashtag, and, for each channel, the call-to-action text with that channel's join host where the join host is configured by `add-join-attribution`.
+(Must) The render bundle endpoint SHALL return, for an authorised machine client of the external renderer, every active series with its badge text, series colour token, opening formula and hashtag, and one call-to-action text that names the installation's join domain where the join domain is configured by `add-join-attribution`.
 
 #### Scenario: Bundle contains active series
 - **GIVEN** two active series and one inactive series
 - **WHEN** the renderer requests the render bundle
 - **THEN** the bundle contains the two active series with their badge text, colour token, opening formula and hashtag, and not the inactive series
 
-#### Scenario: Call-to-action with join host
-- **GIVEN** a channel whose join host is `yt.onelitefeather.net`
+#### Scenario: Call-to-action with join domain
+- **GIVEN** the join domain `onelitefeather.net` is configured
 - **WHEN** the renderer requests the render bundle
-- **THEN** the call-to-action text for that channel contains the host
+- **THEN** the bundle carries one call-to-action text for all channels that contains the domain
 
-#### Scenario: Channel without join host
-- **GIVEN** a channel with no configured join host
+#### Scenario: No join domain configured
+- **GIVEN** no join domain is configured
 - **WHEN** the renderer requests the render bundle
-- **THEN** the bundle contains no join host for that channel and the call-to-action text is omitted without an error
+- **THEN** the bundle contains no call-to-action text and no join domain, and the bundle is returned without an error
 
 #### Scenario: Bundle refused for a person without the machine role
 - **GIVEN** a signed-in person whose token is not a renderer machine client

@@ -15,7 +15,7 @@ OneLiteFeather cuts 7 to 17 shorts from every stream and posts them to YouTube, 
 - An imported external post that carries a series hashtag is assigned to that series automatically. Editors can assign, reassign or explicitly mark a post "no series". A post belongs to at most one series and receives the next episode number of its series on first assignment.
 - Menura reports, per channel and week, the share of published shorts that belong to a series or are marked "no series", and flags any week below 90 %.
 - Menura warns when no active series targets the audience `players`, because the shorts must reach players as well as developers.
-- The JSON render bundle for the external renderer contains every active series and, per channel, the call-to-action text with that channel's join host where one is configured.
+- The JSON render bundle for the external renderer contains every active series and one call-to-action text that names the installation's join domain, where one is configured.
 - Where the platform adapter reports playlist membership, a series post that is not in its series playlist 24 hours after publication is flagged on the post. Phase 1 only reads playlists; writing to playlists comes with the phase 2 platform integrations.
 
 Menura does not render or cut video in this change (principle 2). Until `add-local-editing-mcp` (phase 5) ships, shorts are rendered by the external renderer from the render bundle.
@@ -35,4 +35,4 @@ Menura does not render or cut video in this change (principle 2). Until `add-loc
 - Web: series management and the coverage view.
 - Brand kit: a series colour references a colour token of `add-brand-kit`, which moves to phase 1 with this roadmap re-cut.
 - Jobs: no new scheduled job. Coverage is computed on read; the playlist check runs after collection of platform data.
-- Join attribution: `add-join-attribution` reads the series assignment of posts. No edge in the other direction: the join host reaches the render bundle only where that change is available.
+- Join attribution: `add-join-attribution` reads the series assignment of posts. No edge in the other direction: the join domain reaches the render bundle only where that change is available.

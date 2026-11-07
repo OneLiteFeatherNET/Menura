@@ -1,6 +1,6 @@
 # Tasks
 
-Requirements that need the brand kit, the render bundle consumer or the join host are built as stated in design.md. The render bundle is consumed by the external renderer; its contract is tested here with the bundle fixture, not with a renderer.
+Requirements that need the brand kit, the render bundle consumer or the join domain are built as stated in design.md. The render bundle is consumed by the external renderer; its contract is tested here with the bundle fixture, not with a renderer.
 
 ## 1. Series catalogue
 
@@ -28,9 +28,9 @@ Requirements that need the brand kit, the render bundle consumer or the join hos
 
 ## 5. Render bundle
 
-- [ ] 5.1 Write failing contract tests against a bundle fixture that the bundle contains exactly the active series with badge text, colour token, opening formula and hashtag, that a channel without a join host has no join host and no error, that a person without the renderer machine role gets 403, and that an unknown channel gets 404; verify they fail
+- [ ] 5.1 Write failing contract tests against a bundle fixture that the bundle contains exactly the active series with badge text, colour token, opening formula and hashtag, that without a configured join domain the bundle has no call-to-action text and no error, that a person without the renderer machine role gets 403, and that an unknown channel gets 404; verify they fail
 - [ ] 5.2 Implement the bundle assembly and the endpoint with the renderer machine-client check; verify the tests from 5.1 pass
-- [ ] 5.3 Write a failing test that the call-to-action text of a channel contains its join host when the join-attribution port provides one, using a fake port; verify it fails, then implement the optional port call and verify it passes
+- [ ] 5.3 Write a failing test that the one call-to-action text of the bundle contains the join domain when the join-attribution port provides one, using a fake port; verify it fails, then implement the optional port call and verify it passes
 
 ## 6. Playlist check
 
