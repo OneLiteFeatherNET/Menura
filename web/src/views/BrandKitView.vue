@@ -6,7 +6,7 @@ import type { Channel, Series } from '../api/types';
 import ShortPreview from '../components/ShortPreview.vue';
 import LoadState from '../components/LoadState.vue';
 import { useAsync } from '../composables/useAsync';
-import { readableTextOn } from '../domain/color';
+import { swatchColors } from '../domain/color';
 import { isSlotVisible, SHORT_DURATION_SECONDS, SLOT_LABELS, slotWindowLabel } from '../domain/slots';
 
 // Choice values of the selects: "" is the default (first entry), NONE is an explicit "none".
@@ -58,7 +58,7 @@ function valueOf(event: Event): string {
 }
 
 function tokenStyle(background: string): Record<string, string> {
-  return { background, color: readableTextOn(background) };
+  return swatchColors(background);
 }
 </script>
 

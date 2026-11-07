@@ -88,7 +88,7 @@ async function submit(): Promise<void> {
     emit('created', created);
     emit('close');
   } catch (cause) {
-    formError.value = errorMessage(cause);
+    formError.value = errorMessage(cause, { serverDetailOn422: true });
   } finally {
     saving.value = false;
   }

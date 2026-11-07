@@ -29,6 +29,8 @@ RUN pnpm build
 FROM nginxinc/nginx-unprivileged:1.29.8-alpine AS runtime
 
 COPY web/nginx/default.conf /etc/nginx/conf.d/default.conf
+# Included by default.conf; outside conf.d, because every file there is read into the http block.
+COPY web/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=builder /build/web/dist /usr/share/nginx/html
 
 EXPOSE 8080
