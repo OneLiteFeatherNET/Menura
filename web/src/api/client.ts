@@ -28,10 +28,54 @@ export class ApiError extends Error {
   }
 }
 
-/** A German sentence for the user, whatever went wrong. */
-export function errorMessage(error: unknown): string {
+const STATUS_MESSAGES: Record<number, string> = {
+  400: 'Eingabe ungültig – bitte Felder prüfen',
+  401: 'Bitte erneut anmelden',
+  403: 'Dafür fehlt dir die Rolle',
+  404: 'Nicht gefunden',
+  413: 'Eingabe zu groß',
+  422: 'Eingabe ungültig – bitte Felder prüfen',
+};
+
+const SERVER_ERROR = 'Serverfehler – bitte später erneut';
+const DETAIL_MAX_LENGTH = 120;
+
+/** Control and format characters (bidi overrides among them) are removed from server text. */
+const UNPRINTABLE = /[\p{Cc}\p{Cf}]/gu;
+
+/**
+ * The server's 422 detail, when it is short and printable after stripping control characters.
+ * Anything else yields undefined and the caller shows the fixed message.
+ */
+function printableDetail(detail: string | undefined): string | undefined {
+  if (typeof detail !== 'string') {
+    return undefined;
+  }
+  const text = detail.replace(UNPRINTABLE, '').trim();
+  return text !== '' && text.length <= DETAIL_MAX_LENGTH ? text : undefined;
+}
+
+/** Options for errorMessage: the new-series dialog may show a short server detail for 422. */
+export interface ErrorMessageOptions {
+  serverDetailOn422?: boolean;
+}
+
+/**
+ * A fixed German sentence for the user, chosen by status code. The server's own text is not shown,
+ * except for a 422 when the caller allows it and the detail is short and printable.
+ */
+export function errorMessage(error: unknown, options: ErrorMessageOptions = {}): string {
   if (error instanceof ApiError) {
-    return error.problem.detail ?? error.problem.title ?? 'Die Anfrage wurde abgelehnt.';
+    if (error.status === 422 && options.serverDetailOn422) {
+      const detail = printableDetail(error.problem.detail);
+      if (detail !== undefined) {
+        return detail;
+      }
+    }
+    if (error.status >= 500) {
+      return SERVER_ERROR;
+    }
+    return STATUS_MESSAGES[error.status] ?? 'Die Anfrage wurde abgelehnt.';
   }
   if (error instanceof TypeError) {
     return 'Der Server ist gerade nicht erreichbar.';
