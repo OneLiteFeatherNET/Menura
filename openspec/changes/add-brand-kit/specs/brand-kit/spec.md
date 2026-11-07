@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Keeps one central, versioned brand identity for OneLiteFeather: colours, typography, marks, and voice and tone texts. Every consumer reads the same kit, can pin a version, and is told when a new version is published.
+Keeps one central, versioned brand identity for OneLiteFeather: colours, typography, marks, and voice and tone texts. Every consumer reads the same kit, can pin a version, and is told when a new version is published. The first version is seeded from the stream overlay theme, so the shorts and the stream share one look.
 
 ## ADDED Requirements
 
@@ -101,7 +101,7 @@ Keeps one central, versioned brand identity for OneLiteFeather: colours, typogra
 
 ### Requirement: Read access for all consumers
 
-(Must) The system SHALL make the brand kit readable over REST and MCP and SHALL let the overlay, the desktop app and the OBS plugin read the kit and its templates.
+(Must) The system SHALL make the brand kit and its templates readable over REST for every signed-in role, and SHALL make them readable over MCP only where the hub MCP server is available. The overlay, the desktop app and the OBS plugin SHALL read the kit and its templates over REST and SHALL NOT depend on an MCP read.
 
 #### Scenario: Desktop reads for rendering
 - **GIVEN** a signed-in desktop app
@@ -112,6 +112,11 @@ Keeps one central, versioned brand identity for OneLiteFeather: colours, typogra
 - **GIVEN** a signed-in OBS plugin
 - **WHEN** it requests the current brand kit and overlay theme template
 - **THEN** the kit and theme are returned
+
+#### Scenario: MCP read where the hub MCP server is available
+- **GIVEN** the hub MCP server is available and a client with the viewer role or higher
+- **WHEN** the client reads the current brand kit through MCP
+- **THEN** the current kit version is returned
 
 #### Scenario: Unauthenticated request
 - **GIVEN** a request without a valid token
@@ -146,34 +151,35 @@ Keeps one central, versioned brand identity for OneLiteFeather: colours, typogra
 - **WHEN** it reconnects and reads the current version
 - **THEN** it obtains the latest version without needing the missed notification
 
-### Requirement: Web palette editor with live preview
-
-(Should) The system SHALL offer a web editor for the colour palette that shows the effect of unpublished palette changes on each layout template before publication.
-
-#### Scenario: Preview before publish
-- **GIVEN** an editor changes the primary colour without publishing
-- **WHEN** the editor opens a layout template preview
-- **THEN** the preview shows the template in the new colour and the published version is unchanged
-
 ### Requirement: Design token export
 
-(Should) The system SHALL export the current brand kit as design tokens in JSON and as CSS custom properties.
+(Must) The system SHALL export a named brand kit version as a machine-readable JSON render bundle for external renderers, containing the colour tokens with their resolved light and dark values, the typography roles with their font file references, the marks with their safe areas per variant, the per-language texts and hashtags, and the layout templates; and SHALL export the colour tokens as CSS custom properties.
 
 #### Scenario: Export as CSS variables
 - **GIVEN** a published brand kit with colour tokens
 - **WHEN** a consumer requests the CSS export
 - **THEN** each colour token is returned as a named CSS custom property with its light and dark values
 
-### Requirement: Sub-brands inherit the base kit
+#### Scenario: Render bundle of a named version
+- **GIVEN** brand kit version 2 with colour tokens, typography roles, marks and layout templates
+- **WHEN** an external renderer requests the JSON render bundle of version 2
+- **THEN** the bundle contains every colour token with its resolved values, every typography role with its font file reference, every mark with its safe area, the per-language texts and the layout templates
 
-(Could) The system SHALL allow a sub-brand to be defined that inherits every value of the OLF base kit and overrides only the values it sets.
+#### Scenario: Pinned renderer receives its version
+- **GIVEN** an external renderer pinned to version 2 and version 3 has been published
+- **WHEN** the renderer requests the render bundle for its pin
+- **THEN** the bundle is exactly version 2, not version 3
 
-#### Scenario: Inherited value
-- **GIVEN** a sub-brand that overrides the primary colour only
-- **WHEN** a consumer requests its typography
-- **THEN** the base kit typography is returned
+### Requirement: Initial kit from the overlay theme
 
-#### Scenario: Overridden value
-- **GIVEN** a sub-brand that overrides the primary colour
-- **WHEN** a consumer requests its primary colour
-- **THEN** the sub-brand colour is returned
+(Must) The system SHALL seed the first published brand kit version from the colour roles of the stream overlay theme and from the feather mark, and SHALL NOT take any colour value from another source, such as a colour hard-coded in a renderer.
+
+#### Scenario: Seeded from the overlay theme
+- **GIVEN** the stream overlay theme defines its colour roles and the feather mark is supplied
+- **WHEN** the first brand kit version is published
+- **THEN** the colour tokens carry the overlay theme's role values and the mark is the feather mark
+
+#### Scenario: No colour outside the kit
+- **GIVEN** the first kit version was seeded from the overlay theme
+- **WHEN** the render bundle and the CSS export of that version are requested
+- **THEN** every colour value in them is a value of a kit token and no colour value hard-coded in the external renderer appears
