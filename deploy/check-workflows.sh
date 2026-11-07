@@ -95,6 +95,11 @@ for path, doc in workflows.items():
         if "OneLiteFeatherNET/workflows/" in uses and not re.search(r"@v\d+\.\d+\.\d+$", uses):
             fail(f"{path} job '{job_id}' uses {uses}, which is not pinned to a full SemVer tag")
 
+def push_of(doc):
+    trig = triggers(doc)
+    return trig.get("push") if isinstance(trig, dict) else None
+
+
 # Publishing jobs: gated on the release-please output of this run.
 publishing = ("docker-publish.yml", "sbom-publish.yml")
 for path, doc in workflows.items():
@@ -106,6 +111,19 @@ for path, doc in workflows.items():
         if not publishes:
             continue
         condition = str(job.get("if", ""))
+        if path == ".github/workflows/prototype-images.yml":
+            # Throw-away prototype: publishes outside a release, so it is held to its own invariants
+            # instead: only branches prototype/**, only the prototype-<sha> tag, only the separate
+            # menura-prototype-* image repositories, no extra tags.
+            branches = (push_of(doc) or {}).get("branches") or []
+            with_ = job.get("with") or {}
+            if not branches or not all(str(b).startswith("prototype/") for b in branches):
+                fail(f"{path} must run on prototype/** branches only")
+            if not str(with_.get("image-name", "")).startswith("onelitefeather/menura-prototype-"):
+                fail(f"{path} job '{job_id}' must publish to onelitefeather/menura-prototype-*")
+            if str(with_.get("version", "")) != "${{ needs.version.outputs.tag }}" or "extra-tags" in with_:
+                fail(f"{path} job '{job_id}' must use only the prototype-<sha> tag")
+            continue
         if "needs.release-please.outputs.release_created == 'true'" not in condition:
             fail(f"{path} job '{job_id}' publishes but is not gated on release_created of release-please")
 
