@@ -264,6 +264,57 @@ class DemoStoreTest {
         assertEquals("live-migration-2", created.id());
     }
 
+    // Control and format characters
+
+    @Test
+    void aSeriesNameWithAControlCharacterIsRefusedWith422NamingTheField() {
+        ProblemException problem = refused(() -> store().createSeries(request("Neu\nZeile", "series-k8s",
+                "#FFFFFF", "#neu")));
+
+        assertEquals(422, problem.status());
+        assertTrue(problem.detail().startsWith("name:"), problem.detail());
+        assertFalse(problem.detail().contains("Zeile"), "the raw input is not echoed: " + problem.detail());
+    }
+
+    @Test
+    void aSeriesNameWithAFormatCharacterIsRefusedWith422() {
+        ProblemException problem = refused(() -> store().createSeries(request("Neu\u200Bx", "series-k8s",
+                "#FFFFFF", "#neu")));
+
+        assertEquals(422, problem.status());
+        assertTrue(problem.detail().startsWith("name:"), problem.detail());
+    }
+
+    @Test
+    void aBadgeTextWithAFormatCharacterIsRefusedWith422NamingTheField() {
+        Model.SeriesRequest request = new Model.SeriesRequest("Neu", new Model.Localized("Neu\u202Eok", "New"),
+                "series-k8s", "#FFFFFF", "Kurz:", "#neu", "developers", "THURSDAY", "18:00", Map.of(), null, null);
+
+        ProblemException problem = refused(() -> store().createSeries(request));
+
+        assertEquals(422, problem.status());
+        assertTrue(problem.detail().startsWith("badge.de:"), problem.detail());
+    }
+
+    @Test
+    void anOpeningFormulaWithAControlCharacterIsRefusedWith422NamingTheField() {
+        Model.SeriesRequest request = new Model.SeriesRequest("Neu", new Model.Localized("Neu", "New"),
+                "series-k8s", "#FFFFFF", "Kurz\t:", "#neu", "developers", "THURSDAY", "18:00", Map.of(), null, null);
+
+        ProblemException problem = refused(() -> store().createSeries(request));
+
+        assertEquals(422, problem.status());
+        assertTrue(problem.detail().startsWith("openingFormula:"), problem.detail());
+    }
+
+    @Test
+    void ordinaryTextWithUmlautsAndPunctuationIsStillAccepted() {
+        Model.Series created = store().createSeries(request("Grüße für Ömer: Teil 1", "series-k8s", "#FFFFFF",
+                "#gruesse"));
+
+        assertEquals("Grüße für Ömer: Teil 1", created.name());
+    }
+
     // Warnings
 
     @Test

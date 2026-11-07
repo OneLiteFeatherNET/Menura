@@ -29,6 +29,7 @@ public final class DemoStore {
     private static final Pattern HASHTAG = Pattern.compile("^#[a-z0-9]{2,30}$");
     private static final Pattern SLOT = Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
     private static final Pattern COLOUR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
+    private static final Pattern CONTROL_OR_FORMAT = Pattern.compile("[\\p{Cc}\\p{Cf}]");
 
     static final int MAX_NAME = 80;
     static final int MAX_BADGE_TEXT = 80;
@@ -102,6 +103,7 @@ public final class DemoStore {
             throw unprocessable("Es sind höchstens " + MAX_SERIES + " Serien erlaubt.");
         }
         requireText(request.name(), "name");
+        rejectControlCharacters(request.name(), "name");
         requireText(request.hashtag(), "hashtag");
         requireText(request.colorToken(), "colorToken");
         requireText(request.badgeTextColor(), "badgeTextColor");
@@ -112,6 +114,7 @@ public final class DemoStore {
             throw unprocessable("name: höchstens " + MAX_NAME + " Zeichen erlaubt.");
         }
         checkBadge(request.badge());
+        rejectControlCharacters(request.openingFormula(), "openingFormula");
         if (request.openingFormula() != null && request.openingFormula().length() > MAX_OPENING_FORMULA) {
             throw unprocessable("openingFormula: höchstens " + MAX_OPENING_FORMULA + " Zeichen erlaubt.");
         }
@@ -265,12 +268,21 @@ public final class DemoStore {
         }
     }
 
+    /** Control and format characters (for example line breaks or bidi overrides) have no place in a visible text. */
+    private static void rejectControlCharacters(String value, String field) {
+        if (value != null && CONTROL_OR_FORMAT.matcher(value).find()) {
+            throw unprocessable(field + ": Steuer- und Formatzeichen sind nicht erlaubt.");
+        }
+    }
+
     private static void checkBadge(Model.Localized badge) {
         if (badge == null) {
             throw unprocessable("badge: ist erforderlich.");
         }
         requireText(badge.de(), "badge.de");
         requireText(badge.en(), "badge.en");
+        rejectControlCharacters(badge.de(), "badge.de");
+        rejectControlCharacters(badge.en(), "badge.en");
         if (badge.de().length() > MAX_BADGE_TEXT || badge.en().length() > MAX_BADGE_TEXT) {
             throw unprocessable("badge: jeder Text höchstens " + MAX_BADGE_TEXT + " Zeichen.");
         }

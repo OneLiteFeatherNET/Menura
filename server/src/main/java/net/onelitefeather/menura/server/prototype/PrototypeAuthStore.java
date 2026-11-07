@@ -8,6 +8,7 @@ import net.onelitefeather.menura.server.auth.AuthStore;
 import net.onelitefeather.menura.server.auth.JdbcAuthStore;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Iterator;
@@ -22,24 +23,34 @@ import java.util.concurrent.ConcurrentHashMap;
  * expiry, digests only, one person per Entra ID identity) kept in memory. Sessions end when the server restarts.
  * Active only in the prototype environment.
  *
- * <p>The memory is bounded: every save first removes the expired sign-ins and sessions, and a save that would exceed
- * {@link #MAX_SIGN_INS} or {@link #MAX_SESSIONS} evicts the oldest entries first. Time comes from the injected clock.
+ * <p>The memory is bounded: a save removes the expired entries of its map at most once per {@link #PURGE_INTERVAL},
+ * and a save that would exceed {@link #MAX_SIGN_INS} or {@link #MAX_SESSIONS} evicts the oldest entries first.
+ * Time comes from the injected clock. Sign-ins and sessions have separate locks, so a flood of sign-ins never holds
+ * up a session lookup.
  */
 @Singleton
 @Replaces(JdbcAuthStore.class)
 @Requires(env = "prototype")
 public class PrototypeAuthStore implements AuthStore {
 
-    static final int MAX_SIGN_INS = 10_000;
+    static final int MAX_SIGN_INS = 2_000;
     static final int MAX_SESSIONS = 5_000;
+    /** The least time between two purges of the same map, measured on the injected clock. */
+    static final Duration PURGE_INTERVAL = Duration.ofSeconds(10);
 
     private final Clock clock;
     private final int maxSignIns;
     private final int maxSessions;
-    /** Insertion order is the age order: the first entry is the oldest. Guarded by this store's lock. */
+    private final Object signInLock = new Object();
+    private final Object sessionLock = new Object();
+    /** Insertion order is the age order: the first entry is the oldest. Guarded by {@link #signInLock}. */
     private final Map<String, SignIn> signIns = new LinkedHashMap<>();
+    /** Insertion order is the age order: the first entry is the oldest. Guarded by {@link #sessionLock}. */
     private final Map<String, Session> sessions = new LinkedHashMap<>();
+    /** Thread-safe on its own, so it needs neither lock. */
     private final Map<String, UUID> people = new ConcurrentHashMap<>();
+    private Instant signInsPurgedAt;
+    private Instant sessionsPurgedAt;
 
     @Inject
     public PrototypeAuthStore(Clock clock) {
@@ -53,19 +64,26 @@ public class PrototypeAuthStore implements AuthStore {
     }
 
     @Override
-    public synchronized void saveSignIn(SignIn signIn) {
-        Instant now = clock.instant();
-        signIns.values().removeIf(pending -> !pending.expiresAt().isAfter(now));
-        String key = key(signIn.stateHash());
-        signIns.remove(key);
-        evictOldest(signIns, maxSignIns);
-        signIns.put(key, signIn);
+    public void saveSignIn(SignIn signIn) {
+        synchronized (signInLock) {
+            Instant now = clock.instant();
+            if (purgeDue(signInsPurgedAt, now)) {
+                signIns.values().removeIf(pending -> !pending.expiresAt().isAfter(now));
+                signInsPurgedAt = now;
+            }
+            String key = key(signIn.stateHash());
+            signIns.remove(key);
+            evictOldest(signIns, maxSignIns);
+            signIns.put(key, signIn);
+        }
     }
 
     @Override
-    public synchronized Optional<SignIn> takeSignIn(byte[] stateHash, Instant now) {
-        SignIn taken = signIns.remove(key(stateHash));
-        return taken == null || !taken.expiresAt().isAfter(now) ? Optional.empty() : Optional.of(taken);
+    public Optional<SignIn> takeSignIn(byte[] stateHash, Instant now) {
+        synchronized (signInLock) {
+            SignIn taken = signIns.remove(key(stateHash));
+            return taken == null || !taken.expiresAt().isAfter(now) ? Optional.empty() : Optional.of(taken);
+        }
     }
 
     @Override
@@ -74,40 +92,58 @@ public class PrototypeAuthStore implements AuthStore {
     }
 
     @Override
-    public synchronized void saveSession(Session session) {
-        Instant now = clock.instant();
-        sessions.values().removeIf(live -> !live.expiresAt().isAfter(now));
-        String key = key(session.secretHash());
-        sessions.remove(key);
-        evictOldest(sessions, maxSessions);
-        sessions.put(key, session);
+    public void saveSession(Session session) {
+        synchronized (sessionLock) {
+            Instant now = clock.instant();
+            if (purgeDue(sessionsPurgedAt, now)) {
+                sessions.values().removeIf(live -> !live.expiresAt().isAfter(now));
+                sessionsPurgedAt = now;
+            }
+            String key = key(session.secretHash());
+            sessions.remove(key);
+            evictOldest(sessions, maxSessions);
+            sessions.put(key, session);
+        }
     }
 
     /** Refreshes the last-seen time of a live session atomically; an expired session is never returned. */
     @Override
-    public synchronized Optional<Session> findSession(byte[] secretHash, Instant now) {
-        String key = key(secretHash);
-        Session found = sessions.get(key);
-        if (found == null || !found.expiresAt().isAfter(now)) {
-            return Optional.empty();
+    public Optional<Session> findSession(byte[] secretHash, Instant now) {
+        synchronized (sessionLock) {
+            String key = key(secretHash);
+            Session found = sessions.get(key);
+            if (found == null || !found.expiresAt().isAfter(now)) {
+                return Optional.empty();
+            }
+            Session touched = new Session(found.secretHash(), found.personId(), found.subject(), found.roles(),
+                    found.createdAt(), found.expiresAt(), now);
+            sessions.put(key, touched);
+            return Optional.of(touched);
         }
-        Session touched = new Session(found.secretHash(), found.personId(), found.subject(), found.roles(),
-                found.createdAt(), found.expiresAt(), now);
-        sessions.put(key, touched);
-        return Optional.of(touched);
     }
 
     @Override
-    public synchronized void deleteSession(byte[] secretHash) {
-        sessions.remove(key(secretHash));
+    public void deleteSession(byte[] secretHash) {
+        synchronized (sessionLock) {
+            sessions.remove(key(secretHash));
+        }
     }
 
-    synchronized int pendingSignIns() {
-        return signIns.size();
+    int pendingSignIns() {
+        synchronized (signInLock) {
+            return signIns.size();
+        }
     }
 
-    synchronized int sessionCount() {
-        return sessions.size();
+    int sessionCount() {
+        synchronized (sessionLock) {
+            return sessions.size();
+        }
+    }
+
+    /** True when a map was never purged or its last purge is at least {@link #PURGE_INTERVAL} ago. */
+    private static boolean purgeDue(Instant lastPurge, Instant now) {
+        return lastPurge == null || !now.isBefore(lastPurge.plus(PURGE_INTERVAL));
     }
 
     /** Removes the oldest entries until one more can be added without exceeding the capacity. */
