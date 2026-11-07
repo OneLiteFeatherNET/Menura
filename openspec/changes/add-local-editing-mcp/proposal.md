@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(desktop)` (code PR). Phase: 5 (Local & Brand). Depends on: `add-content-library`, `add-brand-kit`, `add-media-job-queue` (cut-proposal jobs), `add-access-control`
+Conventional Commits: `feat(desktop)` (code PR). Phase: 5 (Local & Brand). Depends on: `add-content-library`, `add-brand-kit`, `add-brand-profiles`, `add-media-job-queue` (cut-proposal jobs), `add-access-control`
 (device-bound tokens), `add-client-and-mcp-auth` (device sign-in and MCP authorization), `add-hub-mcp-server` (the hub tools and the editing playbook), `add-recording-ingest` (sources), `add-local-transcription` (speech model, GPU PC setup).
 
 Strand: content.
