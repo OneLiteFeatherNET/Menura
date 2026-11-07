@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(instagram)` (code PR). Phase: 1 (Platforms & Statistics). Depends on: `add-channel-connections`, `add-external-post-import`, `add-content-analytics`.
+Conventional Commits: `feat(instagram)` (code PR). Phase: 2 (Planning & Scheduling). Depends on: `add-channel-connections`, `add-external-post-import`, `add-content-analytics`.
 
 Strand: platform.
 
