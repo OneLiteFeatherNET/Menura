@@ -18,12 +18,35 @@ export interface NavItem {
   label: string;
 }
 
-export const PRIMARY_NAV: readonly NavItem[] = [
-  { to: '/', label: 'Übersicht' },
-  { to: '/serien', label: 'Serien' },
-  { to: '/brand-kit', label: 'Brand-Kit' },
-  { to: '/join-attribution', label: 'Join-Attribution' },
-  { to: '/analytics', label: 'Analytics' },
+export interface NavGroup {
+  id: string;
+  title: string;
+  items: readonly NavItem[];
+}
+
+/** Working pages of Phase 1, grouped by purpose in the rail. */
+export const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    id: 'overview',
+    title: 'Überblick',
+    items: [{ to: '/', label: 'Übersicht' }],
+  },
+  {
+    id: 'recognition',
+    title: 'Wiedererkennung',
+    items: [
+      { to: '/serien', label: 'Serien' },
+      { to: '/brand-kit', label: 'Brand-Kit' },
+    ],
+  },
+  {
+    id: 'measurability',
+    title: 'Messbarkeit',
+    items: [
+      { to: '/join-attribution', label: 'Join-Attribution' },
+      { to: '/analytics', label: 'Analytics' },
+    ],
+  },
 ];
 
 /** Later phases of Menura: greyed in the rail, each opens a placeholder page. */

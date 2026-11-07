@@ -9,7 +9,6 @@ defineProps<{
 
 <template>
   <header class="top-bar">
-    <h1 class="brand">Menura</h1>
     <span class="prototype-chip">Prototyp · Demo-Daten</span>
     <div class="spacer"></div>
     <ul class="roles" aria-label="Deine Rollen">
@@ -30,14 +29,6 @@ defineProps<{
   background: var(--md-sys-color-surface-variant);
   color: var(--md-sys-color-on-surface-variant);
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.brand {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 500;
-  line-height: 32px;
-  color: var(--md-sys-color-on-surface);
 }
 
 .prototype-chip {
