@@ -7,6 +7,7 @@ import LoadState from '../components/LoadState.vue';
 import NewSeriesDialog from '../components/NewSeriesDialog.vue';
 import { useAsync } from '../composables/useAsync';
 import { audienceLabel, formatCount, formatPublished, weekdayLabel } from '../domain/format';
+import { safeHttpsUrl } from '../domain/url';
 
 // Value of the "keine Serie" entry in the assignment select.
 const NO_SERIES = 'none';
@@ -37,8 +38,9 @@ function channelName(channelId: string): string {
   return data.value?.channels.find((channel) => channel.id === channelId)?.name ?? channelId;
 }
 
+/** The first playlist link of a series, when it is an https URL. Anything else renders no link. */
 function firstPlaylist(series: Series): string | undefined {
-  return Object.values(series.playlists)[0];
+  return safeHttpsUrl(Object.values(series.playlists)[0]);
 }
 
 async function assign(post: Post, value: string): Promise<void> {
