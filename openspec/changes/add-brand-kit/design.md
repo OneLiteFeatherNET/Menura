@@ -63,7 +63,7 @@ Constraints from the project context: the cluster runs no ffmpeg and no renderin
 
 - [Risk] Overlay browser sources cache old theme values → Mitigation: the theme request includes the version number, so a new version is a new URL.
 - [Risk] Tonal palette algorithm output changes between releases, shifting colours → Mitigation: the derived tones are stored in each version, so an existing version never changes when the algorithm is updated.
-- [Risk] Template parameters grow into a second language → Mitigation: the parameters title, subtitle and image slot are required; the cta slot of the short adds the text parameter join_host, which this change proposes explicitly; any further parameter needs a change proposal.
+- [Risk] Template parameters grow into a second language → Mitigation: the parameters title, subtitle and image slot are required; the cta slot of the short adds the text parameter join_domain, which this change proposes explicitly and which takes the one installation-wide join domain for every channel; any further parameter needs a change proposal.
 - [Risk] The external renderer and the seeded first version disagree on a colour during the transition → Mitigation: the renderer reads the render bundle only, so after the switch it has no colour of its own to disagree with.
 - [Trade-off] Storing whole versions uses more space than deltas; the kit is small, so the cost is negligible compared with media.
 

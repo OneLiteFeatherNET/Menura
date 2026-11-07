@@ -74,7 +74,7 @@ Defines the layout templates that turn brand and content into finished output: s
 
 ### Requirement: Short 9:16 template
 
-(Must) The system SHALL provide a short 9:16 template of 1080 by 1920 pixels that declares the slots badge, title, captions, session-tiles and cta; SHALL show the badge for the whole duration of a short, the title only from 0 to 3 seconds and the cta only during the last 2 seconds; SHALL declare the text parameter join_host for the cta; and SHALL NOT contain an end card.
+(Must) The system SHALL provide a short 9:16 template of 1080 by 1920 pixels that declares the slots badge, title, captions, session-tiles and cta; SHALL show the badge for the whole duration of a short, the title only from 0 to 3 seconds and the cta only during the last 2 seconds; SHALL declare the text parameter join_domain for the cta, which takes the one installation-wide join domain, identical for every channel; and SHALL NOT contain an end card.
 
 #### Scenario: Badge for the whole duration
 - **GIVEN** a 30-second short rendered with the short 9:16 template
@@ -87,14 +87,19 @@ Defines the layout templates that turn brand and content into finished output: s
 - **THEN** the title is visible at 2.5 seconds and not visible at 3.5 seconds
 
 #### Scenario: Call to action in the last two seconds
-- **GIVEN** a 30-second short rendered with the short 9:16 template and a join_host text
+- **GIVEN** a 30-second short rendered with the short 9:16 template and the installation-wide join_domain text
 - **WHEN** the cta slot is evaluated at 20 seconds and at 28.5 seconds
 - **THEN** the cta is not visible at 20 seconds and visible at 28.5 seconds
 
-#### Scenario: join_host required
-- **GIVEN** the cta slot declares the text parameter join_host
-- **WHEN** a short is rendered without a join_host value
-- **THEN** the system rejects the request and names the missing parameter join_host
+#### Scenario: join_domain required
+- **GIVEN** the cta slot declares the text parameter join_domain
+- **WHEN** a short is rendered without a join_domain value
+- **THEN** the system rejects the request and names the missing parameter join_domain
+
+#### Scenario: Same join_domain for every channel
+- **GIVEN** two shorts rendered for two different channels with the short 9:16 template
+- **WHEN** the cta slot of each short is evaluated
+- **THEN** both ctas show the same join_domain value, the one installation-wide join domain
 
 #### Scenario: No end card
 - **GIVEN** the short 9:16 template

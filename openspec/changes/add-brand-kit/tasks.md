@@ -40,7 +40,7 @@
 - [ ] 4.3 Write failing unit tests that each required format exists, that parameters must be declared, and that undeclared or missing parameters are refused; verify they fail.
 - [ ] 4.4 Implement the template formats and parameter validation; verify the 4.3 tests pass.
 - [ ] 4.5 Write failing unit tests that the short 9:16 template is 1080 by 1920 pixels and declares the slots badge, title, captions, session-tiles and cta; verify they fail.
-- [ ] 4.6 Write failing unit tests that the badge is visible for the whole duration, the title only from 0 to 3 seconds, the cta only during the last 2 seconds, the cta requires the text parameter join_host, and no end card exists; verify they fail.
+- [ ] 4.6 Write failing unit tests that the badge is visible for the whole duration, the title only from 0 to 3 seconds, the cta only during the last 2 seconds, the cta requires the text parameter join_domain, the same installation-wide join domain is used for every channel, and no end card exists; verify they fail.
 - [ ] 4.7 Implement the short 9:16 template with its slots, timing and parameters; verify the 4.5 and 4.6 tests pass.
 - [ ] 4.8 Write failing unit tests that a template whose badge, title, captions or logo slot lies in the top 14 % or bottom 35 % of the frame is refused and the slot is named, and that a template inside the safe zone is accepted; verify they fail.
 - [ ] 4.9 Implement the safe-zone validation on save; verify the 4.8 tests pass.
