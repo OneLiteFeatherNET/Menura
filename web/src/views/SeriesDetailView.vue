@@ -5,6 +5,7 @@ import FirstJoins from '../components/FirstJoins.vue';
 import LoadState from '../components/LoadState.vue';
 import ViewPercent from '../components/ViewPercent.vue';
 import { useAsync } from '../composables/useAsync';
+import { badgeColors } from '../domain/color';
 import {
   audienceLabel,
   formatCount,
@@ -51,7 +52,7 @@ function channelName(channelId: string): string {
           <div class="head-main">
             <span
               class="badge"
-              :style="{ background: data.series.color, color: data.series.badgeTextColor }"
+              :style="badgeColors(data.series.color, data.series.badgeTextColor)"
             >{{ data.series.badge.de }}</span>
             <h2>{{ data.series.name }}</h2>
             <p class="page-lead">

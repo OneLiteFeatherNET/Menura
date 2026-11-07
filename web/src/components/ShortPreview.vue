@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Channel, Series, SlotDefinition, Template } from '../api/types';
+import { badgeColors } from '../domain/color';
 import {
   CANVAS,
   isSlotVisible,
@@ -39,10 +40,9 @@ const canvas = computed(() => ({
 
 const bands = computed(() => safeBands(props.template, props.scale));
 
-const badgeStyle = computed(() => ({
-  background: props.series?.color ?? '#5C5870',
-  color: props.series?.badgeTextColor ?? '#FFFFFF',
-}));
+const badgeStyle = computed(() =>
+  badgeColors(props.series?.color ?? '#5C5870', props.series?.badgeTextColor ?? '#FFFFFF'),
+);
 
 function isVisible(slot: SlotDefinition): boolean {
   return isSlotVisible(slot, props.second);

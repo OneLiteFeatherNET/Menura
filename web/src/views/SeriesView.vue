@@ -6,6 +6,7 @@ import type { Post, Series } from '../api/types';
 import LoadState from '../components/LoadState.vue';
 import NewSeriesDialog from '../components/NewSeriesDialog.vue';
 import { useAsync } from '../composables/useAsync';
+import { badgeColors } from '../domain/color';
 import { audienceLabel, formatCount, formatPublished, weekdayLabel } from '../domain/format';
 import { safeHttpsUrl } from '../domain/url';
 
@@ -85,7 +86,7 @@ function onCreated(): void {
             <RouterLink :to="{ name: 'series-detail', params: { id: series.id } }" class="series-link">
               <span
                 class="badge"
-                :style="{ background: series.color, color: series.badgeTextColor }"
+                :style="badgeColors(series.color, series.badgeTextColor)"
               >{{ series.badge.de }}</span>
               <h3>{{ series.name }}</h3>
               <span class="hashtag">{{ series.hashtag }}</span>
