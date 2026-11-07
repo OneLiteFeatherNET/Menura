@@ -20,6 +20,9 @@ import java.util.UUID;
 @Requires(env = "prototype")
 public class PrototypeCalendarFeedTokenRepository implements CalendarFeedTokenRepository {
 
+    /** The most rows kept; the oldest one goes first, so the memory stays bounded. */
+    static final int MAX_TOKENS = 1_000;
+
     private final List<FeedToken> rows = new ArrayList<>();
 
     @Override
@@ -39,6 +42,9 @@ public class PrototypeCalendarFeedTokenRepository implements CalendarFeedTokenRe
 
     @Override
     public synchronized void insert(Connection connection, FeedToken token) {
+        if (rows.size() >= MAX_TOKENS) {
+            rows.remove(0);
+        }
         rows.add(token);
     }
 }
