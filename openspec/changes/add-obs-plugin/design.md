@@ -35,7 +35,7 @@ OBS Studio loads native plugins through libobs. Streaming PCs run Windows, macOS
 
 **Installer and updater per OS with signed packages.** Windows and macOS use their platform signing; Linux uses a signed package repository. Alternative: a single archive without signature (rejected: principle 12).
 
-**One profile per person.** The plugin applies the signed-in person's single profile, which `add-brand-kit` gives every
+**One profile per person.** The plugin applies the signed-in person's single profile, which `add-brand-profiles` gives every
 person exactly once, so there is no profile selection in the plugin. Rejected: letting the person choose among several
 profiles on each PC (the hub defines one profile per person, and a selector would create a PC-local state that the hub
 does not know about).
