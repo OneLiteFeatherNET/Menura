@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(overlay)` (code PR). Phase: 6 (Overlay). Depends on: `add-content-analytics`, `add-access-control` (identity, token and session rules), `add-brand-kit` (overlay theme template, `brand-profiles` for personal overrides), `add-hub-mcp-server` (hub MCP tools for scene state and module actions).
+Conventional Commits: `feat(overlay)` (code PR). Phase: 6 (Overlay). Depends on: `add-content-analytics`, `add-access-control` (identity, token and session rules), `add-brand-kit` (overlay theme template), `add-brand-profiles` (personal overrides), `add-hub-mcp-server` (hub MCP tools for scene state and module actions).
 
 Strand: overlay.
 
@@ -51,6 +51,6 @@ the team, and cannot be themed from the brand kit or adapted per streamer.
 - New hub endpoints for templates, variants, modules, the module registry and scene feeds (SSE), built on the access-control model.
 - New web views for template editing and the operator panel.
 - New overlay browser-source application (Vue 3) rendering variants from the feed.
-- Depends on the brand kit for the overlay theme and brand profiles, and on access control for tokens and roles.
+- Depends on the brand kit for the overlay theme, on `add-brand-profiles` for brand profiles, and on access control for tokens and roles.
 - The OBS plugin (`add-obs-plugin`) consumes the variant URLs and rotates tokens; it is not a dependency of this change.
 - The lab prototype `overlay` is the reference for domain rules only; no code is copied.
