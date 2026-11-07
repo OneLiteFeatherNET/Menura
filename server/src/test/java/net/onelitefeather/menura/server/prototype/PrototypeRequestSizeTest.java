@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * The prototype caps the request body at 64 KiB. The cap is set in application-prototype.yml; the server refuses a larger
- * body with 413 before any handler runs.
+ * The prototype caps the request body at 64 KiB. The cap is set in application-prototype.yml; the server refuses
+ * a larger body with 413 before any handler runs.
  */
 @MicronautTest(environments = "prototype")
 class PrototypeRequestSizeTest {

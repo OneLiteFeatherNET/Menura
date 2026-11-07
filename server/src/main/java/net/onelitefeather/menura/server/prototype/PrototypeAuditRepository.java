@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Keeps the most recent audit entries of the prototype in memory, in the order they were written. The log is a ring of
- * {@link #CAPACITY} entries: the insert that exceeds the capacity drops the oldest entry, so the memory of a long-running
+ * {@link #CAPACITY} entries: an insert beyond the capacity drops the oldest entry, so the memory of a long-running
  * prototype stays bounded. All access holds the lock of this repository.
  */
 @Singleton
