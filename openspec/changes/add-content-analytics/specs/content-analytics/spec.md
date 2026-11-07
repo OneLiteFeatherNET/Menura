@@ -91,17 +91,17 @@ Content analytics keeps the performance history of every external post, whether 
 - **THEN** the hub returns the result within one second from the rollups
 
 ### Requirement: Internal metric sources
-(Must) The hub SHALL accept metric points from registered internal sources for a channel, an external post or a series, each under its own registered metric names; SHALL store, roll up and read these points like platform metrics; SHALL mark every point with its source; and SHALL keep an estimate flag on points that a source reports as estimates and show it on every read.
+(Must) The hub SHALL accept metric points from registered internal sources for the installation as a whole, a channel, an external post or a series, each under its own registered metric names; SHALL store, roll up and read these points like platform metrics; SHALL mark every point with its source; and SHALL keep an estimate flag on points that a source reports as estimates and show it on every read.
 
-#### Scenario: Source points stored like platform metrics
-- **GIVEN** a registered internal source that writes the metric "first joins" for a channel on a given day
-- **WHEN** the source writes the point
-- **THEN** the hub stores it with the channel, the metric name, the value and the source, and the daily rollup of that channel includes it
+#### Scenario: First joins per day in total and per stated source
+- **GIVEN** a registered internal source that writes the metric "first joins" for the installation on a given day, with the answers to the optional in-game question as stated sources
+- **WHEN** the source writes the points
+- **THEN** the hub stores a total point and one point per stated source with the metric name, the value and the source, without a channel, the daily rollup of the installation includes them, and each per-platform number is labelled "stated by players" and shown with the answer rate
 
-#### Scenario: Estimate shown
-- **GIVEN** a registered source that reports first joins attributed to an external post as an estimate over a 72 hour window
-- **WHEN** a person reads the analytics of that post
-- **THEN** the value is shown with the estimate flag and its attribution window
+#### Scenario: Post estimate over the 72 hour window
+- **GIVEN** a registered source that reports first joins attributed to external posts as an estimate, splitting each first join evenly over all posts published in the 72 hours before it, restricted to the posts of the answered platform when the answer names a platform
+- **WHEN** a person reads the analytics of a post
+- **THEN** the value is shown with the estimate flag and the 72 hour attribution window
 
 #### Scenario: Estimates kept in rollups
 - **GIVEN** a daily rollup that includes estimated and measured points of the same metric
@@ -132,7 +132,7 @@ Content analytics keeps the performance history of every external post, whether 
 - **THEN** the average view percentage is shown as unavailable and the engaged views are still shown
 
 #### Scenario: Internal source metric in the comparison
-- **GIVEN** a registered source that reports first joins of a series for a week as an estimate
+- **GIVEN** a registered source that reports first joins of a series for a week as an estimate, the sum of the post estimates of the series' posts in that week
 - **WHEN** the comparison for that week is shown
 - **THEN** the first joins of the series are shown with the estimate flag
 
