@@ -1,0 +1,7 @@
+# The throw-away prototype (see net.onelitefeather.menura.server.prototype). Active when MICRONAUT_ENVIRONMENTS
+# contains "prototype", alone or after "prod". The server then runs without PostgreSQL: no datasource, no connection
+# pool, no Flyway. Sign-in with Entra ID stays the production sign-in; the sign-in store, the audit log and the
+# calendar feed tokens are in memory, and the demo API answers under /api/prototype.
+datasources:
+  default:
+    enabled: false
