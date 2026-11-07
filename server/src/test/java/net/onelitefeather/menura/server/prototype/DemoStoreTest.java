@@ -228,9 +228,9 @@ class DemoStoreTest {
     }
 
     @Test
-    void aHashtagAlreadyUsedByAnotherSeriesIsRefusedIgnoringCase() {
+    void aHashtagAlreadyUsedByAnotherSeriesIsRefused() {
         ProblemException problem = refused(() -> store().createSeries(request("Neu", "series-k8s", "#FFFFFF",
-                "#K8SIN30")));
+                "#k8sin30")));
 
         assertEquals(422, problem.status());
         assertTrue(problem.detail().contains("k8s-30s"), problem.detail());
@@ -250,9 +250,10 @@ class DemoStoreTest {
                 "#neu")));
 
         assertEquals(422, problem.status());
-        assertTrue(problem.detail().contains("#7FB0FF"), problem.detail());
+        assertTrue(problem.detail().startsWith("badgeTextColor:"), problem.detail());
         assertTrue(problem.detail().contains("#2F6FEB"), problem.detail());
         assertTrue(problem.detail().contains("2.08:1"), problem.detail());
+        assertFalse(problem.detail().contains("#7FB0FF"), "the raw colour is not echoed: " + problem.detail());
     }
 
     @Test
