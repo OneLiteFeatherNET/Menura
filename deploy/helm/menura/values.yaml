@@ -22,6 +22,13 @@ imagePullSecrets: []
 # Every component listens on this port inside its container.
 httpPort: 8080
 
+# The migrate hook: a pre-install and pre-upgrade Job that runs `jobs run migrate` against the database before the
+# Deployments roll out. Set it to false when no PostgreSQL database is used, as in the prototype environment
+# (MICRONAUT_ENVIRONMENTS=prod,prototype), or when the schema is migrated another way; the chart then renders no
+# migrate Job and the release does not wait for one.
+migrate:
+  enabled: true
+
 database:
   # JDBC URL of the PostgreSQL 17 cluster (OLF CloudNativePG). No credentials.
   url: jdbc:postgresql://menura-postgres-rw:5432/menura

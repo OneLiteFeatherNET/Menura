@@ -1,8 +1,9 @@
 {{- /*
 The migrate hook: applies the Flyway migrations of core (`jobs run migrate`)
 before the Deployments of a release roll out. Hook weight -5 puts it before the
-default-weight resources of the same hook phase.
+default-weight resources of the same hook phase. `migrate.enabled=false` renders nothing.
 */ -}}
+{{- if .Values.migrate.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -39,3 +40,4 @@ spec:
             {{- include "menura.databaseEnv" . | nindent 12 }}
           {{- include "menura.databaseEnvFrom" . | nindent 10 }}
           {{- include "menura.containerSecurity" . | nindent 10 }}
+{{- end }}
