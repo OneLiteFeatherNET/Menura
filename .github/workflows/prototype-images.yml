@@ -1,5 +1,5 @@
 # Throw-away prototype: publishes the server, jobs and web images of the branch prototype/recognition to
-# Harbor as onelitefeather/menura-prototype-{server,jobs,web} under the tag prototype-<short sha> (plus the
+# Harbor as onelitefeather/menura-prototype-{server,jobs,web} under the tag prototype-<commit sha> (plus the
 # sha-<short sha> tag of docker-publish), for the internal menura-dev release. The separate repositories keep
 # it away from the production images; deploy/check-workflows.sh holds this file to those invariants.
 # Same reusable workflows and pins as release-please.yml. Remove together with the prototype branch.
@@ -17,21 +17,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  version:
-    name: Resolve prototype tag
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.tag.outputs.tag }}
-    steps:
-      - id: tag
-        run: echo "tag=prototype-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
   build-server-context:
     name: Build server Docker context
-    needs: version
     uses: OneLiteFeatherNET/workflows/.github/workflows/gradle-docker-context.yml@v2.9.1
     with:
-      version: ${{ needs.version.outputs.tag }}
+      version: prototype-${{ github.sha }}
       gradle-command: "./gradlew :server:buildLayers :server:dockerfile -Pversion=$VERSION"
       context-path: "server/build/docker/main"
       artifact-name: "docker-context-server"
@@ -40,10 +30,9 @@ jobs:
 
   build-jobs-context:
     name: Build jobs Docker context
-    needs: version
     uses: OneLiteFeatherNET/workflows/.github/workflows/gradle-docker-context.yml@v2.9.1
     with:
-      version: ${{ needs.version.outputs.tag }}
+      version: prototype-${{ github.sha }}
       gradle-command: "./gradlew :jobs:installDist -Pversion=$VERSION"
       context-path: "jobs/build/install/jobs"
       artifact-name: "docker-context-jobs"
@@ -52,47 +41,55 @@ jobs:
 
   image-server:
     name: Publish server image
-    needs: [version, build-server-context]
+    needs: build-server-context
     permissions:
       contents: read
       id-token: write   # keyless cosign signing
     uses: OneLiteFeatherNET/workflows/.github/workflows/docker-publish.yml@v2.9.1
     with:
       image-name: "onelitefeather/menura-prototype-server"
-      version: ${{ needs.version.outputs.tag }}
+      version: prototype-${{ github.sha }}
       context: "server/build/docker/main"
       artifact-name: "docker-context-server"
       blob-chunk: "90000000"   # ~90 MB, under the 100 MB Cloudflare cap
       req-concurrent: "4"
-    secrets: inherit
+    secrets:
+      HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
 
   image-jobs:
     name: Publish jobs image
-    needs: [version, build-jobs-context]
+    needs: build-jobs-context
     permissions:
       contents: read
       id-token: write   # keyless cosign signing
     uses: OneLiteFeatherNET/workflows/.github/workflows/docker-publish.yml@v2.9.1
     with:
       image-name: "onelitefeather/menura-prototype-jobs"
-      version: ${{ needs.version.outputs.tag }}
+      version: prototype-${{ github.sha }}
       context: "jobs/build/install/jobs"
       dockerfile: "jobs/Dockerfile"
       artifact-name: "docker-context-jobs"
       blob-chunk: "90000000"
       req-concurrent: "4"
-    secrets: inherit
+    secrets:
+      HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
 
   image-web:
     name: Publish web image
-    needs: version
     permissions:
       contents: read
       id-token: write   # keyless cosign signing
     uses: OneLiteFeatherNET/workflows/.github/workflows/docker-publish.yml@v2.9.1
     with:
       image-name: "onelitefeather/menura-prototype-web"
-      version: ${{ needs.version.outputs.tag }}
+      version: prototype-${{ github.sha }}
       context: "."
       dockerfile: "web/Dockerfile"
-    secrets: inherit
+    secrets:
+      HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}

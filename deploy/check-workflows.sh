@@ -113,16 +113,20 @@ for path, doc in workflows.items():
         condition = str(job.get("if", ""))
         if path == ".github/workflows/prototype-images.yml":
             # Throw-away prototype: publishes outside a release, so it is held to its own invariants
-            # instead: only branches prototype/**, only the prototype-<sha> tag, only the separate
-            # menura-prototype-* image repositories, no extra tags.
+            # instead: only branches prototype/**, only the prototype-<commit sha> tag, only the three
+            # separate menura-prototype-* repositories, no extra tags, and only the three Harbor secrets.
             branches = (push_of(doc) or {}).get("branches") or []
             with_ = job.get("with") or {}
+            allowed = {f"onelitefeather/menura-prototype-{c}" for c in ("server", "jobs", "web")}
             if not branches or not all(str(b).startswith("prototype/") for b in branches):
                 fail(f"{path} must run on prototype/** branches only")
-            if not str(with_.get("image-name", "")).startswith("onelitefeather/menura-prototype-"):
-                fail(f"{path} job '{job_id}' must publish to onelitefeather/menura-prototype-*")
-            if str(with_.get("version", "")) != "${{ needs.version.outputs.tag }}" or "extra-tags" in with_:
-                fail(f"{path} job '{job_id}' must use only the prototype-<sha> tag")
+            if str(with_.get("image-name", "")) not in allowed:
+                fail(f"{path} job '{job_id}' must publish to one of {sorted(allowed)}")
+            if str(with_.get("version", "")) != "prototype-${{ github.sha }}" or "extra-tags" in with_:
+                fail(f"{path} job '{job_id}' must use only the tag prototype-${{{{ github.sha }}}}")
+            secrets = job.get("secrets")
+            if not isinstance(secrets, dict) or set(secrets) != {"HARBOR_REGISTRY", "HARBOR_USERNAME", "HARBOR_PASSWORD"}:
+                fail(f"{path} job '{job_id}' must pass exactly the three Harbor secrets, not secrets: inherit")
             continue
         if "needs.release-please.outputs.release_created == 'true'" not in condition:
             fail(f"{path} job '{job_id}' publishes but is not gated on release_created of release-please")
