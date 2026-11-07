@@ -30,7 +30,7 @@ empty, and have Claude draft the next post for a human to review.
 - The hub never edits video: no tool renders, cuts or transcodes media, checked by a test of the tool surface.
 - A registration port through which the other capability changes add their tools. Each change adds its own MCP tools
   in its own change: library tools and transcript search (`add-content-library`), media job tools
-  (`add-media-job-queue`), brand resources and workflow prompts (`add-brand-kit`), the editing playbook
+  (`add-media-job-queue`), brand resources (`add-brand-profiles`) and workflow prompts (`add-brand-kit`), the editing playbook
   (`add-local-editing-mcp`) and overlay tools (`add-overlay-system`). This change does not define them.
 - Stream heartbeat: an open MCP stream carries a keep-alive at least every 30 seconds.
 
