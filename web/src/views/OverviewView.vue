@@ -3,7 +3,7 @@ import { computed, onMounted } from 'vue';
 import { api } from '../api/client';
 import LoadState from '../components/LoadState.vue';
 import { useAsync } from '../composables/useAsync';
-import { latestWeekOf, PLATFORM_ORDER, totalsByPlatform } from '../domain/attribution';
+import { latestWeekOf, SOURCE_ORDER, summaryOf } from '../domain/attribution';
 import { formatCount, PLATFORM_LABELS } from '../domain/format';
 
 const WARNING_TITLES: Record<string, string> = {
@@ -27,13 +27,11 @@ onMounted(run);
 
 const week = computed(() => (data.value ? latestWeekOf(data.value.weekly) : null));
 
-const totals = computed(() =>
-  data.value && week.value ? totalsByPlatform(data.value.weekly, week.value) : null,
+const summary = computed(() =>
+  data.value && week.value ? summaryOf(data.value.weekly, week.value) : null,
 );
 
-const newPlayers = computed(() =>
-  totals.value ? PLATFORM_ORDER.reduce((sum, platform) => sum + (totals.value?.[platform] ?? 0), 0) : 0,
-);
+const newPlayers = computed(() => summary.value?.firstJoins ?? 0);
 
 const weekCoverage = computed(() =>
   data.value && week.value ? data.value.coverage.filter((row) => row.week === week.value) : [],
@@ -77,11 +75,11 @@ function warningTitle(kind: string): string {
           <article class="card kpi kpi-wide">
             <p class="kpi-label">Neue Spieler · {{ week ?? '–' }}</p>
             <p class="kpi-value">{{ formatCount(newPlayers) }}</p>
-            <p class="muted">gemessene Erstjoins, alle Kanäle</p>
+            <p class="muted">Erstjoins gesamt · Quelle laut Spielern</p>
             <ul class="split">
-              <li v-for="platform in PLATFORM_ORDER" :key="platform">
-                <span>{{ PLATFORM_LABELS[platform] }}</span>
-                <strong>{{ formatCount(totals?.[platform] ?? 0) }}</strong>
+              <li v-for="source in SOURCE_ORDER" :key="source">
+                <span>{{ PLATFORM_LABELS[source] }}</span>
+                <strong>{{ formatCount(summary?.bySource[source] ?? 0) }}</strong>
               </li>
             </ul>
           </article>

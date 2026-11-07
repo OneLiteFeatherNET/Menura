@@ -20,7 +20,7 @@ public final class Model {
     }
 
     @Serdeable
-    public record Channel(String id, String platform, String name, String joinHost, Localized ctaText) {
+    public record Channel(String id, String platform, String name) {
     }
 
     /**
@@ -79,9 +79,19 @@ public final class Model {
     public record Coverage(String channelId, String week, int shorts, int covered, double share, boolean flagged) {
     }
 
-    /** Measured first joins of one week. {@code channelId} is null for "direct". */
+    /**
+     * The measured first joins of one week. {@code answered} counts the first joins that named a source, and
+     * {@code answerRate} is answered / firstJoins rounded to two decimals. {@code bySource} lists every source in
+     * the fixed order of {@link JoinAttribution#SOURCES}, zeros included.
+     */
     @Serdeable
-    public record WeeklyAttribution(String week, String platform, String channelId, int firstJoins) {
+    public record WeeklyAttribution(String week, int firstJoins, int answered, double answerRate,
+                                    List<SourceCount> bySource) {
+    }
+
+    /** The first joins of one stated source (a platform, friends, other or unanswered). */
+    @Serdeable
+    public record SourceCount(String source, int firstJoins) {
     }
 
     @Serdeable
@@ -114,17 +124,22 @@ public final class Model {
     public record Template(String id, int width, int height, SafeZone safeZone, List<Slot> slots) {
     }
 
+    /** {@code joinDomain} is the one domain all players join over; {@code cta} is the one call to action. */
     @Serdeable
     public record BrandKit(int version, String source, List<Token> tokens, List<Mark> marks,
-                           List<Template> templates) {
+                           List<Template> templates, String joinDomain, Localized cta) {
     }
 
     @Serdeable
-    public record RenderBundle(int kitVersion, BrandKit brandKit, List<Series> series, List<Channel> channels) {
+    public record RenderBundle(int kitVersion, BrandKit brandKit, String joinDomain, Localized cta,
+                               List<Series> series, List<Channel> channels) {
     }
 
-    /** One join as the join service reported it. No player identifier exists in this model. Not served. */
-    public record JoinEvent(String host, boolean firstJoin, Instant at) {
+    /**
+     * One join as the join service reported it. {@code answer} is what the player named in the in-game question on
+     * the first join; null when unanswered. No player identifier exists in this model. Not served.
+     */
+    public record JoinEvent(String answer, boolean firstJoin, Instant at) {
     }
 
     /** One short in the seed, before the assignment rule has run. Not served. */

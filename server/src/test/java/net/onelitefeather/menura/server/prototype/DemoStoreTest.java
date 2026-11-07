@@ -109,24 +109,50 @@ class DemoStoreTest {
         assertEquals(4, bundle.series().size());
         assertEquals(3, bundle.channels().size());
         assertEquals(1, bundle.brandKit().version());
+        assertEquals("onelitefeather.net", bundle.joinDomain());
+        assertEquals("Spiel mit uns: onelitefeather.net", bundle.cta().de());
     }
 
     @Test
-    void theSeedAttributesJoinsToChannelsAndDirectPerWeek() {
+    void theSeedCountsFirstJoinsAndTheStatedSourcesPerWeek() {
         assertEquals(List.of(
-                new Model.WeeklyAttribution("2026-W44", "youtube", "yt-de", 2),
-                new Model.WeeklyAttribution("2026-W44", "tiktok", "tt-de", 1),
-                new Model.WeeklyAttribution("2026-W44", "instagram", "ig-de", 2),
-                new Model.WeeklyAttribution("2026-W44", "direct", null, 2),
-                new Model.WeeklyAttribution("2026-W45", "youtube", "yt-de", 3),
-                new Model.WeeklyAttribution("2026-W45", "tiktok", "tt-de", 1)), store().attribution());
+                new Model.WeeklyAttribution("2026-W44", 9, 5, 0.56, List.of(
+                        new Model.SourceCount("youtube", 2), new Model.SourceCount("tiktok", 1),
+                        new Model.SourceCount("instagram", 2), new Model.SourceCount("twitch", 0),
+                        new Model.SourceCount("friends", 0), new Model.SourceCount("other", 0),
+                        new Model.SourceCount("unanswered", 4))),
+                new Model.WeeklyAttribution("2026-W45", 11, 7, 0.64, List.of(
+                        new Model.SourceCount("youtube", 3), new Model.SourceCount("tiktok", 1),
+                        new Model.SourceCount("instagram", 0), new Model.SourceCount("twitch", 1),
+                        new Model.SourceCount("friends", 1), new Model.SourceCount("other", 1),
+                        new Model.SourceCount("unanswered", 4)))), store().attribution());
+    }
+
+    @Test
+    void theSeedHasOneJoinDomainAndOneCtaForAllChannels() {
+        Model.BrandKit kit = store().brandKit();
+
+        assertEquals("onelitefeather.net", kit.joinDomain());
+        assertEquals("Spiel mit uns: onelitefeather.net", kit.cta().de());
+        assertEquals("Play with us: onelitefeather.net", kit.cta().en());
     }
 
     @Test
     void theEstimatedFirstJoinsOfAPostFollowTheWindowSplit() {
-        // p-41 is the only youtube post in the window of the first join and half of the third one.
-        assertEquals(1.5, post(store(), "p-41").estimatedFirstJoins(), 1e-9);
-        assertEquals(1.0, post(store(), "p-50").estimatedFirstJoins(), 1e-9);
+        // p-41 gets its youtube join of 18:00, the unanswered join of 28 Oct and half of the 30 Oct youtube join.
+        assertEquals(2.5, post(store(), "p-41").estimatedFirstJoins(), 1e-9);
+        // p-50 is the only tiktok post in the window of the tiktok join of 6 Nov and one seventh of the last join.
+        assertEquals(1.14, post(store(), "p-50").estimatedFirstJoins(), 1e-9);
+        // p-47 is one seventh of the friends join and of the unanswered join of 5 Nov.
+        assertEquals(0.29, post(store(), "p-47").estimatedFirstJoins(), 1e-9);
+    }
+
+    @Test
+    void theEstimatesOfAllPostsAddUpToTheJoinsThatHadAPostInTheirWindow() {
+        double total = store().posts(null, null).stream().mapToDouble(Model.Post::estimatedFirstJoins).sum();
+
+        // 20 first joins; the instagram join of 27 Oct 06:00 and the twitch join of 3 Nov have no post in their window.
+        assertEquals(18.0, total, 0.1);
     }
 
     @Test

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api/client';
-import type { Channel, Series } from '../api/types';
+import type { Series } from '../api/types';
 import ShortPreview from '../components/ShortPreview.vue';
 import LoadState from '../components/LoadState.vue';
 import { useAsync } from '../composables/useAsync';
@@ -15,19 +15,14 @@ const NONE = 'none';
 const router = useRouter();
 
 const { data, error, loading, run } = useAsync(async () => {
-  const [kit, series, channels] = await Promise.all([
-    api.brandKit(),
-    api.series(),
-    api.channels(),
-  ]);
-  return { kit, series, channels };
+  const [kit, series] = await Promise.all([api.brandKit(), api.series()]);
+  return { kit, series };
 });
 
 onMounted(run);
 
 const second = ref(0);
 const selectedSeries = ref('');
-const selectedChannel = ref('');
 
 const template = computed(() => {
   const kit = data.value?.kit;
@@ -40,11 +35,6 @@ const activeSeries = computed<Series | null>(() => {
     return null;
   }
   return list.find((item) => item.id === selectedSeries.value) ?? list[0] ?? null;
-});
-
-const activeChannel = computed<Channel | null>(() => {
-  const list = data.value?.channels ?? [];
-  return list.find((item) => item.id === selectedChannel.value) ?? list[0] ?? null;
 });
 
 const visibleNow = computed(() =>
@@ -101,7 +91,7 @@ function tokenStyle(background: string): Record<string, string> {
               :template="template"
               :second="second"
               :series="activeSeries"
-              :channel="activeChannel"
+              :cta="data.kit.cta"
             />
 
             <div class="controls">
@@ -117,19 +107,6 @@ function tokenStyle(background: string): Record<string, string> {
                   :headline="item.name"
                 ></md-select-option>
                 <md-select-option :value="NONE" headline="ohne Serie (Standardfarbe)"></md-select-option>
-              </md-outlined-select>
-
-              <md-outlined-select
-                label="Kanal (Join-Host)"
-                :value="selectedChannel"
-                @change="selectedChannel = valueOf($event)"
-              >
-                <md-select-option
-                  v-for="item in data.channels"
-                  :key="item.id"
-                  :value="item.id"
-                  :headline="item.name"
-                ></md-select-option>
               </md-outlined-select>
 
               <div class="timeline">

@@ -80,7 +80,7 @@ public final class DemoStore {
     }
 
     public synchronized Model.RenderBundle renderBundle() {
-        return new Model.RenderBundle(brandKit.version(), brandKit,
+        return new Model.RenderBundle(brandKit.version(), brandKit, brandKit.joinDomain(), brandKit.cta(),
                 series().stream().filter(Model.Series::active).toList(), channels);
     }
 
@@ -199,7 +199,7 @@ public final class DemoStore {
     }
 
     public synchronized List<Model.WeeklyAttribution> attribution() {
-        return JoinAttribution.weekly(channels, joins);
+        return JoinAttribution.weekly(joins);
     }
 
     /** The comparison of one week; the latest week that has posts when {@code week} is null. */
@@ -220,7 +220,7 @@ public final class DemoStore {
     }
 
     private List<Model.Post> withEstimates() {
-        Map<String, Double> estimates = JoinAttribution.estimates(List.copyOf(posts.values()), channels, joins);
+        Map<String, Double> estimates = JoinAttribution.estimates(List.copyOf(posts.values()), joins);
         return posts.values().stream().map(post -> post.withEstimate(estimates.getOrDefault(post.id(), 0.0))).toList();
     }
 

@@ -7,8 +7,10 @@ export interface Session {
   roles: Role[];
 }
 
-export type Platform = 'youtube' | 'tiktok' | 'instagram' | 'direct';
-export type ChannelPlatform = Exclude<Platform, 'direct'>;
+/** The platforms a player can name as the place they found the game. */
+export type Platform = 'youtube' | 'tiktok' | 'instagram' | 'twitch';
+/** A stated source: a platform, friends, other, or unanswered. */
+export type JoinSource = Platform | 'friends' | 'other' | 'unanswered';
 export type Audience = 'players' | 'developers' | 'mixed';
 
 export interface ColorToken {
@@ -47,20 +49,26 @@ export interface Template {
   slots: SlotDefinition[];
 }
 
+/** One call to action and one join domain for all channels. */
+export interface Cta {
+  de: string;
+  en: string;
+}
+
 export interface BrandKit {
   version: number;
   source: string;
   tokens: ColorToken[];
   marks: Mark[];
   templates: Template[];
+  joinDomain: string;
+  cta: Cta;
 }
 
 export interface Channel {
   id: string;
-  platform: ChannelPlatform;
+  platform: Platform;
   name: string;
-  joinHost: string;
-  ctaText: { de: string; en: string };
 }
 
 export interface Series {
@@ -87,7 +95,7 @@ export interface Post {
   id: string;
   title: string;
   channelId: string;
-  platform: ChannelPlatform;
+  platform: Platform;
   publishedAt: string;
   hashtags: string[];
   seriesId: string | null;
@@ -115,11 +123,14 @@ export interface Coverage {
   flagged: boolean;
 }
 
+/** Measured first joins of one week. Sources are listed in a fixed order, zeros included. */
 export interface WeeklyAttribution {
   week: string;
-  platform: Platform;
-  channelId: string | null;
   firstJoins: number;
+  answered: number;
+  /** answered / firstJoins, rounded to two decimals by the server. */
+  answerRate: number;
+  bySource: { source: JoinSource; firstJoins: number }[];
 }
 
 export interface SeriesComparison {
@@ -141,6 +152,8 @@ export interface Warning {
 export interface RenderBundle {
   kitVersion: number;
   brandKit: BrandKit;
+  joinDomain: string;
+  cta: Cta;
   series: Series[];
   channels: Channel[];
 }

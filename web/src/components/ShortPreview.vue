@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Channel, Series, SlotDefinition, Template } from '../api/types';
+import type { Cta, Series, SlotDefinition, Template } from '../api/types';
 import { badgeColors } from '../domain/color';
 import {
   CANVAS,
@@ -16,7 +16,7 @@ const props = withDefaults(
     template: Template;
     second: number;
     series: Series | null;
-    channel: Channel | null;
+    cta: Cta;
     scale?: number;
   }>(),
   { scale: 0.4 },
@@ -63,7 +63,7 @@ function fontStyle(name: string): Record<string, string> {
 }
 
 function ctaText(): string {
-  return props.channel?.ctaText.de ?? 'Spiel mit uns: yt.onelitefeather.net';
+  return props.cta.de;
 }
 </script>
 

@@ -17,21 +17,25 @@ import java.util.Map;
 
 /**
  * The fixed demo data: channels, brand kit, four series, eighteen shorts and a list of join events. Nothing is random
- * and nothing identifies a player; the joins carry only the host they came in through. All values are demo data.
+ * and nothing identifies a player; the joins carry only the answer to the in-game question. All values are demo data.
  */
 final class DemoSeed {
 
     private DemoSeed() {
     }
 
+    /** Every player joins over this one domain; there are no per-channel join hosts. */
+    static final String JOIN_DOMAIN = "onelitefeather.net";
+
+    /** The one call to action of all channels. */
+    static final Localized CTA = new Localized("Spiel mit uns: onelitefeather.net",
+            "Play with us: onelitefeather.net");
+
     static List<Channel> channels() {
         return List.of(
-                new Channel("yt-de", "youtube", "OneLiteFeather (YouTube)", "yt.onelitefeather.net",
-                        new Localized("Spiel mit uns: yt.onelitefeather.net", "Play with us: yt.onelitefeather.net")),
-                new Channel("tt-de", "tiktok", "OneLiteFeather (TikTok)", "tt.onelitefeather.net",
-                        new Localized("Spiel mit uns: tt.onelitefeather.net", "Play with us: tt.onelitefeather.net")),
-                new Channel("ig-de", "instagram", "OneLiteFeather (Instagram)", "ig.onelitefeather.net",
-                        new Localized("Spiel mit uns: ig.onelitefeather.net", "Play with us: ig.onelitefeather.net")));
+                new Channel("yt-de", "youtube", "OneLiteFeather (YouTube)"),
+                new Channel("tt-de", "tiktok", "OneLiteFeather (TikTok)"),
+                new Channel("ig-de", "instagram", "OneLiteFeather (Instagram)"));
     }
 
     static Model.BrandKit brandKit() {
@@ -46,9 +50,9 @@ final class DemoSeed {
                 new Slot("title", 0, 3, null, 90, 420, 900, 240, List.of()),
                 new Slot("captions", 0, null, null, 90, 700, 900, 400, List.of()),
                 new Slot("session-tiles", 3, null, null, 90, 1280, 900, 300, List.of()),
-                new Slot("cta", null, null, 2, 90, 1120, 900, 110, List.of("join_host"))));
+                new Slot("cta", null, null, 2, 90, 1120, 900, 110, List.of("join_domain"))));
         return new Model.BrandKit(1, "overlay-theme", tokens, List.of(new Mark("feather", 10)),
-                List.of(shortVertical));
+                List.of(shortVertical), JOIN_DOMAIN, CTA);
     }
 
     static List<Series> series() {
@@ -114,23 +118,33 @@ final class DemoSeed {
     }
 
     /**
-     * The first and repeat joins of the seed. Only the host, the flag and the time are kept; there is no player
-     * identifier. The repeat join is in the list to show that it is not counted.
+     * The joins of the seed: twenty first joins in two weeks, eight of them unanswered, and one repeat join that is
+     * not counted. Only the answer, the flag and the time are kept; there is no player identifier. A null answer is
+     * an unanswered first join.
      */
     static List<JoinEvent> joins() {
         return List.of(
-                join("yt.onelitefeather.net", true, "2026-10-27T18:00:00Z"),
-                join("ig.onelitefeather.net", true, "2026-10-27T06:00:00Z"),
-                join("yt.onelitefeather.net", true, "2026-10-30T12:00:00Z"),
-                join("tt.onelitefeather.net", true, "2026-10-30T10:00:00Z"),
-                join("onelitefeather.net", true, "2026-10-31T09:00:00Z"),
-                join("ig.onelitefeather.net", true, "2026-10-31T12:00:00Z"),
-                join("unknown.example", true, "2026-11-01T08:00:00Z"),
-                join("yt.onelitefeather.net", true, "2026-11-05T10:00:00Z"),
-                join("yt.onelitefeather.net", false, "2026-11-05T11:00:00Z"),
-                join("yt.onelitefeather.net", true, "2026-11-06T09:00:00Z"),
-                join("tt.onelitefeather.net", true, "2026-11-06T20:00:00Z"),
-                join("YT.onelitefeather.net.:443", true, "2026-11-07T08:00:00Z"));
+                join("youtube", true, "2026-10-27T18:00:00Z"),
+                join("instagram", true, "2026-10-27T06:00:00Z"),
+                join(null, true, "2026-10-28T09:00:00Z"),
+                join("tiktok", true, "2026-10-30T10:00:00Z"),
+                join("youtube", true, "2026-10-30T12:00:00Z"),
+                join(null, true, "2026-10-31T09:00:00Z"),
+                join("instagram", true, "2026-10-31T12:00:00Z"),
+                join(null, true, "2026-10-31T20:00:00Z"),
+                join(null, true, "2026-11-01T08:00:00Z"),
+                join(null, true, "2026-11-02T12:00:00Z"),
+                join("twitch", true, "2026-11-03T15:00:00Z"),
+                join("youtube", true, "2026-11-04T10:00:00Z"),
+                join("youtube", true, "2026-11-05T10:00:00Z"),
+                join("youtube", false, "2026-11-05T11:00:00Z"),
+                join("friends", true, "2026-11-05T14:00:00Z"),
+                join(null, true, "2026-11-05T16:00:00Z"),
+                join(null, true, "2026-11-06T09:00:00Z"),
+                join("other", true, "2026-11-06T12:00:00Z"),
+                join("tiktok", true, "2026-11-06T20:00:00Z"),
+                join("youtube", true, "2026-11-07T08:00:00Z"),
+                join(null, true, "2026-11-07T09:00:00Z"));
     }
 
     private static SeedPost post(String id, String channelId, String publishedAt, String title,
@@ -139,7 +153,7 @@ final class DemoSeed {
         return new SeedPost(id, channelId, publishedAt, title, hashtags, noSeries, engaged, avg, inPlaylist);
     }
 
-    private static JoinEvent join(String host, boolean firstJoin, String at) {
-        return new JoinEvent(host, firstJoin, Instant.parse(at));
+    private static JoinEvent join(String answer, boolean firstJoin, String at) {
+        return new JoinEvent(answer, firstJoin, Instant.parse(at));
     }
 }

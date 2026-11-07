@@ -4,7 +4,7 @@ import { isSlotVisible, previewRect, safeBands, SHORT_DURATION_SECONDS } from '.
 
 const badge: SlotDefinition = { name: 'badge', fromSeconds: 0, toSeconds: null, lastSeconds: null, x: 90, y: 300, w: 900, h: 90 };
 const title: SlotDefinition = { name: 'title', fromSeconds: 0, toSeconds: 3, lastSeconds: null, x: 90, y: 420, w: 900, h: 300 };
-const cta: SlotDefinition = { name: 'cta', fromSeconds: null, toSeconds: null, lastSeconds: 2, x: 90, y: 1100, w: 900, h: 120, params: ['join_host'] };
+const cta: SlotDefinition = { name: 'cta', fromSeconds: null, toSeconds: null, lastSeconds: 2, x: 90, y: 1100, w: 900, h: 120, params: ['join_domain'] };
 
 describe('slot visibility by time', () => {
   it('shows the badge for the whole short', () => {

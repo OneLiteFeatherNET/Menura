@@ -1,47 +1,58 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { api } from '../api/client';
-import type { Platform } from '../api/types';
+import type { JoinSource } from '../api/types';
 import LoadState from '../components/LoadState.vue';
 import { useAsync } from '../composables/useAsync';
-import { groupedBars, PLATFORM_ORDER, weeksOf } from '../domain/attribution';
+import { SOURCE_ORDER, stackedColumns, summaryOf, weeksOf, type WeekSummary } from '../domain/attribution';
 import { formatCount, PLATFORM_LABELS } from '../domain/format';
 
-// Bar colours are M3 role tokens. Every bar also carries its value and the legend names it.
-const PLATFORM_COLOR: Record<Platform, string> = {
+// Segment colours are M3 role tokens. Every segment also carries its value and the legend names it.
+const SOURCE_COLOR: Record<JoinSource, string> = {
   youtube: 'var(--md-sys-color-primary)',
   tiktok: 'var(--md-sys-color-tertiary)',
   instagram: 'var(--md-sys-color-secondary)',
-  direct: 'var(--md-sys-color-outline)',
+  twitch: 'var(--md-sys-color-primary-container)',
+  friends: 'var(--md-sys-color-tertiary-container)',
+  other: 'var(--md-sys-color-secondary-container)',
+  unanswered: 'var(--md-sys-color-outline)',
 };
 
-const CHART = { width: 960, height: 340, left: 56, right: 16, top: 32, bottom: 48 };
+const CHART = { width: 960, height: 340, left: 56, right: 16, top: 32, bottom: 64 };
 
-const { data, error, loading, run } = useAsync(async () => {
-  const [channels, weekly] = await Promise.all([api.channels(), api.weeklyAttribution()]);
-  return { channels, weekly };
-});
+const { data, error, loading, run } = useAsync(() => api.weeklyAttribution());
 
 onMounted(run);
 
+function percent(rate: number): string {
+  return `${Math.round(rate * 100)} %`;
+}
+
+const summaries = computed<WeekSummary[]>(() => {
+  const rows = data.value ?? [];
+  return weeksOf(rows)
+    .map((week) => summaryOf(rows, week))
+    .filter((summary): summary is WeekSummary => summary !== null);
+});
+
 const chart = computed(() => {
-  if (!data.value) {
+  const rows = data.value;
+  if (!rows) {
     return null;
   }
-  const weeks = weeksOf(data.value.weekly);
-  const { bars, maxValue } = groupedBars(weeks, data.value.weekly, CHART);
+  const weeks = weeksOf(rows);
+  const { segments, maxValue } = stackedColumns(weeks, rows, CHART);
   const plotHeight = CHART.height - CHART.top - CHART.bottom;
   const groupWidth = weeks.length === 0 ? 0 : (CHART.width - CHART.left - CHART.right) / weeks.length;
   return {
-    weeks,
-    bars,
-    maxValue,
+    segments,
     gridLines: [0, 0.5, 1].map((fraction) => ({
       y: CHART.top + plotHeight - fraction * plotHeight,
       label: formatCount(Math.round(fraction * maxValue)),
     })),
-    weekLabels: weeks.map((week, index) => ({
-      week,
+    weekLabels: summaries.value.map((summary, index) => ({
+      week: summary.week,
+      rate: percent(summary.answerRate),
       x: CHART.left + index * groupWidth + groupWidth / 2,
     })),
   };
@@ -53,30 +64,30 @@ const chart = computed(() => {
     <header class="page-head">
       <div>
         <h2>Join-Attribution</h2>
-        <p class="page-lead">Woher die neuen Spieler kommen, pro Kanal und Woche.</p>
+        <p class="page-lead">Erstjoins pro Woche und, soweit die Spieler es nennen, woher sie kommen.</p>
       </div>
     </header>
 
     <LoadState :loading="loading" :error="error">
       <template v-if="data && chart">
         <section class="section">
-          <h3 class="section-title">Kanäle</h3>
+          <h3 class="section-title">Erstjoins pro Woche</h3>
           <div class="table-wrap">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Plattform</th>
-                  <th>Join-Host</th>
-                  <th>CTA (Deutsch)</th>
-                  <th>CTA (Englisch)</th>
+                  <th>Woche</th>
+                  <th class="num">Erstjoins gesamt</th>
+                  <th class="num">Antworten</th>
+                  <th class="num">Antwortrate</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="channel in data.channels" :key="channel.id">
-                  <td>{{ PLATFORM_LABELS[channel.platform] }}</td>
-                  <td><code>{{ channel.joinHost }}</code></td>
-                  <td>{{ channel.ctaText.de }}</td>
-                  <td>{{ channel.ctaText.en }}</td>
+                <tr v-for="summary in summaries" :key="summary.week">
+                  <td>{{ summary.week }}</td>
+                  <td class="num">{{ formatCount(summary.firstJoins) }}</td>
+                  <td class="num">{{ formatCount(summary.answered) }} von {{ formatCount(summary.firstJoins) }}</td>
+                  <td class="num">{{ percent(summary.answerRate) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -84,11 +95,11 @@ const chart = computed(() => {
         </section>
 
         <section class="section">
-          <h3 class="section-title">Neue Spieler pro Woche</h3>
-          <ul class="legend" aria-label="Legende">
-            <li v-for="platform in PLATFORM_ORDER" :key="platform">
-              <span class="swatch" :style="{ background: PLATFORM_COLOR[platform] }"></span>
-              {{ PLATFORM_LABELS[platform] }}
+          <h3 class="section-title">Angegebene Quelle, laut Spielern</h3>
+          <ul class="legend" aria-label="Quellen laut Spielern">
+            <li v-for="source in SOURCE_ORDER" :key="source">
+              <span class="swatch" :style="{ background: SOURCE_COLOR[source] }"></span>
+              {{ PLATFORM_LABELS[source] }}
             </li>
           </ul>
 
@@ -97,7 +108,7 @@ const chart = computed(() => {
               class="chart"
               :viewBox="`0 0 ${CHART.width} ${CHART.height}`"
               role="img"
-              aria-label="Gemessene Erstjoins pro Woche und Plattform"
+              aria-label="Erstjoins pro Woche nach Angabe der Spieler"
             >
               <g v-for="line in chart.gridLines" :key="line.y">
                 <line
@@ -110,37 +121,31 @@ const chart = computed(() => {
                 <text :x="CHART.left - 10" :y="line.y + 5" text-anchor="end" class="axis">{{ line.label }}</text>
               </g>
 
-              <g v-for="bar in chart.bars" :key="`${bar.week}-${bar.platform}`">
+              <g v-for="segment in chart.segments" :key="`${segment.week}-${segment.source}`">
                 <rect
-                  :x="bar.x"
-                  :y="bar.y"
-                  :width="bar.width - 4"
-                  :height="Math.max(bar.height, 0)"
+                  :x="segment.x"
+                  :y="segment.y"
+                  :width="segment.width"
+                  :height="Math.max(segment.height, 0)"
                   rx="4"
-                  :style="{ fill: PLATFORM_COLOR[bar.platform] }"
+                  :style="{ fill: SOURCE_COLOR[segment.source] }"
                 >
-                  <title>{{ bar.week }} · {{ PLATFORM_LABELS[bar.platform] }}: {{ bar.value }}</title>
+                  <title>{{ segment.week }} · {{ PLATFORM_LABELS[segment.source] }} (laut Spielern): {{ segment.value }}</title>
                 </rect>
-                <text
-                  :x="bar.x + (bar.width - 4) / 2"
-                  :y="bar.y - 6"
-                  text-anchor="middle"
-                  class="value"
-                >{{ formatCount(bar.value) }}</text>
               </g>
 
-              <text
-                v-for="label in chart.weekLabels"
-                :key="label.week"
-                :x="label.x"
-                :y="CHART.height - 16"
-                text-anchor="middle"
-                class="axis"
-              >{{ label.week }}</text>
+              <g v-for="label in chart.weekLabels" :key="label.week">
+                <text :x="label.x" :y="CHART.height - 30" text-anchor="middle" class="axis">{{ label.week }}</text>
+                <text :x="label.x" :y="CHART.height - 10" text-anchor="middle" class="axis">
+                  Antwortrate {{ label.rate }}
+                </text>
+              </g>
             </svg>
           </div>
 
-          <p class="explainer">Plattform exakt gemessen, Clip und Serie geschätzt (72-h-Fenster).</p>
+          <p class="explainer">
+            Gemessen: Erstjoins gesamt und Antworten der Ingame-Frage. Geschätzt: Verteilung auf Posts im 72-h-Fenster.
+          </p>
         </section>
       </template>
     </LoadState>
@@ -191,19 +196,9 @@ const chart = computed(() => {
   font-size: 16px;
 }
 
-.value {
-  fill: var(--md-sys-color-on-surface);
-  font-size: 18px;
-  font-weight: 500;
-}
-
 .explainer {
   margin: 0;
   font-size: 16px;
   color: var(--app-muted);
-}
-
-code {
-  font-size: 15px;
 }
 </style>

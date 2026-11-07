@@ -12,4 +12,10 @@ final class Fixtures {
         return new Model.Post(id, "Titel " + id, channelId, "youtube", publishedAt, List.of(), seriesId, noSeries,
                 null, 0, null, 0.0, true);
     }
+
+    /** A post on the given platform, in the channel of that platform. */
+    static Model.Post onPlatform(String id, String platform, String publishedAt) {
+        return new Model.Post(id, "Titel " + id, platform + "-de", platform, publishedAt, List.of(), null, true,
+                null, 0, null, 0.0, true);
+    }
 }

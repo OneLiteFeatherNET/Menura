@@ -89,8 +89,8 @@ function onWeekChange(event: Event): void {
         </table>
       </div>
       <p class="muted footnote">
-        Erstjoins einer Serie sind Schätzungen: Ein Join über den Kanal-Host wird gleichmäßig auf die
-        Posts des Kanals verteilt, die in den 72 Stunden davor erschienen sind.
+        Erstjoins einer Serie sind Schätzungen: Jeder Erstjoin wird gleichmäßig auf alle Posts aller Kanäle verteilt,
+        die in den 72 Stunden davor erschienen sind. Hat der Spieler eine Plattform genannt, zählen nur deren Posts.
       </p>
     </LoadState>
   </div>

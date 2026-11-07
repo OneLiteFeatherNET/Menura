@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { formatJoins } from '../domain/format';
 
-// First joins are measured (exact) for platforms and estimated for clips and series. Estimates
+// First joins are measured (exact) for the week and estimated for posts and series. Estimates
 // always carry the "geschätzt" chip so nobody reads them as measured.
 defineProps<{
   value: number | null;

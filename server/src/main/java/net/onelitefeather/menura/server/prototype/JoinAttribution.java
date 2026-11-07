@@ -2,43 +2,56 @@ package net.onelitefeather.menura.server.prototype;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.TreeMap;
 
 /**
- * Join attribution. Measured first joins are counted per week and channel (exact); a first join through a channel
- * host is also split evenly across the channel's posts published in the 72 hours before the join, which gives an
- * estimate per post. A join with no post in its window, and a direct join, are attributed to no post. Repeat joins
- * are ignored.
+ * Join attribution over one shared join domain. Measured: the first joins per ISO week and the answers to the
+ * in-game question "Wo hast du uns gefunden?" (asked once, on the first join). Estimated: each first join is split
+ * evenly across the posts published in the 72 hours before it. A join that named a platform is split only across
+ * that platform's posts; a join that named friends, other or nothing is split across all posts. A platform join
+ * with no post of that platform in its window gives no post an estimate. Repeat joins are ignored.
  */
 final class JoinAttribution {
 
     static final Duration WINDOW = Duration.ofHours(72);
 
-    private static final String DIRECT = "direct";
+    /** The sources in the order the weekly counts list them. The last one is "unanswered". */
+    static final List<String> SOURCES = List.of(
+            "youtube", "tiktok", "instagram", "twitch", "friends", "other", "unanswered");
+
+    private static final List<String> PLATFORMS = List.of("youtube", "tiktok", "instagram", "twitch");
+    private static final String UNANSWERED = "unanswered";
 
     private JoinAttribution() {
     }
 
+    /**
+     * The source of one answer. A missing or blank answer is unanswered; a known source is itself; any other text is
+     * "other", so a stray value never creates a source the weekly counts do not list.
+     */
+    static String sourceOf(String answer) {
+        if (answer == null || answer.isBlank()) {
+            return UNANSWERED;
+        }
+        String normalised = answer.trim().toLowerCase(Locale.ROOT);
+        return SOURCES.contains(normalised) ? normalised : "other";
+    }
+
     /** The estimated first joins per post id. Only posts that received a share appear. */
-    static Map<String, Double> estimates(List<Model.Post> posts, List<Model.Channel> channels,
-                                         List<Model.JoinEvent> joins) {
+    static Map<String, Double> estimates(List<Model.Post> posts, List<Model.JoinEvent> joins) {
         Map<String, Double> shares = new HashMap<>();
         for (Model.JoinEvent join : joins) {
             if (!join.firstJoin()) {
                 continue;
             }
-            Optional<String> channelId = Hosts.channelIdFor(channels, join.host());
-            if (channelId.isEmpty()) {
-                continue;
-            }
+            String source = sourceOf(join.answer());
             Instant from = join.at().minus(WINDOW);
             List<Model.Post> eligible = posts.stream()
-                    .filter(post -> post.channelId().equals(channelId.get()))
+                    .filter(post -> !PLATFORMS.contains(source) || post.platform().equals(source))
                     .filter(post -> {
                         Instant published = Instant.parse(post.publishedAt());
                         return !published.isBefore(from) && !published.isAfter(join.at());
@@ -55,32 +68,27 @@ final class JoinAttribution {
         return shares;
     }
 
-    /** Measured first joins per ISO week, channel and direct. Rows with no first join are not listed. */
-    static List<Model.WeeklyAttribution> weekly(List<Model.Channel> channels, List<Model.JoinEvent> joins) {
-        TreeMap<Bucket, Integer> counts = new TreeMap<>(Comparator.comparing(Bucket::week)
-                .thenComparingInt(Bucket::order));
+    /** Measured first joins per ISO week and source. Weeks without a first join are not listed. */
+    static List<Model.WeeklyAttribution> weekly(List<Model.JoinEvent> joins) {
+        TreeMap<String, Map<String, Integer>> counts = new TreeMap<>();
         for (Model.JoinEvent join : joins) {
             if (!join.firstJoin()) {
                 continue;
             }
-            String week = IsoWeek.of(join.at());
-            Optional<Model.Channel> channel = channelFor(channels, join.host());
-            Bucket bucket = channel
-                    .map(c -> new Bucket(week, channels.indexOf(c), c.id(), c.platform()))
-                    .orElse(new Bucket(week, Integer.MAX_VALUE, null, DIRECT));
-            counts.merge(bucket, 1, Integer::sum);
+            counts.computeIfAbsent(IsoWeek.of(join.at()), week -> new HashMap<>())
+                    .merge(sourceOf(join.answer()), 1, Integer::sum);
         }
-        return counts.entrySet().stream()
-                .map(e -> new Model.WeeklyAttribution(e.getKey().week(), e.getKey().platform(),
-                        e.getKey().channelId(), e.getValue()))
+        return counts.entrySet().stream().map(entry -> row(entry.getKey(), entry.getValue())).toList();
+    }
+
+    private static Model.WeeklyAttribution row(String week, Map<String, Integer> bySource) {
+        int firstJoins = bySource.values().stream().mapToInt(Integer::intValue).sum();
+        int unanswered = bySource.getOrDefault(UNANSWERED, 0);
+        int answered = firstJoins - unanswered;
+        double rate = firstJoins == 0 ? 0.0 : Rounding.to((double) answered / firstJoins, 2);
+        List<Model.SourceCount> counts = SOURCES.stream()
+                .map(source -> new Model.SourceCount(source, bySource.getOrDefault(source, 0)))
                 .toList();
-    }
-
-    private static Optional<Model.Channel> channelFor(List<Model.Channel> channels, String host) {
-        return Hosts.channelIdFor(channels, host).flatMap(id -> channels.stream()
-                .filter(channel -> channel.id().equals(id)).findFirst());
-    }
-
-    private record Bucket(String week, int order, String channelId, String platform) {
+        return new Model.WeeklyAttribution(week, firstJoins, answered, rate, counts);
     }
 }

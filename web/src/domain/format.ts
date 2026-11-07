@@ -1,4 +1,4 @@
-import type { Audience, Platform } from '../api/types';
+import type { Audience, JoinSource } from '../api/types';
 
 export const NOT_AVAILABLE = 'nicht verfügbar';
 
@@ -58,9 +58,12 @@ export function weekdayLabel(weekday: string): string {
   return WEEKDAY_LABELS[weekday] ?? weekday;
 }
 
-export const PLATFORM_LABELS: Record<Platform, string> = {
+export const PLATFORM_LABELS: Record<JoinSource, string> = {
   youtube: 'YouTube',
   tiktok: 'TikTok',
   instagram: 'Instagram',
-  direct: 'direkt',
+  twitch: 'Twitch',
+  friends: 'Freunde',
+  other: 'Sonstiges',
+  unanswered: 'keine Angabe',
 };
