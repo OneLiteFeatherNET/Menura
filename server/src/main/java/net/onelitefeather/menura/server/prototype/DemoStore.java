@@ -2,6 +2,8 @@ package net.onelitefeather.menura.server.prototype;
 
 import net.onelitefeather.menura.core.problem.ProblemException;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.text.Normalizer;
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -24,8 +26,16 @@ import java.util.regex.Pattern;
 public final class DemoStore {
 
     private static final Set<String> AUDIENCES = Set.of("developers", "mixed", "players");
-    private static final Pattern HASHTAG = Pattern.compile("^#[\\p{L}\\p{N}_]+$");
+    private static final Pattern HASHTAG = Pattern.compile("^#[a-z0-9]{2,30}$");
     private static final Pattern SLOT = Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
+    private static final Pattern COLOUR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
+
+    static final int MAX_NAME = 80;
+    static final int MAX_BADGE_TEXT = 80;
+    static final int MAX_OPENING_FORMULA = 200;
+    static final int MAX_PLAYLISTS = 10;
+    static final int MAX_PLAYLIST_URL = 300;
+    static final int MAX_SERIES = 50;
 
     private final Clock clock;
     private final List<Model.Channel> channels;
@@ -83,49 +93,64 @@ public final class DemoStore {
                 .toList();
     }
 
+    /**
+     * Creates a series from a request. Every refusal is a 422 whose detail names the field and the rule; the detail
+     * never repeats the raw input, so a caller's text cannot end up in a log line or an error page.
+     */
     public synchronized Model.Series createSeries(Model.SeriesRequest request) {
-        require(request.name(), "name");
-        require(request.hashtag(), "hashtag");
-        require(request.colorToken(), "colorToken");
-        require(request.badgeTextColor(), "badgeTextColor");
-        require(request.weekday(), "weekday");
-        require(request.slot(), "slot");
-        if (request.badge() == null) {
-            throw unprocessable("badge is required.");
+        if (series.size() >= MAX_SERIES) {
+            throw unprocessable("Es sind höchstens " + MAX_SERIES + " Serien erlaubt.");
+        }
+        requireText(request.name(), "name");
+        requireText(request.hashtag(), "hashtag");
+        requireText(request.colorToken(), "colorToken");
+        requireText(request.badgeTextColor(), "badgeTextColor");
+        requireText(request.audience(), "audience");
+        requireText(request.weekday(), "weekday");
+        requireText(request.slot(), "slot");
+        if (request.name().length() > MAX_NAME) {
+            throw unprocessable("name: höchstens " + MAX_NAME + " Zeichen erlaubt.");
+        }
+        checkBadge(request.badge());
+        if (request.openingFormula() != null && request.openingFormula().length() > MAX_OPENING_FORMULA) {
+            throw unprocessable("openingFormula: höchstens " + MAX_OPENING_FORMULA + " Zeichen erlaubt.");
         }
         if (!HASHTAG.matcher(request.hashtag()).matches()) {
-            throw unprocessable("hashtag " + request.hashtag() + " must start with # and hold letters or digits.");
+            throw unprocessable("hashtag: erlaubt sind # und 2–30 Kleinbuchstaben oder Ziffern.");
         }
         for (Model.Series existing : series.values()) {
             if (existing.hashtag().equalsIgnoreCase(request.hashtag())) {
-                throw unprocessable("hashtag " + request.hashtag() + " is already used by series " + existing.id()
-                        + ".");
+                throw unprocessable("hashtag: bereits von der Serie " + existing.id() + " verwendet.");
             }
         }
         Optional<Model.Token> token = brandKit.tokens().stream()
                 .filter(t -> t.name().equals(request.colorToken())).findFirst();
         if (token.isEmpty()) {
-            throw unprocessable("colour token " + request.colorToken() + " is unknown.");
+            throw unprocessable("colorToken: unbekannte Farbe.");
         }
         String colour = token.get().light();
         if (!Contrast.isHex(request.badgeTextColor())) {
-            throw unprocessable("badge text colour " + request.badgeTextColor() + " must be #RRGGBB.");
+            throw unprocessable("badgeTextColor: erlaubt ist #RRGGBB.");
+        }
+        if (request.color() != null && !COLOUR.matcher(request.color()).matches()) {
+            throw unprocessable("color: erlaubt ist #RRGGBB.");
         }
         double ratio = Contrast.ratio(request.badgeTextColor(), colour);
         if (ratio < Contrast.MINIMUM) {
             throw unprocessable(String.format(Locale.ROOT,
-                    "badge text colour %s on series colour %s has a contrast of %.2f:1; at least 4.5:1 is required.",
-                    request.badgeTextColor(), colour, ratio));
+                    "badgeTextColor: Kontrast %.2f:1 zur Serienfarbe %s; mindestens 4.5:1 ist erforderlich.",
+                    ratio, colour));
         }
         if (!AUDIENCES.contains(request.audience())) {
-            throw unprocessable("audience " + request.audience() + " is unknown.");
+            throw unprocessable("audience: erlaubt sind developers, mixed, players.");
         }
         if (!isWeekday(request.weekday())) {
-            throw unprocessable("weekday " + request.weekday() + " is unknown.");
+            throw unprocessable("weekday: erlaubt ist ein Wochentag in Großbuchstaben, z. B. THURSDAY.");
         }
         if (!SLOT.matcher(request.slot()).matches()) {
-            throw unprocessable("slot " + request.slot() + " must be HH:mm.");
+            throw unprocessable("slot: erlaubt ist HH:mm.");
         }
+        checkPlaylists(request.playlists());
         Model.Series created = new Model.Series(uniqueId(request.name()), request.name(), request.badge(),
                 request.colorToken(), colour, request.badgeTextColor(),
                 request.openingFormula() == null ? "" : request.openingFormula(), request.hashtag(),
@@ -143,19 +168,19 @@ public final class DemoStore {
     public synchronized Model.Post assign(String postId, Model.AssignRequest request) {
         Model.Post current = posts.get(postId);
         if (current == null) {
-            throw new ProblemException(404, "Not Found", "No post with the id " + postId + ".");
+            throw new ProblemException(404, "Not Found", "unbekannter Beitrag.");
         }
         Model.Post updated;
         if (request.noSeries()) {
             if (request.seriesId() != null) {
-                throw unprocessable("a post cannot be marked noSeries and assigned to a series at once.");
+                throw unprocessable("seriesId: ein Beitrag ist nicht zugleich ohne Serie und einer Serie zugeordnet.");
             }
             updated = current.withAssignment(null, true, null);
         } else if (request.seriesId() == null) {
             updated = current.withAssignment(null, false, null);
         } else {
             if (!series.containsKey(request.seriesId())) {
-                throw unprocessable("series " + request.seriesId() + " is unknown.");
+                throw unprocessable("unbekannte Serie.");
             }
             updated = request.seriesId().equals(current.seriesId()) ? current
                     : current.withAssignment(request.seriesId(), false, nextEpisode(request.seriesId()));
@@ -177,7 +202,7 @@ public final class DemoStore {
     /** The comparison of one week; the latest week that has posts when {@code week} is null. */
     public synchronized List<Model.SeriesComparison> comparison(String week) {
         if (week != null && !IsoWeek.isWellFormed(week)) {
-            throw unprocessable("week " + week + " must look like 2026-W45.");
+            throw unprocessable("week: erlaubt ist das Format 2026-W45.");
         }
         String wanted = week != null ? week : latestWeek().orElse(null);
         if (wanted == null) {
@@ -234,9 +259,51 @@ public final class DemoStore {
         }
     }
 
-    private static void require(String value, String field) {
+    private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
-            throw unprocessable(field + " is required.");
+            throw unprocessable(field + ": ist erforderlich.");
+        }
+    }
+
+    private static void checkBadge(Model.Localized badge) {
+        if (badge == null) {
+            throw unprocessable("badge: ist erforderlich.");
+        }
+        requireText(badge.de(), "badge.de");
+        requireText(badge.en(), "badge.en");
+        if (badge.de().length() > MAX_BADGE_TEXT || badge.en().length() > MAX_BADGE_TEXT) {
+            throw unprocessable("badge: jeder Text höchstens " + MAX_BADGE_TEXT + " Zeichen.");
+        }
+    }
+
+    /** Playlists are optional; when present, at most ten entries, each a known channel and an https URL. */
+    private void checkPlaylists(Map<String, String> playlists) {
+        if (playlists == null) {
+            return;
+        }
+        if (playlists.size() > MAX_PLAYLISTS) {
+            throw unprocessable("playlists: höchstens " + MAX_PLAYLISTS + " Einträge erlaubt.");
+        }
+        for (Map.Entry<String, String> entry : playlists.entrySet()) {
+            if (entry.getKey() == null || channels.stream().noneMatch(c -> c.id().equals(entry.getKey()))) {
+                throw unprocessable("playlists: unbekannter Kanal.");
+            }
+            if (!isHttpsUrl(entry.getValue())) {
+                throw unprocessable("playlists: jeder Wert ist eine https-URL mit höchstens "
+                        + MAX_PLAYLIST_URL + " Zeichen.");
+            }
+        }
+    }
+
+    private static boolean isHttpsUrl(String value) {
+        if (value == null || value.length() > MAX_PLAYLIST_URL) {
+            return false;
+        }
+        try {
+            URI uri = new URI(value);
+            return "https".equals(uri.getScheme()) && uri.getHost() != null;
+        } catch (URISyntaxException malformed) {
+            return false;
         }
     }
 
