@@ -1,6 +1,6 @@
 # Tasks
 
-Requirements marked "Where ... is available" in the spec are built by the change that provides the component: recording, stream, contributor and tag links in `add-content-library` (phase 4), layout template in `add-brand-kit` (phase 5), overlay state in `add-overlay-system` (phase 6), source post and revision comparisons in `add-content-distribution` (phase 2), MCP reads in `add-hub-mcp-server` (phase 3).
+Requirements marked "Where ... is available" in the spec are built by the change that provides the component: recording, stream, contributor and tag links in `add-content-library` (phase 4), overlay state in `add-overlay-system` (phase 6), source post and revision comparisons in `add-content-distribution` (phase 2), MCP reads in `add-hub-mcp-server` (phase 3). The series and layout template dimensions read the catalogue of `add-content-series` and the brand kit of `add-brand-kit`, both phase 1 dependencies; the internal source tests use a test double, as the join-attribution source is built in `add-join-attribution`.
 
 ## 1. Metric model and collection
 
@@ -29,10 +29,27 @@ Requirements marked "Where ... is available" in the spec are built by the change
 
 - [ ] 4.1 (Could) Write a failing test that the Prometheus-compatible endpoint exposes aggregated external post metrics by channel and is disabled by default; verify it fails, then implement the endpoint and verify it passes, or skip this task and note the skip in the pull request
 
-## 5. Integration checks
+## 5. Dimensions and internal sources
 
-- [ ] 5.1 Run the integration suite with the project's heavy-job lock (`flock ~/.cache/claude-heavy.lock`) and verify the partition, rollup and two-year read tests pass
+- [ ] 5.1 Write failing tests that a metric point of an external post carries the series, layout template and brand kit version it was rendered with, that an imported post stores them as absent, and that a series reassignment changes only the points collected afterwards; verify they fail for the expected reason
+- [ ] 5.2 Implement the capture of series, layout template and brand kit version at write time and their rollup dimensions; verify the tests from 5.1 pass
+- [ ] 5.3 Write failing tests that a registered internal source writes points with its source and estimate flag, that an unregistered source or metric name is refused without storing anything, that an internal write leaves a platform point unchanged, and that a rollup marks the estimates it contains; verify they fail
+- [ ] 5.4 Implement the internal source registration, the write path into the metric point table and the estimate flag in rollups; verify the tests from 5.3 pass
 
-## 6. Delivery
+## 6. Series comparison
 
-- [ ] 6.1 Open the code pull request titled `feat(analytics): collect metrics of external posts`
+- [ ] 6.1 Write failing tests that the series comparison returns engaged views and average view percentage per series and week from the series-week rollup, shows the average view percentage as unavailable when no point provides it, shows the metrics of a registered internal source with its estimate flag, and ranks series by engaged views rather than views; verify they fail
+- [ ] 6.2 Implement the series-week rollup, the comparison endpoint and the dashboard comparison view; verify the tests from 6.1 pass
+- [ ] 6.3 Write a failing integration test (tagged `integration`) that the comparison of 52 weeks over 20 series and two years of generated points returns within one second from the rollup; verify it fails, then tune the rollup until it passes
+
+## 7. Integration checks
+
+- [ ] 7.1 Run the integration suite with the project's heavy-job lock (`flock ~/.cache/claude-heavy.lock`) and verify the partition, rollup, series comparison and two-year read tests pass
+
+## 8. Delivery
+
+- [ ] 8.1 Open the code pull request titled `feat(analytics): collect metrics of external posts`
+
+## Workflow follow-up
+
+- Tick the completed boxes and archive the change in a follow-up pull request after the code pull request is merged.

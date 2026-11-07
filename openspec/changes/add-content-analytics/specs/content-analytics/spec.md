@@ -5,7 +5,7 @@ Content analytics keeps the performance history of every external post, whether 
 ## ADDED Requirements
 
 ### Requirement: Scheduled metric collection
-(Must) The scheduled analytics job SHALL collect the performance metrics of every external post from the native analytics of its platform, through the metrics operation of the adapter port: views, watch time, retention curve, likes, comments, shares and follower delta, each where the platform provides it.
+(Must) The scheduled analytics job SHALL collect the performance metrics of every external post from the native analytics of its platform, through the metrics operation of the adapter port: views, engaged views, average view percentage, watch time, retention curve, likes, comments, shares and follower delta, each where the platform provides it.
 
 #### Scenario: Metrics collected for an external post
 - **GIVEN** an external post on a channel that provides views and likes
@@ -59,6 +59,24 @@ Content analytics keeps the performance history of every external post, whether 
 - **WHEN** the post's analytics are read
 - **THEN** no source recording is shown and the analytics are shown without error
 
+### Requirement: Series and layout template dimensions
+(Must) The hub SHALL store with each metric point of an external post the series that post belongs to, if any, and the layout template and brand kit version it was rendered with, so that rollups group and filter the points by these values.
+
+#### Scenario: Points grouped by series and layout template
+- **GIVEN** two external posts of one series, rendered with the same layout template and brand kit version, and one imported post without a series
+- **WHEN** a person groups the views of the last month by series and by layout template
+- **THEN** the two posts are summed under their series and the imported post is grouped under no series
+
+#### Scenario: Imported post without series or template
+- **GIVEN** an imported external post that belongs to no series and was not rendered by Menura
+- **WHEN** its metric points are stored
+- **THEN** the series, layout template and brand kit version are stored as absent
+
+#### Scenario: Series reassigned
+- **GIVEN** an external post moved to another series after some of its points were collected
+- **WHEN** the next collection runs
+- **THEN** the new points carry the new series and the earlier points keep the series they were collected with
+
 ### Requirement: Dashboard aggregates read rollups within one second
 (Must) The hub SHALL answer aggregate analytics queries grouped or filtered by channel, format and posting hour from precomputed rollups within one second on two years of data, and the dashboard SHALL read rollups only. Where content distribution, the content library and the brand kit are available, the same SHALL apply to queries grouped or filtered by layout template, tags or topic, source stream and contributor.
 
@@ -71,6 +89,62 @@ Content analytics keeps the performance history of every external post, whether 
 - **GIVEN** two years of metric points and their rollups
 - **WHEN** a person requests the average views per posting hour for one channel
 - **THEN** the hub returns the result within one second from the rollups
+
+### Requirement: Internal metric sources
+(Must) The hub SHALL accept metric points from registered internal sources for a channel, an external post or a series, each under its own registered metric names; SHALL store, roll up and read these points like platform metrics; SHALL mark every point with its source; and SHALL keep an estimate flag on points that a source reports as estimates and show it on every read.
+
+#### Scenario: Source points stored like platform metrics
+- **GIVEN** a registered internal source that writes the metric "first joins" for a channel on a given day
+- **WHEN** the source writes the point
+- **THEN** the hub stores it with the channel, the metric name, the value and the source, and the daily rollup of that channel includes it
+
+#### Scenario: Estimate shown
+- **GIVEN** a registered source that reports first joins attributed to an external post as an estimate over a 72 hour window
+- **WHEN** a person reads the analytics of that post
+- **THEN** the value is shown with the estimate flag and its attribution window
+
+#### Scenario: Estimates kept in rollups
+- **GIVEN** a daily rollup that includes estimated and measured points of the same metric
+- **WHEN** a person reads the rollup
+- **THEN** the rollup shows the sum and marks that it contains estimates
+
+#### Scenario: Unregistered source or metric refused
+- **GIVEN** a source that is not registered, or a registered source that writes a metric name it did not register
+- **WHEN** the source writes a point
+- **THEN** the hub refuses the point and stores nothing
+
+#### Scenario: Source cannot change platform points
+- **GIVEN** a stored platform point of an external post
+- **WHEN** an internal source writes a point for the same post
+- **THEN** the platform point is unchanged and the internal point is stored with its own source
+
+### Requirement: Series comparison
+(Must) The dashboard SHALL show, per series and per week, the engaged views, the average view percentage and the metrics of registered internal sources, read from rollups within the one-second budget of dashboard aggregates; a value the platform does not deliver SHALL be shown as unavailable and not as zero; and series SHALL be ranked by engaged views, not by views.
+
+#### Scenario: Weekly comparison per series
+- **GIVEN** a series with posts on two channels in one week
+- **WHEN** a person requests the series comparison for that week
+- **THEN** the dashboard shows the engaged views and average view percentage of the series for that week, read from rollups
+
+#### Scenario: Average view percentage unavailable
+- **GIVEN** a series whose posts all come from a channel that does not deliver average view percentage
+- **WHEN** the comparison is shown
+- **THEN** the average view percentage is shown as unavailable and the engaged views are still shown
+
+#### Scenario: Internal source metric in the comparison
+- **GIVEN** a registered source that reports first joins of a series for a week as an estimate
+- **WHEN** the comparison for that week is shown
+- **THEN** the first joins of the series are shown with the estimate flag
+
+#### Scenario: Ranking by engaged views
+- **GIVEN** series A with more views than series B but fewer engaged views
+- **WHEN** the series are ranked by the comparison
+- **THEN** series B ranks above series A
+
+#### Scenario: Comparison within one second
+- **GIVEN** two years of metric points with their rollups, and 20 series
+- **WHEN** a person requests the comparison of the last 52 weeks
+- **THEN** the hub returns it within one second from the rollups
 
 ### Requirement: Rollups maintained by a job
 (Must) A scheduled job SHALL maintain daily and weekly rollups of the metric points, and SHALL rebuild the rollups of a period when a channel corrects its numbers.
