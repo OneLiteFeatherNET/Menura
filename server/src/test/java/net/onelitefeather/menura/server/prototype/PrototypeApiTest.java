@@ -13,6 +13,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The prototype environment without a database. Requests name their caller with the test identity headers (see
@@ -112,6 +114,63 @@ class PrototypeApiTest {
         for (Model.Post post : posts) {
             assertNull(post.avgViewPercent(), "TikTok does not deliver the average in the seed");
         }
+    }
+
+    @Test
+    void aSeriesWithoutAnAudienceIsRefusedWith422NotAServerError() {
+        Map<String, Object> body = validSeriesBody();
+        body.remove("audience");
+
+        HttpClientResponseException refused = assertThrows(HttpClientResponseException.class,
+                () -> client.toBlocking().exchange(signedIn(HttpRequest.POST("/api/prototype/series", body),
+                        "EDITOR"), Map.class));
+
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, refused.getStatus());
+        assertEquals("application/problem+json", refused.getResponse().getContentType().orElseThrow().toString());
+    }
+
+    @Test
+    void aNullPlaylistValueIsRefusedWith422NotAServerError() {
+        Map<String, Object> body = validSeriesBody();
+        Map<String, String> playlists = new HashMap<>();
+        playlists.put("yt-de", null);
+        body.put("playlists", playlists);
+
+        HttpClientResponseException refused = assertThrows(HttpClientResponseException.class,
+                () -> client.toBlocking().exchange(signedIn(HttpRequest.POST("/api/prototype/series", body),
+                        "EDITOR"), Map.class));
+
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, refused.getStatus());
+    }
+
+    @Test
+    void aRefusedSeriesDoesNotEchoTheRawHashtagInTheProblemDetail() {
+        Map<String, Object> body = validSeriesBody();
+        body.put("hashtag", "#Raw-Echo-Value");
+
+        HttpClientResponseException refused = assertThrows(HttpClientResponseException.class,
+                () -> client.toBlocking().exchange(signedIn(HttpRequest.POST("/api/prototype/series", body),
+                        "EDITOR"), Map.class));
+
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, refused.getStatus());
+        String problemBody = refused.getResponse().getBody(Map.class).map(Object::toString).orElse("");
+        assertTrue(problemBody.contains("hashtag"), problemBody);
+        assertFalse(problemBody.contains("Raw-Echo-Value"), problemBody);
+    }
+
+    private static Map<String, Object> validSeriesBody() {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", "Neu");
+        body.put("badge", Map.of("de", "Neu", "en", "New"));
+        body.put("colorToken", "series-k8s");
+        body.put("badgeTextColor", "#FFFFFF");
+        body.put("openingFormula", "Kurz:");
+        body.put("hashtag", "#neu");
+        body.put("audience", "developers");
+        body.put("weekday", "THURSDAY");
+        body.put("slot", "18:00");
+        body.put("playlists", Map.of());
+        return body;
     }
 
     private static MutableHttpRequest<?> viewer(MutableHttpRequest<?> request) {
