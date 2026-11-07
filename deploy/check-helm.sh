@@ -226,6 +226,12 @@ if [[ "$(yq -N 'select(.kind == "Deployment") | .metadata.name' "$rendered_disab
   report "with httpRoute.enabled=false the Deployments must still be rendered"
 fi
 
+# migrate.enabled=false: the migrate hook Job is not rendered (for example in the prototype, which has no database);
+# the other workloads still are.
+if helm template "$release" "$chart" --set migrate.enabled=false | yq -N 'select(.kind == "Job") | .metadata.name' | grep -q .; then
+  report "with migrate.enabled=false no migrate Job may be rendered"
+fi
+
 # imagePullSecrets set: every pod spec carries the secret, including the migrate hook Job.
 helm template "$release" "$chart" --set 'imagePullSecrets[0].name=harbor-pull' >"$rendered_pull"
 pod_count="$(yq -N 'select(.kind == "Deployment" or .kind == "Job") | .spec.template.spec | select(. != null) | .containers[0].name' "$rendered_pull" | grep -c . || true)"

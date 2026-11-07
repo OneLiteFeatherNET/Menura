@@ -1,5 +1,8 @@
 # Menura chart: edge policies
 
+`migrate.enabled` (default `true`) switches the pre-install and pre-upgrade migrate hook off, for example for the
+prototype environment, which runs without a database.
+
 The chart renders the three public routes and the rate limits that Envoy Gateway applies to them. The gateway is the
 shared `eg` Gateway of the cluster repository; the chart does not own it. `deploy/check-helm.sh` asserts the rendered
 resources.
