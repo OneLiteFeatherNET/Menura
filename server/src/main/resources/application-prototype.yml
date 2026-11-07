@@ -2,6 +2,10 @@
 # contains "prototype", alone or after "prod". The server then runs without PostgreSQL: no datasource, no connection
 # pool, no Flyway. Sign-in with Entra ID stays the production sign-in; the sign-in store, the audit log and the
 # calendar feed tokens are in memory, and the demo API answers under /api/prototype.
+micronaut:
+  server:
+    # The prototype takes no large bodies: a request body above 64 KiB is refused with 413 before a handler runs.
+    max-request-size: 65536
 datasources:
   default:
     enabled: false
