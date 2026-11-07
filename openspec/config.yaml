@@ -100,14 +100,14 @@ context: |
   16. Roadmap: code is built in phases; a change depends only on changes of the same or an earlier
      phase, and needs of a later component are phrased "Where <component> is available".
      0 Fundament: add-project-skeleton, add-ci-pipeline, add-access-control.
-     1 Plattformen & Statistiken: add-channel-connections, add-external-post-import,
-       add-content-analytics, add-youtube-insights, add-twitch-insights, add-tiktok-insights,
-       add-instagram-insights.
+     1 Wiedererkennung & Messbarkeit: add-brand-kit, add-content-series, add-channel-connections,
+       add-external-post-import, add-content-analytics, add-join-attribution, add-youtube-insights,
+       add-twitch-insights.
      2 Planung & Scheduling: add-asset-upload, add-content-distribution and the four
-       add-<platform>-integration changes.
+       add-<platform>-integration changes, add-tiktok-insights and add-instagram-insights.
      3 Hub-MCP: add-client-and-mcp-auth, add-hub-mcp-server.
      4 S3 & Aufnahme: add-recording-ingest, add-content-library, add-media-job-queue.
-     5 Lokal & Brand: add-brand-kit, add-local-transcription, add-local-editing-mcp.
+     5 Lokal & Brand: add-brand-profiles, add-local-transcription, add-local-editing-mcp.
      6 Overlay: add-overlay-system, add-obs-plugin, add-agent-activity-feed.
      Within a phase, contracts (API, schema, adapter port) are merged first so that agents can then
      work in parallel, one change slice per agent, worktree and pull request.
