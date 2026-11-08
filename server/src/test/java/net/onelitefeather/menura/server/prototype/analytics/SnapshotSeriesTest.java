@@ -89,15 +89,29 @@ class SnapshotSeriesTest {
     }
 
     @Test
-    void theSevenDaySnapshotHasTheV1ViewsAndEngagedViews() {
+    void theSevenDaySnapshotHasTheV1EngagedViews() {
         for (Model.Post post : seedPosts()) {
             Snapshot sevenDays = SnapshotSeed.of(post).get(Snapshot.Offset.D7.ordinal());
 
-            assertEquals((double) post.engagedViews(), sevenDays.values().get("views"), post.id() + " views");
             if (post.platform().equals(MetricCatalogue.YOUTUBE)) {
                 assertEquals((double) post.engagedViews(), sevenDays.values().get("engagedViews"),
                         post.id() + " engagedViews");
+            } else {
+                assertEquals((double) post.engagedViews(), sevenDays.values().get("views"), post.id() + " views");
             }
+        }
+    }
+
+    @Test
+    void youTubeViewsLieAboveEngagedViews() {
+        for (Model.Post post : seedPosts()) {
+            if (!post.platform().equals(MetricCatalogue.YOUTUBE) || post.engagedViews() == 0) {
+                continue;
+            }
+            Snapshot sevenDays = SnapshotSeed.of(post).get(Snapshot.Offset.D7.ordinal());
+
+            assertTrue(sevenDays.values().get("views") > sevenDays.values().get("engagedViews"),
+                    post.id() + ": a view counts every start, an engaged view only some, so views must be higher");
         }
     }
 

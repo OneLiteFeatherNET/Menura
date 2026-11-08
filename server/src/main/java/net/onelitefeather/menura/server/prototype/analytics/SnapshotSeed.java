@@ -43,7 +43,9 @@ final class SnapshotSeed {
     private static Map<String, Double> finalValues(Model.Post post, long seed) {
         double views = post.engagedViews();
         Map<String, Double> finals = new LinkedHashMap<>();
-        finals.put("views", views);
+        // YouTube counts every start as a view and only some as engaged views, so its views lie 25-45 % above them.
+        boolean youTube = MetricCatalogue.YOUTUBE.equals(post.platform());
+        finals.put("views", youTube ? (double) Math.round(views * (1.25 + 0.2 * unit(seed, 31))) : views);
         switch (post.platform()) {
             case MetricCatalogue.YOUTUBE -> {
                 finals.put("engagedViews", views);

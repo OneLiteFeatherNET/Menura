@@ -52,7 +52,7 @@ class AggregationTest {
                 youtube("b", "2026-11-06T23:10:00Z", 300, null),
                 youtube("c", "2026-11-07T10:00:00Z", 1000, null));
 
-        Aggregation.Result result = aggregate(posts, "views", "publishHour", "+7d", LATER);
+        Aggregation.Result result = aggregate(posts, "engagedViews", "publishHour", "+7d", LATER);
 
         assertEquals(List.of("0", "11"), result.rows().stream().map(Aggregation.Row::key).toList());
         assertEquals(200.0, result.rows().get(0).value(), "median of 100 and 300 near midnight Berlin");
@@ -86,7 +86,7 @@ class AggregationTest {
                 youtube("a", "2026-10-01T10:00:00Z", 1000, 70.2),
                 youtube("b", "2026-10-01T12:00:00Z", 500, 48.2));
 
-        Aggregation.Result result = aggregate(posts, "views", "channel", "+7d", LATER);
+        Aggregation.Result result = aggregate(posts, "engagedViews", "channel", "+7d", LATER);
 
         assertEquals(1500.0, result.rows().get(0).value());
         assertEquals(2, result.rows().get(0).posts());
@@ -150,7 +150,7 @@ class AggregationTest {
                 youtube("a", "2026-11-05T23:30:00Z", 100, null),
                 youtube("b", "2026-11-06T23:10:00Z", 300, null),
                 youtube("c", "2026-11-07T10:00:00Z", 1000, null));
-        Aggregation.Selection selection = Aggregation.select(CHANNELS, "views", null, "+7d", null, null);
+        Aggregation.Selection selection = Aggregation.select(CHANNELS, "engagedViews", null, "+7d", null, null);
 
         Aggregation.Heatmap heatmap = Aggregation.heatmap(selection,
                 Aggregation.contributions(selection, posts, LATER));
