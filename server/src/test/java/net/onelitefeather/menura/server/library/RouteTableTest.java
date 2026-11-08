@@ -75,6 +75,7 @@ class RouteTableTest {
             "GET /library/search",
             "GET /library/raw-items/{id}/lineage",
             "PUT /library/raw-items/{id}/transcript",
+            "DELETE /library/raw-items/{id}/media",
             "POST /library/timelines",
             "GET /library/timelines/{id}",
             "POST /library/finished-assets/{id}/registration");
