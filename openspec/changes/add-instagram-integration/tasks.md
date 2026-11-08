@@ -43,4 +43,4 @@
 
 ## Implemented elsewhere
 
-- Reel insights: `add-instagram-insights` (phase 1).
+- Reel insights: `add-instagram-insights` (phase 2).
