@@ -63,8 +63,14 @@ export interface TransferOptions {
  * Sends the given parts. A part the storage refuses is requested again after a fresh read of the session, which
  * returns new URLs for the parts still missing. The result names the parts that failed in every round.
  */
+/** The calls that moving parts needs: a fresh read of the parts still missing, and the part request. */
+export type TransferApi = {
+  read(id: string): Promise<Pick<UploadSessionView, 'parts'>>;
+  putPart: UploadApi['putPart'];
+};
+
 export async function transferParts(
-  api: Pick<UploadApi, 'read' | 'putPart'>,
+  api: TransferApi,
   sessionId: string,
   initial: readonly PartUrl[],
   prepared: Prepared,
@@ -80,9 +86,12 @@ export async function transferParts(
       options.concurrency ?? CONCURRENCY,
       async (part) => {
         const slice = prepared.plan.parts[part.partNumber - 1];
-        const digest = toBase64(prepared.digests[part.partNumber - 1]);
+        const digest = prepared.digests[part.partNumber - 1];
+        if (!slice || !digest) {
+          throw new RangeError(`part ${part.partNumber} is not part of the prepared upload`);
+        }
         try {
-          await api.putPart(part.url, source.blob(slice.offset, slice.offset + slice.size), digest, options.signal);
+          await api.putPart(part.url, source.blob(slice.offset, slice.offset + slice.size), toBase64(digest), options.signal);
         } catch (error) {
           if (isAbortError(error)) throw error;
           refused.push(part.partNumber);
@@ -170,12 +179,13 @@ export async function continueUpload(input: ContinueInput): Promise<UploadSessio
  * its composite checksum has to equal the declared one, or nothing is sent.
  */
 export async function resumeUpload(
-  api: UploadApi,
+  api: Pick<UploadApi, 'read'>,
   sessionId: string,
   source: UploadSource,
+  onHashed?: (done: number, total: number) => void,
 ): Promise<{ view: UploadSessionView; prepared: Prepared } | { mismatch: true }> {
   const view = await api.read(sessionId);
-  const prepared = await prepareUpload(source);
+  const prepared = await prepareUpload(source, PART_SIZE_BYTES, onHashed);
   if (!isSameUpload(view.checksum, prepared.checksum)) {
     return { mismatch: true };
   }

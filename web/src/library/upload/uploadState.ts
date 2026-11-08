@@ -44,15 +44,21 @@ export type UploadEvent =
   | { type: 'duplicateConfirmed' }
   | { type: 'partConfirmed'; partNumber: number }
   | { type: 'partsFailed'; parts: number[]; message: string }
+  | { type: 'retrying' }
   | { type: 'completing' }
   | { type: 'completed'; assetId: string }
   | { type: 'failed'; message: string }
-  | { type: 'cancelled' };
+  | { type: 'cancelled' }
+  | { type: 'reset' };
 
 export function reduceUpload(state: UploadState, event: UploadEvent): UploadState {
   switch (event.type) {
     case 'selected':
       return { ...IDLE_UPLOAD, phase: 'hashing', fileName: event.fileName, partCount: event.partCount };
+    case 'reset':
+      return IDLE_UPLOAD;
+    case 'retrying':
+      return { ...state, phase: 'uploading', failedParts: [], message: null };
     case 'hashed':
       return { ...state, hashedParts: event.done };
     case 'sessionStarted':

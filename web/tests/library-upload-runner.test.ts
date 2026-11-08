@@ -92,7 +92,7 @@ describe('transferring the parts', () => {
     });
     expect(result).toEqual({ failed: [] });
     expect(confirmed.sort()).toEqual([1, 2, 3]);
-    expect(storage.digests.get(2)).toBe(toBase64(prepared.digests[1]));
+    expect(storage.digests.get(2)).toBe(toBase64(prepared.digests[1] as Uint8Array));
   });
 
   it('asks for fresh part URLs when the storage refused a URL, and sends the part again', async () => {

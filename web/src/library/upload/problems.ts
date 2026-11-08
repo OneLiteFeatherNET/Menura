@@ -35,12 +35,7 @@ export function problemFromBody(body: unknown, status: number): ProblemView {
 
 /** The failure of a response that is not ok, read from its body when it has one. */
 export async function failureOf(response: Response): Promise<ApiProblem> {
-  let body: unknown = null;
-  try {
-    body = await response.json();
-  } catch {
-    body = null;
-  }
+  const body: unknown = await response.json().catch(() => null);
   return new ApiProblem(problemFromBody(body, response.status));
 }
 

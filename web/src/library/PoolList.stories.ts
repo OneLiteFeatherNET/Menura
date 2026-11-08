@@ -79,3 +79,22 @@ export const LoadFailed: Story = {
     expect(args.onRetry).toHaveBeenCalledTimes(1);
   },
 };
+
+export const EditorTranscriptAction: Story = {
+  args: { canEdit: true, onTranscript: fn() },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // Only the raw recording offers a transcript; the clip row has no such action.
+    expect(canvas.getAllByRole('button', { name: 'Transkript' })).toHaveLength(1);
+    await userEvent.click(canvas.getByRole('button', { name: 'Transkript' }));
+    expect(args.onTranscript).toHaveBeenCalledWith(RAW.id);
+  },
+};
+
+export const ViewerHasNoUploadActions: Story = {
+  args: { canEdit: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.queryByRole('button', { name: 'Transkript' })).toBeNull();
+  },
+};

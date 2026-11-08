@@ -62,4 +62,15 @@ describe('upload state', () => {
     const state = reduceUpload(selected(), { type: 'cancelled' });
     expect(state).toMatchObject({ phase: 'cancelled', assetId: null });
   });
+
+  it('goes back to uploading and clears the failure when the editor retries', () => {
+    const failed = reduceUpload(selected(), { type: 'partsFailed', parts: [2], message: 'Teil 2 fehlt.' });
+    const retrying = reduceUpload(failed, { type: 'retrying' });
+    expect(retrying).toMatchObject({ phase: 'uploading', failedParts: [], message: null });
+  });
+
+  it('returns to an empty form on reset', () => {
+    const state = reduceUpload(selected(), { type: 'failed', message: 'nein' });
+    expect(reduceUpload(state, { type: 'reset' })).toEqual(IDLE_UPLOAD);
+  });
 });

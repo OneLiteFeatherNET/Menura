@@ -52,7 +52,8 @@ describe('checksum', () => {
   });
 
   it('depends on the order of the parts', async () => {
-    const digests = [await sha256(ABC), await sha256(EMPTY)];
-    expect(await compositeChecksum([digests[1], digests[0]])).not.toBe(COMPOSITE_TWO_PARTS);
+    const first = await sha256(ABC);
+    const second = await sha256(EMPTY);
+    expect(await compositeChecksum([second, first])).not.toBe(COMPOSITE_TWO_PARTS);
   });
 });

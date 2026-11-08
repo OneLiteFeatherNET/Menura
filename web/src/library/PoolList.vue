@@ -11,8 +11,9 @@ const props = defineProps<{
   status: 'loading' | 'error' | 'ready';
   hasMore: boolean;
   errorMessage?: string;
+  canEdit?: boolean;
 }>();
-const emit = defineEmits<{ more: []; retry: [] }>();
+const emit = defineEmits<{ more: []; retry: [], transcript: [itemId: string] }>();
 
 const columns: { key: string; label: string }[] = [
   { key: 'title', label: 'Titel' },
@@ -22,6 +23,7 @@ const columns: { key: string; label: string }[] = [
   { key: 'usage', label: 'Verwendung' },
   { key: 'uploader', label: 'Hochgeladen von' },
   { key: 'tags', label: 'Tags' },
+  { key: 'actions', label: 'Aktion' },
 ];
 
 const KIND_LABELS: Record<string, string> = { raw: 'Rohmaterial', clip: 'Clip' };
@@ -66,6 +68,16 @@ function stageTone(stage: string): 'neutral' | 'info' | 'success' {
         <template #cell-tags="{ row }">
           <TagChips :tags="(row.tags as string[])" empty-text="Keine Tags" />
         </template>
+        <template #cell-actions="{ row }">
+          <button
+            v-if="canEdit && row.kind === 'raw'"
+            type="button"
+            class="pool-list__action"
+            @click="emit('transcript', String(row.id))"
+          >
+            Transkript
+          </button>
+        </template>
       </DataTable>
       <div v-if="hasMore" class="pool-list__more">
         <button type="button" class="pool-list__button" @click="emit('more')">Mehr laden</button>
@@ -85,6 +97,18 @@ function stageTone(stage: string): 'neutral' | 'info' | 'success' {
 .pool-list__more {
   display: flex;
   justify-content: center;
+}
+
+.pool-list__action {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .pool-list__button {

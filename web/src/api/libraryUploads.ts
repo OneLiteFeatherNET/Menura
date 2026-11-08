@@ -2,7 +2,7 @@
 // menura.yaml, Library and Content). The API carries metadata and presigned part URLs only; the media bytes go from
 // the browser straight to the object storage, with no credential in the browser (principle 1 and 6).
 
-import { ApiProblem, failureOf } from '../library/upload/problems';
+import { failureOf } from '../library/upload/problems';
 import { apiBase, type Fetcher } from '../auth/session';
 import type { UploadRequestBody } from '../library/upload/declaration';
 import type { TranscriptFormat } from '../library/upload/transcript';

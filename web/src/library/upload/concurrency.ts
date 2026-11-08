@@ -16,7 +16,7 @@ export async function runBounded<T>(
       if (signal?.aborted) {
         throw abortError();
       }
-      const item = items[next];
+      const item = items[next] as T;
       next += 1;
       try {
         await worker(item);
