@@ -16,6 +16,9 @@ public interface ExternalPostStore {
     /** Every post of a channel, for the comparison with a listing. */
     List<ExternalPost> listForChannel(Connection connection, UUID channelId) throws SQLException;
 
+    /** One post by its identifier, if it exists. */
+    Optional<ExternalPost> find(Connection connection, UUID id) throws SQLException;
+
     /**
      * One page of a channel's posts, newest first. The page after {@code afterPublishedAt} and {@code afterId} is
      * returned when both are given; the first page when both are null.

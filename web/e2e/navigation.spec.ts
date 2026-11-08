@@ -4,11 +4,11 @@ import { APP, ROLES, ROLE_LABELS, expect, signInAs, test, type TestRole } from '
 // The items of the navigation per role. Every existing area is open to any signed-in person, so each role sees the
 // same four items; a role that is later shut out of an area is listed without that area (web/src/navigation/areas.ts).
 const EXPECTED_NAV: Record<TestRole, string[]> = {
-  viewer: ['Übersicht', 'Pool', 'Brand-Kit', 'Kanäle'],
-  editor: ['Übersicht', 'Pool', 'Brand-Kit', 'Kanäle'],
-  publisher: ['Übersicht', 'Pool', 'Brand-Kit', 'Kanäle'],
-  operator: ['Übersicht', 'Pool', 'Brand-Kit', 'Kanäle'],
-  admin: ['Übersicht', 'Pool', 'Brand-Kit', 'Kanäle'],
+  viewer: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
+  editor: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
+  publisher: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
+  operator: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
+  admin: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
 };
 
 const rail = (page: Page) => page.getByRole('navigation', { name: 'Hauptnavigation' });

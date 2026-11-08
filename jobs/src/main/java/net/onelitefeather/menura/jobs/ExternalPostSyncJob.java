@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.jobs;
 
+import net.onelitefeather.menura.core.brand.BrandKit.ColourToken;
 import net.onelitefeather.menura.core.channel.ChannelAudit;
 import net.onelitefeather.menura.core.channel.ConnectionService;
 import net.onelitefeather.menura.core.channel.JdbcChannelStore;
@@ -12,6 +13,11 @@ import net.onelitefeather.menura.core.db.DataSourceTransactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
 import net.onelitefeather.menura.core.post.ExternalPostService;
 import net.onelitefeather.menura.core.post.JdbcExternalPostStore;
+import net.onelitefeather.menura.core.series.BrandTokens;
+import net.onelitefeather.menura.core.series.JdbcSeriesStore;
+import net.onelitefeather.menura.core.series.JoinDomain;
+import net.onelitefeather.menura.core.series.SeriesPlaylistCheck;
+import net.onelitefeather.menura.core.series.SeriesService;
 import net.onelitefeather.menura.core.secret.SecretGenerator;
 import net.onelitefeather.menura.core.secret.TokenCipher;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -21,6 +27,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Imports the existing posts of connected channels and re-syncs them on a schedule (change add-external-post-import).
@@ -68,14 +75,39 @@ public final class ExternalPostSyncJob implements Job {
         JdbcChannelStore channelStore = new JdbcChannelStore(cipher);
         ConnectionService connections = new ConnectionService(transactions, clock, new IdentifierGenerator(random),
                 new SecretGenerator(random), channelStore, NO_AUDIT, registry, channels.refreshMargin(), 0.8);
+        JdbcExternalPostStore posts = new JdbcExternalPostStore();
+        JdbcSeriesStore seriesStore = new JdbcSeriesStore();
+        SeriesService series = new SeriesService(clock, new IdentifierGenerator(random), seriesStore, posts, channelStore,
+                NO_BRAND_KIT, JoinDomain.NONE);
         ExternalPostService service = new ExternalPostService(transactions, clock, new IdentifierGenerator(random),
-                channelStore, new JdbcExternalPostStore(), connections, registry);
+                channelStore, posts, connections, registry, ExternalPostService.LISTING_LIMIT, series);
 
         ExternalPostService.SyncReport report = service.syncDue(interval);
         System.out.println("external-post-sync checked=" + report.checked() + " synced=" + report.synced()
                 + " skipped=" + report.skipped() + " incomplete=" + report.incomplete() + " failed=" + report.failed()
                 + " waiting=" + report.waiting());
+
+        SeriesPlaylistCheck.Report playlists = new SeriesPlaylistCheck(transactions, clock, seriesStore, posts,
+                channelStore, connections, registry).run();
+        System.out.println("series-playlist-check checked=" + playlists.checked() + " missing=" + playlists.missing()
+                + " notChecked=" + playlists.notChecked());
     }
+
+    /**
+     * The sync only assigns imported posts and checks playlists, which read no brand colour; a brand-kit read here would be a
+     * programming error.
+     */
+    private static final BrandTokens NO_BRAND_KIT = new BrandTokens() {
+        @Override
+        public Optional<ColourToken> colour(String name) {
+            throw new IllegalStateException("the external post sync does not read the brand kit");
+        }
+
+        @Override
+        public boolean hasTemplate(String format) {
+            throw new IllegalStateException("the external post sync does not read the brand kit");
+        }
+    };
 
     /** A sync acts for no person, so it writes no audit entry; reaching this would be a programming error. */
     private static final ChannelAudit NO_AUDIT = (connection, actor, action, target) -> {

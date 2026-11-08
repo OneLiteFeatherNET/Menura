@@ -32,6 +32,11 @@ tags:
       reads it; the editor role publishes versions and sets the pins of consumers.
   - name: Content
     description: The shared pool of raw recordings and clips, person and free tags, transcript search, timelines and lineage.
+  - name: Series
+    description: >-
+      Content series: badge, opening formula, hashtag and colour token per series; the assignment of external posts with
+      their episode numbers; the weekly coverage; and the render bundle for the external renderer. Every signed-in role
+      reads them; the editor role writes them.
 paths:
   /health:
     get:
@@ -1568,6 +1573,215 @@ paths:
         "404":
           $ref: "#/components/responses/Problem"
         "409":
+          $ref: "#/components/responses/Problem"
+  /series:
+    get:
+      tags:
+        - Series
+      operationId: listSeries
+      summary: Every content series, active and inactive.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The series of the installation.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Series"
+        "401":
+          $ref: "#/components/responses/Problem"
+    post:
+      tags:
+        - Series
+      operationId: createSeries
+      summary: Stores a new content series. Only the editor role.
+      description: |
+        The colour and the badge text colour are tokens of the brand kit, never raw values; the badge text must reach 4.5:1
+        against the series colour in both roles, and the layout template must exist in the brand kit. A refused series is
+        stored nothing.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeriesRequest"
+      responses:
+        "201":
+          description: The stored series with its identifier.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Series"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /series/overview:
+    get:
+      tags:
+        - Series
+      operationId: getSeriesOverview
+      summary: The series with the audience warning and the weekly coverage of every channel.
+      description: |
+        Coverage counts published shorts only. A week below 90 percent is flagged; a week without shorts is not flagged.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: weeks
+          in: query
+          required: false
+          description: How many weeks back to report, the current week included. 1 to 52, default 8.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 52
+      responses:
+        "200":
+          description: The overview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesOverview"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /series/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The series identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Series
+      operationId: getSeries
+      summary: One series with its episodes in number order.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The series and its episodes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      tags:
+        - Series
+      operationId: updateSeries
+      summary: Replaces a series. Only the editor role; the colours are checked again against the brand kit.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeriesRequest"
+      responses:
+        "200":
+          description: The stored series.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Series"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /external-posts/{id}/series:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The external post identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    put:
+      tags:
+        - Series
+      operationId: assignExternalPostSeries
+      summary: Assigns a post to a series or marks it "no series". Only the editor role.
+      description: |
+        Moving a post that already belongs to a series, or carries the no-series mark, needs replace set to true; without it
+        the request is refused with 409 and nothing changes.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeriesAssignRequest"
+      responses:
+        "200":
+          description: The decision on the post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesAssignment"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /channels/{id}/series-render-bundle:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The channel identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Series
+      operationId: getSeriesRenderBundle
+      summary: The active series and one call to action of a channel, for the external renderer.
+      description: |
+        Readable by the renderer's operator role only. The call to action names the join domain when one is configured;
+        without a join domain the bundle carries no call to action and no error.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The render bundle.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderBundle"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
           $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
@@ -3156,3 +3370,357 @@ components:
                 type: array
                 items:
                   $ref: "#/components/schemas/Identifier"
+    SeriesRequest:
+      type: object
+      description: A content series as an editor sends it. Colours are brand-kit token names, never hex values.
+      required:
+        - name
+        - badgeText
+        - colourToken
+        - badgeToken
+        - openingFormula
+        - layoutTemplate
+        - hashtag
+        - audience
+        - weekday
+        - postingSlot
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        badgeText:
+          type: object
+          description: The badge text per language, for example de. At least one language.
+          additionalProperties:
+            type: string
+            maxLength: 40
+        colourToken:
+          type: string
+          description: The brand-kit token of the series colour.
+        badgeToken:
+          type: string
+          description: The brand-kit token of the badge text colour; must reach 4.5:1 against the series colour.
+        openingFormula:
+          type: string
+          maxLength: 120
+        layoutTemplate:
+          type: string
+          description: The format of a layout template of the brand kit, for example short-9x16.
+        hashtag:
+          type: string
+          description: Starts with #, two to 49 letters, digits or underscores. Stored in lower case.
+        audience:
+          type: string
+          enum:
+            - players
+            - developers
+            - mixed
+        weekday:
+          type: integer
+          minimum: 1
+          maximum: 7
+          description: The preferred weekday, 1 (Monday) to 7 (Sunday).
+        postingSlot:
+          type: integer
+          enum:
+            - 12
+            - 18
+            - 21
+          description: The preferred posting hour. A hint for planning; comparisons use a random slot.
+        active:
+          type: boolean
+          description: Defaults to true.
+        playlists:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeriesPlaylist"
+        visibleTo:
+          type: array
+          description: The roles that may see the series. Omitted means every role. A series a caller may not see answers 404.
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - viewer
+              - editor
+              - publisher
+              - operator
+              - admin
+    SeriesPlaylist:
+      type: object
+      required:
+        - channelId
+        - playlistId
+        - playlistName
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        playlistId:
+          type: string
+        playlistName:
+          type: string
+    Series:
+      type: object
+      description: A content series with its opaque identifier and its checked values.
+      required:
+        - id
+        - name
+        - badgeText
+        - colourToken
+        - badgeToken
+        - openingFormula
+        - layoutTemplate
+        - hashtag
+        - audience
+        - weekday
+        - postingSlot
+        - active
+        - playlists
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        name:
+          type: string
+        badgeText:
+          type: object
+          additionalProperties:
+            type: string
+        colourToken:
+          type: string
+        badgeToken:
+          type: string
+        openingFormula:
+          type: string
+        layoutTemplate:
+          type: string
+        hashtag:
+          type: string
+        audience:
+          type: string
+          enum:
+            - players
+            - developers
+            - mixed
+        weekday:
+          type: integer
+        postingSlot:
+          type: integer
+        active:
+          type: boolean
+        playlists:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeriesPlaylist"
+        visibleTo:
+          type: array
+          description: The roles that may see the series.
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    SeriesDetail:
+      type: object
+      required:
+        - series
+        - episodes
+      properties:
+        series:
+          $ref: "#/components/schemas/Series"
+        episodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Episode"
+    Episode:
+      type: object
+      description: One episode of a series. The number is never reused within the series.
+      required:
+        - number
+        - postId
+        - title
+        - format
+        - publishedAt
+      properties:
+        number:
+          type: integer
+        postId:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type: string
+        format:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        playlistState:
+          type:
+            - string
+            - "null"
+          enum:
+            - in_playlist
+            - missing
+            - not_checked
+            - null
+    SeriesAssignRequest:
+      type: object
+      description: Names one series, or the no-series mark. Exactly one of the two.
+      required:
+        - noSeries
+        - replace
+      properties:
+        seriesId:
+          $ref: "#/components/schemas/Identifier"
+        noSeries:
+          type: boolean
+        replace:
+          type: boolean
+          description: Set to true to move a post that already has a decision.
+    SeriesAssignment:
+      type: object
+      required:
+        - postId
+        - noSeries
+      properties:
+        postId:
+          $ref: "#/components/schemas/Identifier"
+        seriesId:
+          type:
+            - string
+            - "null"
+        noSeries:
+          type: boolean
+        flag:
+          type:
+            - string
+            - "null"
+          enum:
+            - two_series
+            - null
+        playlistState:
+          type:
+            - string
+            - "null"
+          enum:
+            - in_playlist
+            - missing
+            - not_checked
+            - null
+        playlistCheckedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        assignedAt:
+          type: string
+          format: date-time
+        assignedBy:
+          type:
+            - string
+            - "null"
+    SeriesOverview:
+      type: object
+      required:
+        - series
+        - warnings
+        - coverage
+      properties:
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/Series"
+        warnings:
+          type: array
+          description: Warning codes. no_players_series means no active series targets the audience players.
+          items:
+            type: string
+        coverage:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChannelCoverage"
+    ChannelCoverage:
+      type: object
+      required:
+        - channelId
+        - displayName
+        - weeks
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        displayName:
+          type: string
+        weeks:
+          type: array
+          description: Newest week first. A week below 90 percent is flagged.
+          items:
+            $ref: "#/components/schemas/WeekCoverage"
+    WeekCoverage:
+      type: object
+      required:
+        - isoWeek
+        - weekStart
+        - shorts
+        - covered
+        - noSeries
+        - flagged
+      properties:
+        isoWeek:
+          type: string
+          example: "2026-W45"
+        weekStart:
+          type: string
+          format: date
+        shorts:
+          type: integer
+        covered:
+          type: integer
+        noSeries:
+          type: integer
+        percent:
+          type:
+            - integer
+            - "null"
+          description: Null for a week without published shorts.
+        flagged:
+          type: boolean
+    RenderBundle:
+      type: object
+      required:
+        - channelId
+        - series
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        series:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - name
+              - badgeText
+              - colourToken
+              - openingFormula
+              - hashtag
+            properties:
+              id:
+                $ref: "#/components/schemas/Identifier"
+              name:
+                type: string
+              badgeText:
+                type: object
+                additionalProperties:
+                  type: string
+              colourToken:
+                type: string
+              openingFormula:
+                type: string
+              hashtag:
+                type: string
+        callToAction:
+          type:
+            - string
+            - "null"
+          description: One text for all channels that names the join domain. Null when no join domain is configured.

@@ -10,6 +10,7 @@ import net.onelitefeather.menura.core.id.IdentifierGenerator;
 import net.onelitefeather.menura.core.post.ExternalPostService;
 import net.onelitefeather.menura.core.post.ExternalPostStore;
 import net.onelitefeather.menura.core.post.JdbcExternalPostStore;
+import net.onelitefeather.menura.core.series.SeriesService;
 
 import java.time.Clock;
 
@@ -25,7 +26,9 @@ public class ExternalPostBeans {
     @Singleton
     ExternalPostService externalPostService(Transactions transactions, Clock clock, IdentifierGenerator identifiers,
                                             ChannelStore channels, ExternalPostStore posts,
-                                            ConnectionService connections, PlatformRegistry platforms) {
-        return new ExternalPostService(transactions, clock, identifiers, channels, posts, connections, platforms);
+                                            ConnectionService connections, PlatformRegistry platforms,
+                                            SeriesService series) {
+        return new ExternalPostService(transactions, clock, identifiers, channels, posts, connections, platforms,
+                ExternalPostService.LISTING_LIMIT, series);
     }
 }

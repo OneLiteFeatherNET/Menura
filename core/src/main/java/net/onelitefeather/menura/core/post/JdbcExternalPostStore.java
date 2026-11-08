@@ -28,6 +28,16 @@ public final class JdbcExternalPostStore implements ExternalPostStore {
     }
 
     @Override
+    public Optional<ExternalPost> find(Connection connection, UUID id) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select " + COLUMNS + " from menura.external_post where id = ?")) {
+            statement.setObject(1, id);
+            List<ExternalPost> found = posts(statement);
+            return found.isEmpty() ? Optional.empty() : Optional.of(found.get(0));
+        }
+    }
+
+    @Override
     public List<ExternalPost> page(Connection connection, UUID channelId, Instant afterPublishedAt, UUID afterId,
                                    int limit) throws SQLException {
         boolean continuing = afterPublishedAt != null;
