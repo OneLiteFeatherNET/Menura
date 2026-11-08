@@ -8,7 +8,7 @@ Schedules approved finished content to external platforms through one hub, with 
 
 ### Requirement: Channels from platform integrations
 
-(Must) The system SHALL offer channels only from platform integrations: YouTube, TikTok and Instagram for publishing, and Twitch for schedule, each connected through the platform's own consent as specified in `add-channel-connections`.
+(Must) The system SHALL offer channels only from platform integrations enabled in this release: YouTube for publishing in phase 1, and TikTok and Instagram for publishing and Twitch for schedule once their phase 2 integration changes are enabled, each connected through the platform's own consent as specified in `add-channel-connections`.
 
 #### Scenario: Channel connected
 - **GIVEN** an admin or publisher who completes the platform's consent for a YouTube account
@@ -16,7 +16,7 @@ Schedules approved finished content to external platforms through one hub, with 
 - **THEN** the channel is listed with its platform and account name
 
 #### Scenario: Unsupported platform
-- **GIVEN** a request to add a channel for a platform outside the first-stage list
+- **GIVEN** a request to add a channel for a platform whose integration is not enabled in this release
 - **WHEN** the request is submitted
 - **THEN** the system rejects it with a validation error
 
@@ -71,6 +71,53 @@ Schedules approved finished content to external platforms through one hub, with 
 - **WHEN** the editor creates a draft post for that asset with per-channel text
 - **THEN** the draft is stored with status draft and the editor recorded as its author
 
+### Requirement: Clip planned onto several channels
+
+(Must) The system SHALL let a person with the editor role plan one finished asset onto several channels at once, creating one post per channel with its own text and scheduled time, and SHALL validate each post separately.
+
+#### Scenario: Clip planned onto three channels
+- **GIVEN** an editor, a finished clip recorded by `add-asset-upload` and three connected channels the editor may plan onto
+- **WHEN** the editor plans the clip onto the three channels with a time for each
+- **THEN** three draft posts are stored, one per channel, each referencing the clip with its own text and time
+
+#### Scenario: One channel refused, others kept
+- **GIVEN** a multi-channel plan that includes a channel the editor may not plan onto
+- **WHEN** the plan is submitted
+- **THEN** the posts for the other channels are stored, and the refused channel is named with the reason
+
+### Requirement: Next episodes planned onto the series slot
+
+(Must) The system SHALL let a person with the editor role plan the next N episodes of a series onto the weekday and time slot configured for that series, using on each channel the next free slots, SHALL skip every slot that already holds a post on that channel, and SHALL name each skipped slot.
+
+#### Scenario: Next three episodes on free slots
+- **GIVEN** a series configured for Mondays at 18:00 Europe/Berlin and a Monday slot of the next week already taken on its channel
+- **WHEN** the editor plans the next three episodes
+- **THEN** the episodes are planned on the next three free Mondays at 18:00, and the taken slot is named as skipped
+
+#### Scenario: Slot not configured
+- **GIVEN** a series without a configured weekday and time slot
+- **WHEN** the editor plans episodes for it
+- **THEN** the system refuses the request and names the missing slot
+
+### Requirement: Series defaults for planned posts
+
+(Must) The system SHALL fill the title, description, hashtags including the series hashtag, clip tags and the playlist of each channel of a planned episode from the series defaults, SHALL include the series opening formula and call-to-action in the description, and SHALL let the editor change every filled value until the post is approved.
+
+#### Scenario: Defaults filled into the draft
+- **GIVEN** a series with an opening formula, a call-to-action, a series hashtag, clip tags and a playlist for a channel
+- **WHEN** an episode is planned on that channel
+- **THEN** the draft shows the description with the opening formula and call-to-action, the series hashtag with the clip tags, and the channel's playlist
+
+#### Scenario: Default changed before approval
+- **GIVEN** a draft filled from the series defaults
+- **WHEN** the editor changes its title
+- **THEN** the draft keeps the changed title and its other filled values
+
+#### Scenario: Series change does not reach planned posts
+- **GIVEN** a post planned from the series defaults, and later a change to the series description
+- **WHEN** the post is read
+- **THEN** the post keeps the description it was planned with
+
 #### Scenario: Draft created through MCP
 - **GIVEN** the hub MCP server is available and an MCP client with the editor role and a finished asset
 - **WHEN** the client creates a draft post for that asset with per-channel text
@@ -121,12 +168,27 @@ Schedules approved finished content to external platforms through one hub, with 
 
 ### Requirement: Content calendar
 
-(Must) The system SHALL show planned and published posts per channel in a content calendar, and, where the hub MCP server is available, SHALL make the same data readable by MCP clients.
+(Must) The system SHALL show planned and published posts together in a content calendar with month, week and list views, SHALL filter them by channel, series and status, SHALL show every time in the installation time zone (default Europe/Berlin), and, where the hub MCP server is available, SHALL make the same data readable by MCP clients.
 
 #### Scenario: Calendar per channel
 - **GIVEN** two channels with planned and published posts
 - **WHEN** a publisher opens the calendar filtered to one channel
 - **THEN** only the planned and published posts of that channel are shown
+
+#### Scenario: Planned and published together
+- **GIVEN** a channel with a planned post and a published post in the same week
+- **WHEN** a publisher opens the week view
+- **THEN** both posts are shown in that week, each with its status
+
+#### Scenario: Filter by series and status
+- **GIVEN** posts of two series in different statuses
+- **WHEN** a publisher filters the list view by one series and the status scheduled
+- **THEN** only the scheduled posts of that series are listed
+
+#### Scenario: Times in the installation time zone
+- **GIVEN** a post scheduled for 2026-11-08T23:30:00Z and the default installation time zone Europe/Berlin
+- **WHEN** the calendar shows the post
+- **THEN** the time shown is Monday 2026-11-09 00:30
 
 ### Requirement: Recycling with lineage
 
@@ -228,7 +290,7 @@ Schedules approved finished content to external platforms through one hub, with 
 
 ### Requirement: Publication by scheduled jobs
 
-(Must) The system SHALL record the due time of each scheduled post, and SHALL let scheduled Kubernetes jobs claim due posts and publish them, so that a post is claimed by at most one job run at a time.
+(Must) The system SHALL record the due time of each scheduled post, and SHALL let scheduled Kubernetes jobs claim due posts and publish them, except for channels whose platform schedules natively as specified in "Native scheduling where the adapter declares it", so that a post is claimed by at most one job run at a time.
 
 #### Scenario: Due post published by a job
 - **GIVEN** a scheduled post whose time has arrived and a job run that starts
@@ -244,6 +306,39 @@ Schedules approved finished content to external platforms through one hub, with 
 - **GIVEN** a job run that claimed a post and stopped before recording the platform outcome
 - **WHEN** its claim lease expires
 - **THEN** the post is marked failed with an unknown outcome and is not published again automatically
+
+### Requirement: Native scheduling where the adapter declares it
+
+(Must) The system SHALL read from each platform adapter a capability flag stating whether the platform schedules publication natively; for a channel whose adapter declares native scheduling, the system SHALL hand each approved post to the platform ahead of its scheduled time so that the platform publishes it at that time, and for any other channel the publication job SHALL publish the post at its scheduled time.
+
+#### Scenario: Native channel handed over before its time
+- **GIVEN** an approved post on a channel whose adapter declares native scheduling, with a scheduled time next week
+- **WHEN** the handover becomes due
+- **THEN** the post is handed to the platform with its scheduled time, its schedule step is recorded as done, and the publication job does not publish it itself at that time
+
+#### Scenario: Channel without native scheduling published at its time
+- **GIVEN** an approved post on a channel whose adapter does not declare native scheduling
+- **WHEN** its scheduled time arrives
+- **THEN** the publication job publishes the post and records the publish step
+
+#### Scenario: Handover refused without approval
+- **GIVEN** a post in review on a channel with native scheduling
+- **WHEN** a handover to the platform is attempted
+- **THEN** the system refuses it and the post is not handed to the platform
+
+### Requirement: Publication steps with state and time
+
+(Must) The system SHALL record each publication step of a post, namely upload, schedule, metadata and publish, with its state (pending, running, done or failed), the time of its last change and, when failed, its reason, and SHALL show the steps of each post in the calendar.
+
+#### Scenario: Steps shown in the calendar
+- **GIVEN** a post whose upload and metadata steps are done and whose schedule step is pending
+- **WHEN** a person opens the calendar item of the post
+- **THEN** the item shows the four steps with their states and times, the pending schedule step included
+
+#### Scenario: Failed step shows its reason
+- **GIVEN** a post whose metadata step failed on a platform error after its last attempt
+- **WHEN** the calendar is shown
+- **THEN** the metadata step is shown as failed with its reason and attempt count
 
 ### Requirement: Pipeline view per channel
 

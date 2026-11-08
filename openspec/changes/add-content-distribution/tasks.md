@@ -3,11 +3,11 @@
 ## 1. Channels and connections
 
 - [ ] 1.1 Write failing unit tests that a channel can be configured only for supported platforms and that its API representation has no credential field; verify they fail.
-- [ ] 1.2 Implement channels that reference a connection from `add-channel-connections`, with the first-stage platform allowlist (YouTube, TikTok, Instagram for publishing; Twitch for schedule); verify the 1.1 tests pass.
+- [ ] 1.2 Implement channels that reference a connection from `add-channel-connections`, with the phase 1 platform allowlist (YouTube for publishing; TikTok, Instagram and Twitch are enabled by their phase 2 changes); verify the 1.1 tests pass.
 - [ ] 1.3 Write failing unit tests that no response, MCP tool result, log line or error message contains a credential value, using a known test credential; verify they fail.
 - [ ] 1.4 Implement redaction of credentials across responses, logs and errors; verify the 1.3 tests pass.
 - [ ] 1.5 Add the database migration for channels and their connection references; verify it applies to an empty PostgreSQL in an integration test.
-- [ ] 1.6 Document the channel list and the first-stage platform allowlist in the server documentation; verify every documented key exists in the configuration class. The credential key is documented by `add-channel-connections`.
+- [ ] 1.6 Document the channel list and the phase 1 platform allowlist in the server documentation; verify every documented key exists in the configuration class. The credential key is documented by `add-channel-connections`.
 
 ## 2. Posts, drafts and lifecycle
 
@@ -99,10 +99,34 @@
 - [ ] 13.1 Write failing tests that analytics aggregates can be grouped by the Menura post an external post was published from, with its revisions, read from rollups; verify they fail
 - [ ] 13.2 Record the originating post and revision on each published external post for the rollup job; verify the tests from the previous task pass
 
-## 14. Integration check
+## 14. Multi-channel and episode planning
 
-- [ ] 14.1 Run the integration suite tagged `integration` on a fresh database and verify approval, dry run, job-based publication with retry and external post record, recycling, pipeline, runway, the calendar feed, latest numbers and best-time suggestions end to end with a fake platform and a fake analytics port.
-- [ ] 14.2 Open the code pull request titled `feat(publish): add content distribution`.
+- [ ] 14.1 Write failing unit tests that one finished asset planned onto three channels creates three draft posts with their own text and times, and that a channel the editor may not plan onto is refused and named while the other posts are stored; verify they fail.
+- [ ] 14.2 Implement multi-channel planning with one post per channel and separate validation; verify the 14.1 tests pass.
+- [ ] 14.3 Write failing unit tests with an injected clock that planning the next three episodes of a series fills the next free weekday and time slots on the channel, names each taken slot it skips, and refuses a series without a slot; verify they fail.
+- [ ] 14.4 Implement the episode planner on the next free slots; verify the 14.3 tests pass.
+- [ ] 14.5 Write failing unit tests that a planned episode takes title, description, hashtags, clip tags and the channel playlist from the series defaults, that the editor can change each filled value before approval, and that a later change to the series description leaves a planned post unchanged; verify they fail.
+- [ ] 14.6 Implement the defaults copy and the edit rules; verify the 14.5 tests pass.
+- [ ] 14.7 Document the multi-channel and episode planning operations in the OpenAPI description; verify the OpenAPI document validates.
+
+## 15. Calendar views and filters
+
+- [ ] 15.1 Write failing unit tests that the month, week and list views contain the same planned and published posts, that the channel, series and status filters narrow each view, and that a post scheduled at 2026-11-08T23:30:00Z is shown as Monday 00:30 in Europe/Berlin with the time zone injected; verify they fail.
+- [ ] 15.2 Implement the month, week and list views, the filters and the rendering in the installation time zone; verify the 15.1 tests pass.
+- [ ] 15.3 Document the filters and the time zone setting in the OpenAPI description and the server documentation; verify every documented key exists in the configuration class.
+
+## 16. Native scheduling and publication steps
+
+- [ ] 16.1 Write failing unit tests with fake adapters: an approved post on an adapter that declares native scheduling is handed over with its scheduled time and is not published by the job at that time; an adapter without the flag is published by the job at its time; a handover of a post in review is refused; verify they fail.
+- [ ] 16.2 Implement the `nativeScheduling` capability flag on the adapter port, the handover and the due-time rule per channel; verify the 16.1 tests pass.
+- [ ] 16.3 Write failing unit tests that each step (upload, schedule, metadata, publish) keeps its state, time and reason, that a failed step shows its reason and attempt count on the calendar item, and that the step row is written before the platform is called; verify they fail.
+- [ ] 16.4 Implement the step rows, their writes and their display in the calendar; verify the 16.3 tests pass.
+- [ ] 16.5 Document the capability flag and the step states in the OpenAPI description and the server documentation; verify the OpenAPI document validates.
+
+## 17. Integration check
+
+- [ ] 17.1 Run the integration suite tagged `integration` on a fresh database and verify approval, dry run, job-based publication with retry and external post record, native handover, recycling, multi-channel and episode planning, calendar views, pipeline, runway, the calendar feed, latest numbers and best-time suggestions end to end with a fake platform and a fake analytics port.
+- [ ] 17.2 Open the code pull request titled `feat(publish): add content distribution`.
 
 ## Implemented elsewhere
 
