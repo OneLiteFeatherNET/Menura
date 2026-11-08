@@ -97,3 +97,6 @@ CREATE TABLE menura.external_post_origin (
 );
 
 CREATE INDEX external_post_origin_post_idx ON menura.external_post_origin (post_id);
+
+-- The calendar feed lists the approvals due only to a token issued while its person held the publisher role.
+ALTER TABLE menura.calendar_feed_token ADD COLUMN publisher boolean NOT NULL DEFAULT false;

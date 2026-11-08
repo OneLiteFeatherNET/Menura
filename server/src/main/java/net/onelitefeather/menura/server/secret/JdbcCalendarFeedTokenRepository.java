@@ -14,12 +14,12 @@ import java.util.UUID;
 @Singleton
 public class JdbcCalendarFeedTokenRepository implements CalendarFeedTokenRepository {
 
-    private static final String FIND_ACTIVE = "select person_id, secret_hash, created_at, revoked_at "
+    private static final String FIND_ACTIVE = "select person_id, secret_hash, created_at, revoked_at, publisher "
             + "from menura.calendar_feed_token where id = ? and revoked_at is null";
     private static final String REVOKE_ACTIVE = "update menura.calendar_feed_token set revoked_at = ? "
             + "where person_id = ? and revoked_at is null";
     private static final String INSERT = "insert into menura.calendar_feed_token "
-            + "(id, person_id, secret_hash, created_at, revoked_at) values (?, ?, ?, ?, ?)";
+            + "(id, person_id, secret_hash, created_at, revoked_at, publisher) values (?, ?, ?, ?, ?, ?)";
 
     @Override
     public Optional<FeedToken> findActive(Connection connection, UUID id) throws SQLException {
@@ -30,7 +30,7 @@ public class JdbcCalendarFeedTokenRepository implements CalendarFeedTokenReposit
                     return Optional.empty();
                 }
                 return Optional.of(new FeedToken(id, row.getObject("person_id", UUID.class), row.getBytes("secret_hash"),
-                        row.getTimestamp("created_at").toInstant(), null));
+                        row.getTimestamp("created_at").toInstant(), null, row.getBoolean("publisher")));
             }
         }
     }
@@ -52,6 +52,7 @@ public class JdbcCalendarFeedTokenRepository implements CalendarFeedTokenReposit
             statement.setBytes(3, token.secretHash());
             statement.setTimestamp(4, Timestamp.from(token.createdAt()));
             statement.setTimestamp(5, token.revokedAt() == null ? null : Timestamp.from(token.revokedAt()));
+            statement.setBoolean(6, token.publisher());
             statement.executeUpdate();
         }
     }

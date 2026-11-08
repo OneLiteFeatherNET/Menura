@@ -41,6 +41,13 @@ tags:
     description: >-
       Performance of external posts across channels, per channel, per series, and by publish hour and weekday at equal age
       (snapshots at fixed offsets after publication). Every signed-in role reads them; no endpoint changes a post.
+  - name: Posts
+    description: >-
+      Posts planned per channel from finished assets: drafts, planning onto several channels and onto the next episodes
+      of a series, the status lifecycle (draft, in review, approved, scheduled, published, failed), approval by a
+      publisher in the web application only, the schedule dry run, and revisions with their acceptance. No MCP tool
+      approves or publishes.
+
 paths:
   /health:
     get:
@@ -241,10 +248,14 @@ paths:
       tags:
         - Calendar
       operationId: getCalendarFeed
-      summary: The calendar feed of a token holder, as iCalendar.
+      summary: The calendar feed of a token holder, as iCalendar (RFC 5545).
       description: |
-        Read-only. The token in the path is the credential, so the route needs no session. Unknown, revoked and rotated
-        tokens are refused. The body is a placeholder until the iCalendar change lands.
+        Read-only. The token in the path is the credential, so the route needs no session. It lists the planned posts
+        of the next year (planned, approved and in review, scheduled) and, for a token issued by a publisher, the
+        approvals due. Each event has a stable UID and a SEQUENCE that grows with every change of its post. Unknown,
+        revoked, rotated and malformed tokens answer 404 with the same body. Write requests have no route. The response
+        carries Referrer-Policy no-referrer; the token is redacted from logs. Each token is rate-limited and answers 429
+        with Retry-After.
       security: []
       parameters:
         - name: token
@@ -260,7 +271,9 @@ paths:
             text/calendar:
               schema:
                 type: string
-        "401":
+        "404":
+          $ref: "#/components/responses/Problem"
+        "429":
           $ref: "#/components/responses/Problem"
   /asset-upload-sessions:
     post:
@@ -1949,6 +1962,444 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+  /posts:
+    post:
+      tags:
+        - Posts
+      operationId: createPost
+      summary: Creates a draft post for one finished asset on one channel.
+      description: |
+        The editor or publisher role creates the draft; the author is recorded. Fields not given are filled from the
+        series defaults when a series is named. A recycled post names a source post and must reuse its asset; the source
+        is not changed (lineage). Only finished assets recorded by the upload can be planned.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostDraftRequest"
+      responses:
+        "201":
+          description: The draft, with status draft.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /posts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+    get:
+      tags:
+        - Posts
+      operationId: getPost
+      summary: One post with its channel, steps, attempts and dry-run problems.
+      description: Read by every signed-in person. A post that does not exist answers 404.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags:
+        - Posts
+      operationId: updatePost
+      summary: Changes the fields of a draft or of a post in review, until it is approved.
+      description: |
+        Only the fields given change. A post that is approved, scheduled, published or failed refuses the edit with 409;
+        its content is changed through a revision instead. A new channel re-derives the playlist from the series.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostPatch"
+      responses:
+        "200":
+          description: The changed post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags:
+        - Posts
+      operationId: deletePost
+      summary: Deletes a draft or a post in review.
+      description: A post that was approved, scheduled, published or failed is kept and cannot be deleted.
+      security:
+        - sessionCookie: []
+      responses:
+        "204":
+          description: The post was deleted.
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /posts/{id}/submission:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+    post:
+      tags:
+        - Posts
+      operationId: submitPost
+      summary: Sends a draft to review (status in_review).
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The post in review.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /posts/{id}/approval:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+    post:
+      tags:
+        - Posts
+      operationId: approvePost
+      summary: A publisher approves a post in review (status approved).
+      description: |
+        Requires the publisher role and the web application's own session. A token, a desktop app or an MCP client is
+        refused with 403 whatever role it holds: approval is a human decision in the web application.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The approved post, with the publisher recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /posts/{id}/schedule:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+    post:
+      tags:
+        - Posts
+      operationId: schedulePost
+      summary: Schedules an approved post, or a failed post that is to be published again (status scheduled).
+      description: |
+        The publisher role is required. The schedule dry run runs now: a blocking problem (text or hashtag limits, format,
+        a connection that needs reconnection, an unaudited public visibility) refuses the schedule with 422 and lists the
+        problems. A collision with another post on the channel is a warning: it is shown and does not block. The
+        publication job publishes the post at its time, or hands it to the platform when the platform schedules natively.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The scheduled post with its dry-run problems.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /post-plans:
+    post:
+      tags:
+        - Posts
+      operationId: planPosts
+      summary: Plans one finished asset onto several channels, one post per channel with its own text and time.
+      description: |
+        Each channel is checked on its own. A channel that does not exist, is not connected or whose platform does not
+        publish in this build is refused and named with its reason; the other posts are stored.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostPlanRequest"
+      responses:
+        "201":
+          description: The drafts created and the channels refused.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostPlanResult"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /series/{id}/episodes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The series identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    post:
+      tags:
+        - Posts
+      operationId: planSeriesEpisodes
+      summary: Plans the next episodes of a series onto the free weekday and posting slots of one channel.
+      description: |
+        Each episode takes the next free slot of the series' weekday and posting hour in the installation time zone. A slot
+        that already holds a post on the channel is skipped and named in the result. Each draft takes the series title,
+        opening formula, hashtag and the channel's playlist; the editor may change each value until approval.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EpisodePlanRequest"
+      responses:
+        "201":
+          description: The drafts created and the slots skipped.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EpisodePlanResult"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /posts/{id}/revisions:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+    get:
+      tags:
+        - Posts
+      operationId: listPostRevisions
+      summary: The revisions proposed for a post, with their status and rationale.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The revisions, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostRevision"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    post:
+      tags:
+        - Posts
+      operationId: proposePostRevision
+      summary: Proposes a revision of a post with a rationale. The post itself does not change.
+      description: |
+        Allowed for a draft, a post in review, an approved post and a scheduled post. A revision stores only the fields it
+        names; a null field is unchanged. A post already handed to its platform takes no revision.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevisionRequest"
+      responses:
+        "201":
+          description: The pending revision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostRevision"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /posts/{id}/revisions/{revisionId}/acceptance:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+      - $ref: "#/components/parameters/RevisionId"
+    post:
+      tags:
+        - Posts
+      operationId: acceptPostRevision
+      summary: A publisher accepts a pending revision in the web application; the post changes.
+      description: |
+        An approved, scheduled or failed post returns to review, so its approval happens again. Requires the publisher role
+        and the web application's session.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The changed post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /posts/{id}/revisions/{revisionId}/rejection:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+      - $ref: "#/components/parameters/RevisionId"
+    post:
+      tags:
+        - Posts
+      operationId: rejectPostRevision
+      summary: A publisher rejects a pending revision; the post stays unchanged.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The rejected revision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostRevision"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /calendar:
+    get:
+      tags:
+        - Calendar
+      operationId: readCalendar
+      summary: Planned and published posts of a month, a week or a list of days, with filters.
+      description: |
+        Planned and published posts appear together. Every time is in the installation time zone (default Europe/Berlin):
+        each item carries its local date and time next to the UTC instant. The range is bounded: a list covers at most 92
+        days, and one read returns at most 1000 items (truncated tells when more exist). Each item carries its steps and
+        its dry-run problems, computed on read.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: view
+          in: query
+          required: false
+          description: Which view to return. Defaults to month.
+          schema:
+            type: string
+            enum:
+              - month
+              - week
+              - list
+        - name: date
+          in: query
+          required: false
+          description: A day in the view, as YYYY-MM-DD in the installation time zone. Defaults to today there.
+          schema:
+            type: string
+            format: date
+        - name: days
+          in: query
+          required: false
+          description: Days a list covers, from the date, at most 92. Defaults to 31; ignored by month and week.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 92
+        - $ref: "#/components/parameters/CalendarChannel"
+        - $ref: "#/components/parameters/CalendarSeries"
+        - $ref: "#/components/parameters/CalendarStatus"
+      responses:
+        "200":
+          description: The calendar window with its items.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+
+
 components:
   securitySchemes:
     sessionCookie:
@@ -2095,6 +2546,42 @@ components:
       description: The external post.
       schema:
         $ref: "#/components/schemas/Identifier"
+    PostId:
+      name: id
+      in: path
+      required: true
+      description: The post identifier.
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    RevisionId:
+      name: revisionId
+      in: path
+      required: true
+      description: The revision identifier.
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    CalendarChannel:
+      name: channelId
+      in: query
+      required: false
+      description: Only the posts of this channel.
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    CalendarSeries:
+      name: seriesId
+      in: query
+      required: false
+      description: Only the posts of this series.
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    CalendarStatus:
+      name: status
+      in: query
+      required: false
+      description: Only the posts in this status.
+      schema:
+        $ref: "#/components/schemas/PostStatus"
+
   responses:
     Problem:
       description: An error, described by RFC 9457 Problem Details.
@@ -4250,3 +4737,781 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AnalyticsValue"
+    PostStatus:
+      type: string
+      description: The status of a post. Moves are fixed by the server; a skip is refused with 409.
+      enum:
+        - draft
+        - in_review
+        - approved
+        - scheduled
+        - published
+        - failed
+    PostVisibility:
+      type: string
+      enum:
+        - private
+        - unlisted
+        - public
+    PostDraftRequest:
+      type: object
+      description: A new draft. Fields not given are filled from the series when one is named.
+      required:
+        - channelId
+        - assetId
+        - title
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        assetId:
+          $ref: "#/components/schemas/Identifier"
+        coverAssetId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: A finished image of the upload, shown as the cover.
+        seriesId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        sourcePostId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: The post this one recycles. Its asset must be the same asset; the source is not changed.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type:
+            - string
+            - "null"
+          maxLength: 5000
+        hashtags:
+          type:
+            - array
+            - "null"
+          maxItems: 30
+          items:
+            type: string
+        visibility:
+          oneOf:
+            - $ref: "#/components/schemas/PostVisibility"
+            - type: "null"
+        scheduledAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+    PostPatch:
+      type: object
+      description: The fields to change. A field that is absent is unchanged.
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        coverAssetId:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        hashtags:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+        visibility:
+          $ref: "#/components/schemas/PostVisibility"
+        scheduledAt:
+          type: string
+          format: date-time
+    PostStep:
+      type: object
+      description: One publication step of a post, with its state, the time of its last change and its reason when failed.
+      required:
+        - step
+        - state
+        - changedAt
+        - reason
+      properties:
+        step:
+          type: string
+          enum:
+            - upload
+            - schedule
+            - metadata
+            - publish
+        state:
+          type: string
+          enum:
+            - pending
+            - running
+            - done
+            - failed
+        changedAt:
+          type: string
+          format: date-time
+        reason:
+          type:
+            - string
+            - "null"
+    DryRunProblem:
+      type: object
+      description: A problem the schedule dry run found on a post. A warning does not block; an error does.
+      required:
+        - code
+        - severity
+        - message
+        - action
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+          enum:
+            - error
+            - warning
+        message:
+          type: string
+        action:
+          type:
+            - string
+            - "null"
+          enum:
+            - reconnect
+            - null
+    PostAttempt:
+      type: object
+      description: One publication attempt. An attempt without an outcome stopped before the platform answered.
+      required:
+        - attempt
+        - startedAt
+        - finishedAt
+        - outcome
+        - reason
+      properties:
+        attempt:
+          type: integer
+          minimum: 1
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        outcome:
+          type:
+            - string
+            - "null"
+          enum:
+            - handed_over
+            - published
+            - retry_scheduled
+            - failed
+            - unknown
+            - null
+        reason:
+          type:
+            - string
+            - "null"
+    Post:
+      type: object
+      description: >-
+        A finished asset planned onto one channel: its per-channel text, hashtags, cover and time, its status, its
+        publication steps and attempts, and the problems of its dry run. A post carries no credential.
+      required:
+        - id
+        - channelId
+        - channelName
+        - platform
+        - channelState
+        - assetId
+        - coverAssetId
+        - seriesId
+        - sourcePostId
+        - authorId
+        - status
+        - title
+        - description
+        - hashtags
+        - visibility
+        - playlistId
+        - scheduledAt
+        - handedOverAt
+        - approvedBy
+        - approvedAt
+        - publishedAt
+        - url
+        - externalId
+        - failureReason
+        - attempts
+        - nextAttemptAt
+        - revision
+        - steps
+        - attemptHistory
+        - problems
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        channelName:
+          type: string
+        platform:
+          type: string
+        channelState:
+          type: string
+          enum:
+            - connected
+            - needs_reconnection
+            - disconnected
+        assetId:
+          $ref: "#/components/schemas/Identifier"
+        coverAssetId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        seriesId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        sourcePostId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        authorId:
+          $ref: "#/components/schemas/Identifier"
+        status:
+          $ref: "#/components/schemas/PostStatus"
+        title:
+          type: string
+        description:
+          type: string
+        hashtags:
+          type: array
+          items:
+            type: string
+        visibility:
+          $ref: "#/components/schemas/PostVisibility"
+        playlistId:
+          type:
+            - string
+            - "null"
+        scheduledAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        handedOverAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: When the platform accepted the post for its own timed publication. Null for a job publication.
+        approvedBy:
+          type:
+            - string
+            - "null"
+          format: uuid
+        approvedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        publishedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        url:
+          type:
+            - string
+            - "null"
+          description: The public URL of the published item. Null until the post is published.
+        externalId:
+          type:
+            - string
+            - "null"
+          description: The platform identifier of the item, once the platform has it.
+        failureReason:
+          type:
+            - string
+            - "null"
+          description: The fixed text of the last failure, with no credential and no response body.
+        attempts:
+          type: integer
+          minimum: 0
+        nextAttemptAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        revision:
+          type: integer
+          minimum: 0
+          description: Grows with every change of the post. The calendar feed uses it as the event sequence.
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostStep"
+        attemptHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostAttempt"
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/DryRunProblem"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PostRevision:
+      type: object
+      description: A proposed revision. It stores only the fields it names; the post changes only when a publisher accepts it.
+      required:
+        - id
+        - postId
+        - authorId
+        - rationale
+        - status
+        - title
+        - description
+        - hashtags
+        - coverAssetId
+        - scheduledAt
+        - channelId
+        - decidedBy
+        - decidedAt
+        - createdAt
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        postId:
+          $ref: "#/components/schemas/Identifier"
+        authorId:
+          $ref: "#/components/schemas/Identifier"
+        rationale:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - accepted
+            - rejected
+        title:
+          type:
+            - string
+            - "null"
+        description:
+          type:
+            - string
+            - "null"
+        hashtags:
+          type:
+            - array
+            - "null"
+          items:
+            type: string
+        coverAssetId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        scheduledAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        channelId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        decidedBy:
+          type:
+            - string
+            - "null"
+          format: uuid
+        decidedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    PostRevisionRequest:
+      type: object
+      description: The fields a revision proposes, with its rationale.
+      required:
+        - rationale
+      properties:
+        rationale:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        coverAssetId:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        hashtags:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+        scheduledAt:
+          type: string
+          format: date-time
+    RevisionRequest:
+      allOf:
+        - $ref: "#/components/schemas/PostRevisionRequest"
+    PostPlanItem:
+      type: object
+      description: One channel of a plan, with its own text and time.
+      required:
+        - channelId
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        scheduledAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        hashtags:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+        visibility:
+          $ref: "#/components/schemas/PostVisibility"
+    PostPlanRequest:
+      type: object
+      description: One finished asset planned onto several channels.
+      required:
+        - assetId
+        - channels
+      properties:
+        assetId:
+          $ref: "#/components/schemas/Identifier"
+        coverAssetId:
+          $ref: "#/components/schemas/Identifier"
+        seriesId:
+          $ref: "#/components/schemas/Identifier"
+        sourcePostId:
+          $ref: "#/components/schemas/Identifier"
+        channels:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/PostPlanItem"
+    PlanRefusal:
+      type: object
+      description: A channel of a plan that was not used, and why.
+      required:
+        - channelId
+        - reason
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        reason:
+          type: string
+    PostPlanResult:
+      type: object
+      required:
+        - posts
+        - refused
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        refused:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanRefusal"
+    EpisodePlanRequest:
+      type: object
+      description: The next episodes of a series on one channel.
+      required:
+        - channelId
+        - assetId
+        - count
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        assetId:
+          $ref: "#/components/schemas/Identifier"
+        coverAssetId:
+          $ref: "#/components/schemas/Identifier"
+        count:
+          type: integer
+          minimum: 1
+          maximum: 10
+    SkippedSlot:
+      type: object
+      description: A slot the episode planner skipped, with the post that already holds it.
+      required:
+        - scheduledAt
+        - postId
+        - reason
+      properties:
+        scheduledAt:
+          type: string
+          format: date-time
+        postId:
+          $ref: "#/components/schemas/Identifier"
+        reason:
+          type: string
+    EpisodePlanResult:
+      type: object
+      required:
+        - posts
+        - skipped
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        skipped:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkippedSlot"
+    CalendarItem:
+      type: object
+      description: A planned or published post on the calendar, with its local date and time in the installation time zone.
+      required:
+        - id
+        - channelId
+        - channelName
+        - platform
+        - channelState
+        - assetId
+        - coverAssetId
+        - seriesId
+        - sourcePostId
+        - authorId
+        - status
+        - title
+        - description
+        - hashtags
+        - visibility
+        - playlistId
+        - scheduledAt
+        - handedOverAt
+        - approvedBy
+        - approvedAt
+        - publishedAt
+        - url
+        - externalId
+        - failureReason
+        - attempts
+        - nextAttemptAt
+        - revision
+        - steps
+        - attemptHistory
+        - problems
+        - createdAt
+        - updatedAt
+        - startsAt
+        - localDate
+        - localTime
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        channelName:
+          type: string
+        platform:
+          type: string
+        channelState:
+          type: string
+          enum:
+            - connected
+            - needs_reconnection
+            - disconnected
+        assetId:
+          $ref: "#/components/schemas/Identifier"
+        coverAssetId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        seriesId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        sourcePostId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        authorId:
+          $ref: "#/components/schemas/Identifier"
+        status:
+          $ref: "#/components/schemas/PostStatus"
+        title:
+          type: string
+        description:
+          type: string
+        hashtags:
+          type: array
+          items:
+            type: string
+        visibility:
+          $ref: "#/components/schemas/PostVisibility"
+        playlistId:
+          type:
+            - string
+            - "null"
+        scheduledAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        handedOverAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        approvedBy:
+          type:
+            - string
+            - "null"
+          format: uuid
+        approvedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        publishedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        url:
+          type:
+            - string
+            - "null"
+        externalId:
+          type:
+            - string
+            - "null"
+        failureReason:
+          type:
+            - string
+            - "null"
+        attempts:
+          type: integer
+          minimum: 0
+        nextAttemptAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        revision:
+          type: integer
+          minimum: 0
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostStep"
+        attemptHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostAttempt"
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/DryRunProblem"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        startsAt:
+          type: string
+          format: date-time
+          description: The publish time of a published post, else its scheduled time. The instant the calendar places the item at.
+        localDate:
+          type: string
+          format: date
+          description: The day of startsAt in the installation time zone.
+        localTime:
+          type: string
+          description: The time of startsAt in the installation time zone, as HH:mm.
+    CalendarPage:
+      type: object
+      description: One calendar window, planned and published posts together.
+      required:
+        - timeZone
+        - view
+        - firstDay
+        - lastDay
+        - from
+        - to
+        - truncated
+        - items
+      properties:
+        timeZone:
+          type: string
+          example: Europe/Berlin
+        view:
+          type: string
+          enum:
+            - month
+            - week
+            - list
+        firstDay:
+          type: string
+          format: date
+        lastDay:
+          type: string
+          format: date
+        from:
+          type: string
+          format: date-time
+          description: The first instant of the window (local midnight of firstDay, in UTC).
+        to:
+          type: string
+          format: date-time
+          description: The instant after the window (local midnight of the day after lastDay, in UTC).
+        truncated:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarItem"

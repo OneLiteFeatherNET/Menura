@@ -478,8 +478,8 @@ public final class PostService {
         if (channel.state() != ConnectionState.CONNECTED) {
             throw new ProblemException(422, "Unprocessable Entity", "The channel needs reconnection before it takes posts.");
         }
-        if (platforms.find(channel.platform()).isEmpty() || !platforms.require(channel.platform()).capabilities().publishing()) {
-            throw new ProblemException(422, "Unprocessable Entity", "The platform does not publish in this build.");
+        if (platforms.find(channel.platform()).isEmpty()) {
+            throw new ProblemException(422, "Unprocessable Entity", "The platform of this channel is not supported in this build.");
         }
         return channel;
     }
