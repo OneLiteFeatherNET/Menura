@@ -258,6 +258,45 @@ class ContentLibraryTest {
     }
 
     @Test
+    void rawItemIsUsedOnlyWhenOneOfItsClipsIsInATimeline() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID used = f.rawItem(LibraryFixture.EDITOR, "Used raw", STREAM, 3600);
+        f.rawItem(LibraryFixture.EDITOR, "Unused raw", STREAM, 3600);
+        UUID clip = f.library.createClip(LibraryFixture.editor(),
+                new ContentLibrary.ClipRequest(used, 10, 20, "Cut", Set.of(), null), "req-1").id();
+        f.timelines.store(LibraryFixture.editor(), "Short",
+                new TimelineDocument(null, List.of(clip), List.of(), List.of(), List.of()), "req-2");
+
+        ContentViews.PoolPageView usedPage = f.library.pool(LibraryFixture.viewer(),
+                new ContentLibrary.PoolQuery(false, null, null, null, null, "used", null, null), null, 50);
+        ContentViews.PoolPageView unusedPage = f.library.pool(LibraryFixture.viewer(),
+                new ContentLibrary.PoolQuery(false, null, null, null, null, "never_used", null, null), null, 50);
+
+        assertEquals(List.of("Used raw"), usedPage.items().stream().filter(item -> "raw".equals(item.kind()))
+                .map(ContentViews.PoolItemView::title).toList(), "the raw item with a used clip is used");
+        assertEquals(List.of("Unused raw"), unusedPage.items().stream().filter(item -> "raw".equals(item.kind()))
+                .map(ContentViews.PoolItemView::title).toList(), "the other raw item is never used");
+        assertEquals("used", usedPage.items().stream().filter(item -> "raw".equals(item.kind())).findFirst()
+                .orElseThrow().usage(), "raw items report their usage");
+    }
+
+    @Test
+    void registeredFinishedAssetReportsNeverUsed() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);
+        UUID clip = f.library.createClip(LibraryFixture.editor(),
+                new ContentLibrary.ClipRequest(raw, 10, 20, "Cut", Set.of(), null), "req-1").id();
+        UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short",
+                new TimelineDocument(null, List.of(clip), List.of(), List.of(), List.of()), "req-2").id();
+        f.timelines.register(LibraryFixture.editor(), f.finishedVideo(LibraryFixture.EDITOR), timeline, "Short 9x16", "req-3");
+
+        ContentViews.PoolPageView page = f.library.pool(LibraryFixture.viewer(), ContentLibrary.PoolQuery.NONE, null, 50);
+
+        assertEquals("never_used", page.items().stream().filter(item -> item.assetId() != null).findFirst()
+                .orElseThrow().usage(), "a finished asset is an end product and is never used inside the library");
+    }
+
+    @Test
     void searchFilteredByUploaderOnlyReturnsThatUploadersRecordings() throws Exception {
         ContentFixture f = new ContentFixture();
         UUID mine = f.rawItem(LibraryFixture.EDITOR, "Mine", STREAM, 3600);
