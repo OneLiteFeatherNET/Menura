@@ -18,6 +18,7 @@ public final class JobsMain {
                 new ChannelHealthJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC()),
                 new ExternalPostSyncJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC(),
                         ExternalPostSyncJob.intervalFrom(System.getenv())),
+                new MetricCollectionJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC()),
                 new RetentionJob(System.getenv(), Clock.systemUTC())));
         System.exit(dispatcher.dispatch(args, System.out, System.err));
     }

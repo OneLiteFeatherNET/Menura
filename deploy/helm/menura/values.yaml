@@ -108,6 +108,13 @@ jobs:
     schedule: "17 */6 * * *"
     interval: PT6H
 
+  # The metric collection CronJob (jobs run metric-collection, change add-content-analytics) reads the metrics of every
+  # external post and takes the snapshots at fixed offsets. It runs every half hour, so the +1 hour snapshot is at most
+  # half an hour late. Needs channels.existingSecret, like the other job CronJobs.
+  metricCollection:
+    enabled: true
+    schedule: "*/30 * * * *"
+
   # The retention CronJob (jobs run retention, change add-content-library). It is rendered only when enabled, and the
   # policy itself is switched on separately, so a deployment can render the job and keep the policy off.
   #   policyEnabled  -> MENURA_RETENTION_ENABLED: true moves raw recordings older than rawMaxAge to cold storage.

@@ -135,6 +135,11 @@ items adds the items it lists but marks no post removed. The channel overview sh
 "not listed in this build". The YouTube listing comes with `add-youtube-insights`; until then the YouTube channels show
 that reason.
 
+The `metric-collection` CronJob reads the metrics of every external post of the connected channels and takes the snapshots at
+fixed offsets after publication (change `add-content-analytics`). It runs at `jobs.metricCollection.schedule` (every 30 minutes
+by default), so the +1 hour snapshot is at most half an hour late, and it needs no further key beyond `channels.existingSecret`.
+A platform that does not report metrics is recorded as `not_supported`; nothing is written for it.
+
 **Check the import.** `kubectl get cronjob menura-external-post-sync` shows the schedule, and a finished run prints
 `external-post-sync checked=… synced=… skipped=… incomplete=… failed=… waiting=…`. Channels that need reconnection are
 counted as `waiting` and are not read.
