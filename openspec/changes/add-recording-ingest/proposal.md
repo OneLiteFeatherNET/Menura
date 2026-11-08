@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(ingest)` (code PR). Phase: 4 (S3 & Recording). Depends on: `add-access-control`, `add-client-and-mcp-auth` (the OBS plugin signs in with device tokens).
+Conventional Commits: `feat(ingest)` (code PR). Phase: 4 (Recording & Jobs). Depends on: `add-access-control`, `add-client-and-mcp-auth` (the OBS plugin signs in with device tokens).
 
 Strand: content.
 
