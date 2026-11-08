@@ -10,7 +10,7 @@ import net.onelitefeather.menura.server.audit.AuditLog;
 import net.onelitefeather.menura.server.audit.Channel;
 import net.onelitefeather.menura.server.audit.JdbcAuditRepository;
 import net.onelitefeather.menura.server.auth.CurrentPerson;
-import net.onelitefeather.menura.server.db.DataSourceTransactions;
+import net.onelitefeather.menura.core.db.DataSourceTransactions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;

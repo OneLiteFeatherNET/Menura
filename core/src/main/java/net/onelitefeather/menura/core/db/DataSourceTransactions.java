@@ -1,15 +1,13 @@
-package net.onelitefeather.menura.server.db;
-
-import jakarta.inject.Singleton;
-import net.onelitefeather.menura.core.db.Transactions;
-import net.onelitefeather.menura.core.db.Work;
+package net.onelitefeather.menura.core.db;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-/** Runs work on one pooled connection in one transaction: commit when the work returns, rollback when it throws. */
-@Singleton
+/**
+ * Runs work on one pooled connection in one transaction: commit when the work returns, rollback when it throws. Shared
+ * by the server and the jobs; the server registers it as a bean.
+ */
 public class DataSourceTransactions implements Transactions {
 
     private final DataSource dataSource;

@@ -7,7 +7,7 @@ import net.onelitefeather.menura.core.secret.SecretHasher;
 import net.onelitefeather.menura.server.audit.AuditLog;
 import net.onelitefeather.menura.server.audit.Channel;
 import net.onelitefeather.menura.server.audit.JdbcAuditRepository;
-import net.onelitefeather.menura.server.db.DataSourceTransactions;
+import net.onelitefeather.menura.core.db.DataSourceTransactions;
 import net.onelitefeather.menura.server.security.Caller;
 import net.onelitefeather.menura.server.support.DeterministicRandom;
 import org.junit.jupiter.api.Tag;

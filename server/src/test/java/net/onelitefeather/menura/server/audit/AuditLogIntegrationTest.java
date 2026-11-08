@@ -2,7 +2,7 @@ package net.onelitefeather.menura.server.audit;
 
 import net.onelitefeather.menura.core.db.Migrations;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
-import net.onelitefeather.menura.server.db.DataSourceTransactions;
+import net.onelitefeather.menura.core.db.DataSourceTransactions;
 import net.onelitefeather.menura.server.security.Caller;
 import net.onelitefeather.menura.server.support.DeterministicRandom;
 import org.junit.jupiter.api.Tag;
