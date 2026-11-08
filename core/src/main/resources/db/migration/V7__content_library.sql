@@ -89,7 +89,7 @@ CREATE INDEX lineage_edge_parent_idx ON menura.lineage_edge (parent_kind, parent
 
 -- A finished asset (video or image with a verified upload) registered in the pool, with the timeline it was made from.
 CREATE TABLE menura.registered_asset (
-    asset_id      uuid        PRIMARY KEY REFERENCES menura.asset (id),
+    asset_id      uuid        PRIMARY KEY REFERENCES menura.asset (id) ON DELETE CASCADE,
     uploader_id   uuid        NOT NULL,
     title         text        NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
     timeline_id   uuid        NOT NULL REFERENCES menura.timeline (id),

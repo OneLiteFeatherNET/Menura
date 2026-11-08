@@ -116,6 +116,9 @@ public class ContentLibrary {
         Set<UUID> persons = personTags == null ? Set.of() : Set.copyOf(personTags);
         return auditLog.write(AssetUploads.caller(viewer), "item.tags", "item:" + item, requestId, connection -> {
             requireItem(connection, item);
+            if (!content.existingPersons(connection, persons).containsAll(persons)) {
+                throw new ProblemException(400, "Invalid tag", "The field 'personTags' names a person that does not exist.");
+            }
             content.replaceTags(connection, item, new ItemTags(free, persons));
             return tagsView(item, new ItemTags(free, persons));
         });

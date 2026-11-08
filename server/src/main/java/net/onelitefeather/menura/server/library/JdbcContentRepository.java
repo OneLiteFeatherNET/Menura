@@ -98,8 +98,8 @@ public class JdbcContentRepository implements ContentRepository {
 
     @Override
     public Optional<RawItem> findRawItem(Connection connection, UUID id) throws SQLException {
-        String sql = "select id, uploader_id, stream_title, stream_date, duration_seconds, created_at from menura.asset "
-                + "where id = ? and kind = 'raw_material'";
+        String sql = "select id, uploader_id, stream_title, stream_date, duration_seconds, created_at, storage_key, "
+                + "media_state from menura.asset where id = ? and kind = 'raw_material'";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setObject(1, id);
             try (ResultSet row = statement.executeQuery()) {
@@ -109,9 +109,37 @@ public class JdbcContentRepository implements ContentRepository {
                 Date date = row.getDate("stream_date");
                 return Optional.of(new RawItem(row.getObject("id", UUID.class), row.getObject("uploader_id", UUID.class),
                         row.getString("stream_title"), date == null ? null : date.toLocalDate(),
-                        row.getInt("duration_seconds"), row.getTimestamp("created_at").toInstant()));
+                        row.getInt("duration_seconds"), row.getTimestamp("created_at").toInstant(),
+                        row.getString("storage_key"), row.getString("media_state")));
             }
         }
+    }
+
+    @Override
+    public void setRawMediaState(Connection connection, UUID rawItem, String state) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "update menura.asset set media_state = ? where id = ? and kind = 'raw_material'")) {
+            statement.setString(1, state);
+            statement.setObject(2, rawItem);
+            statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public Set<UUID> existingPersons(Connection connection, Collection<UUID> persons) throws SQLException {
+        Set<UUID> found = new HashSet<>();
+        if (persons.isEmpty()) {
+            return found;
+        }
+        try (PreparedStatement statement = connection.prepareStatement("select id from person where id = any(?)")) {
+            statement.setArray(1, connection.createArrayOf("uuid", persons.toArray(UUID[]::new)));
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    found.add(row.getObject("id", UUID.class));
+                }
+            }
+        }
+        return found;
     }
 
     @Override

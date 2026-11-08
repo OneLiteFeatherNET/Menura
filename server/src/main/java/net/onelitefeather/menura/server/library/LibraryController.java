@@ -39,14 +39,23 @@ public class LibraryController {
     private final ContentLibrary library;
     private final Transcripts transcripts;
     private final Timelines timelines;
+    private final RawMedia rawMedia;
     private final IdentifierGenerator identifiers;
 
-    public LibraryController(ContentLibrary library, Transcripts transcripts, Timelines timelines,
+    public LibraryController(ContentLibrary library, Transcripts transcripts, Timelines timelines, RawMedia rawMedia,
                              IdentifierGenerator identifiers) {
         this.library = library;
         this.transcripts = transcripts;
         this.timelines = timelines;
+        this.rawMedia = rawMedia;
         this.identifiers = identifiers;
+    }
+
+    @RequiresRole(Role.EDITOR)
+    @Delete("/raw-items/{id}/media")
+    public HttpResponse<Void> removeRawMedia(@PathVariable String id, HttpRequest<?> request) throws SQLException {
+        rawMedia.removeMedia(person(request), itemId(id), RequestIds.from(request, identifiers));
+        return HttpResponse.noContent();
     }
 
     /** Body of a tag change: the free tags and the person tags that replace the current ones. */

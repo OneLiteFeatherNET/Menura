@@ -24,7 +24,8 @@ import java.util.UUID;
 public interface ContentRepository {
 
     /** A raw item: a verified raw-material asset of the asset table, listed in the pool. */
-    record RawItem(UUID id, UUID uploaderId, String title, LocalDate streamDate, int durationSeconds, Instant createdAt) {
+    record RawItem(UUID id, UUID uploaderId, String title, LocalDate streamDate, int durationSeconds, Instant createdAt,
+                   String storageKey, String mediaState) {
     }
 
     /** A clip: a time range of a raw item. The raw item's identifier and the range are fixed once the clip exists. */
@@ -68,6 +69,12 @@ public interface ContentRepository {
     void updateClip(Connection connection, ClipRecord clip) throws SQLException;
 
     void deleteClip(Connection connection, UUID id) throws SQLException;
+
+    /** Sets the media state of a raw item: available, cold or removed. */
+    void setRawMediaState(Connection connection, UUID rawItem, String state) throws SQLException;
+
+    /** The given persons that exist; a person tag may only name one of them. */
+    Set<UUID> existingPersons(Connection connection, Collection<UUID> persons) throws SQLException;
 
     /** Tags of each of the given items; an item without tags has an empty entry. */
     Map<UUID, ItemTags> tagsOf(Connection connection, Collection<UUID> items) throws SQLException;
