@@ -87,6 +87,11 @@ web:
 analytics:
   timeZone: Europe/Berlin
 
+# The installation time zone of the content calendar and the episode slots (change add-content-distribution). The server
+# and the publication job read it as MENURA_CALENDAR_TIME_ZONE.
+calendar:
+  timeZone: Europe/Berlin
+
 jobs:
   image:
     repository: harbor.onelitefeather.dev/onelitefeather/menura-jobs
@@ -119,6 +124,23 @@ jobs:
   metricCollection:
     enabled: true
     schedule: "*/30 * * * *"
+
+  # The publication CronJob (jobs run publish-due, change add-content-distribution). It claims the due approved posts and
+  # publishes them, or hands them to a platform that schedules natively a lead time before their time. It runs every five
+  # minutes with concurrency one. Needs channels.existingSecret, like the other job CronJobs.
+  #   maxAttempts  -> MENURA_PUBLISH_MAX_ATTEMPTS: attempts per post, 1 to 10.
+  #   retryDelay   -> MENURA_PUBLISH_RETRY_DELAY: the first retry delay as an ISO-8601 duration; it doubles.
+  #   handoverLead -> MENURA_PUBLISH_HANDOVER_LEAD: how long before its time a natively scheduled post is handed over.
+  #   batchSize    -> MENURA_PUBLISH_BATCH_SIZE: posts one run claims, 1 to 100.
+  #   lease        -> MENURA_PUBLISH_LEASE: how long a claim lasts before another run may take the post.
+  publishDue:
+    enabled: true
+    schedule: "*/5 * * * *"
+    maxAttempts: 3
+    retryDelay: PT5M
+    handoverLead: PT24H
+    batchSize: 10
+    lease: PT10M
 
   # The retention CronJob (jobs run retention, change add-content-library). It is rendered only when enabled, and the
   # policy itself is switched on separately, so a deployment can render the job and keep the policy off.

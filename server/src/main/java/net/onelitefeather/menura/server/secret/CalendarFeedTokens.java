@@ -50,14 +50,30 @@ public class CalendarFeedTokens {
      * time the secret leaves the server.
      */
     public String issue(Caller caller, String requestId) throws SQLException {
+        return issue(caller, requestId, false);
+    }
+
+    /** Issues a token that carries the publisher role of its person into the feed (approvals due). */
+    public String issue(Caller caller, String requestId, boolean publisher) throws SQLException {
         UUID id = identifiers.next();
         String secret = secrets.next();
         Instant now = clock.instant();
         return auditLog.write(caller, "calendar_feed_token.issue", target(caller), requestId, connection -> {
             repository.revokeActive(connection, caller.personId(), now);
-            repository.insert(connection, new FeedToken(id, caller.personId(), SecretHasher.hash(secret), now, null));
+            repository.insert(connection, new FeedToken(id, caller.personId(), SecretHasher.hash(secret), now, null,
+                    publisher));
             return id + "." + secret;
         });
+    }
+
+    /** What a valid feed token grants: the token's identifier for rate limiting, the person and the publisher flag. */
+    public record FeedAccess(UUID tokenId, UUID personId, boolean publisher) {
+    }
+
+    /** The access a presented feed token grants. Unknown, malformed, revoked and rotated tokens answer 401 here. */
+    public FeedAccess authenticateFeed(String presented) throws SQLException {
+        FeedToken stored = verify(presented);
+        return new FeedAccess(stored.id(), stored.personId(), stored.publisher());
     }
 
     /** Revokes the person's active token, if any. The revocation is audited even when there was nothing to revoke. */
@@ -74,6 +90,10 @@ public class CalendarFeedTokens {
      * secret is compared through its hash in constant time.
      */
     public UUID authenticate(String presented) throws SQLException {
+        return verify(presented).personId();
+    }
+
+    private FeedToken verify(String presented) throws SQLException {
         Matcher token = presented == null ? null : TOKEN.matcher(presented);
         if (token == null || !token.matches()) {
             throw unauthorized();
@@ -84,7 +104,7 @@ public class CalendarFeedTokens {
         if (stored.isEmpty() || !SecretHasher.matches(secret, stored.get().secretHash())) {
             throw unauthorized();
         }
-        return stored.get().personId();
+        return stored.get();
     }
 
     private static String target(Caller caller) {

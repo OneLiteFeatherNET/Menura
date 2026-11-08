@@ -53,29 +53,29 @@ class CalendarFeedHttpTest {
         String current = issue(PERSON);
 
         assertProblem(assertThrows(HttpClientResponseException.class,
-                () -> client.toBlocking().exchange(HttpRequest.GET("/calendar/feed/" + previous), String.class)), 401);
+                () -> client.toBlocking().exchange(HttpRequest.GET("/calendar/feed/" + previous), String.class)), 404);
         assertEquals(200, client.toBlocking().exchange(HttpRequest.GET("/calendar/feed/" + current), String.class).code());
     }
 
     @Test
-    void revokedTokenIsRefusedWith401AsProblemDetails() {
+    void revokedTokenIsRefusedWith404AsProblemDetails() {
         String token = issue(PERSON);
 
         HttpResponse<Void> revoked = client.toBlocking().exchange(withPerson(HttpRequest.DELETE("/calendar-feed-token"), PERSON));
         assertEquals(204, revoked.code(), "revoking answers 204 No Content");
 
         assertProblem(assertThrows(HttpClientResponseException.class,
-                () -> client.toBlocking().exchange(HttpRequest.GET("/calendar/feed/" + token), String.class)), 401);
+                () -> client.toBlocking().exchange(HttpRequest.GET("/calendar/feed/" + token), String.class)), 404);
     }
 
     @Test
-    void unknownTokenAnswers401WithoutEchoingTheSecretInTheProblem() {
+    void unknownTokenAnswers404WithoutEchoingTheSecretInTheProblem() {
         String forged = UUID.randomUUID() + "." + "Q".repeat(43);
 
         HttpClientResponseException failure = assertThrows(HttpClientResponseException.class,
                 () -> client.toBlocking().exchange(HttpRequest.GET("/calendar/feed/" + forged), String.class));
 
-        assertProblem(failure, 401);
+        assertProblem(failure, 404);
         String body = failure.getResponse().getBody(String.class).orElse("");
         assertFalse(body.contains(forged), "the token must never be echoed in a Problem Details body");
         assertTrue(body.contains("/calendar/feed/{token}"), "the instance names the route, not the token");
