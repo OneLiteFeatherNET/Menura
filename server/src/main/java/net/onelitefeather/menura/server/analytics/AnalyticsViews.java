@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import io.micronaut.serde.annotation.Serdeable;
 import net.onelitefeather.menura.core.analytics.Aggregation;
 import net.onelitefeather.menura.core.analytics.AnalyticsReader;
-import net.onelitefeather.menura.core.analytics.PublishSlot;
 import net.onelitefeather.menura.core.analytics.MetricStore.PointValue;
 import net.onelitefeather.menura.core.analytics.MetricStore.SnapshotValue;
 import net.onelitefeather.menura.core.post.ExternalPost;
@@ -125,7 +124,7 @@ public final class AnalyticsViews {
                 .map(s -> new SlotView(s.slot(), s.posts(), s.median()))
                 .toList();
         return new EqualAgeView(comparison.metric(), comparison.offset().toHours(),
-                comparison.by().name().toLowerCase(Locale.ROOT), PublishSlot.ZONE.getId(), comparison.channelId(), slots);
+                comparison.by().name().toLowerCase(Locale.ROOT), comparison.timeZone(), comparison.channelId(), slots);
     }
 
     public static PostAnalyticsView of(AnalyticsReader.PostDetail detail) {

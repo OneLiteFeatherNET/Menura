@@ -25,6 +25,8 @@ public final class MetricsPlatform implements PlatformAdapter {
     private final Map<String, Map<String, Long>> metricsByItem = new HashMap<>();
     private final Map<String, RuntimeException> failureByItem = new HashMap<>();
     private final List<String> reads = new ArrayList<>();
+    private final List<List<String>> batches = new ArrayList<>();
+    private int batchSize = 50;
     private List<PublishedItem> items = List.of();
     private RuntimeException failure;
     private final List<Integer> limits = new ArrayList<>();
@@ -139,23 +141,47 @@ public final class MetricsPlatform implements PlatformAdapter {
     }
 
     @Override
-    public Map<String, Long> readMetrics(String accessToken, String platformItemId, Set<String> metrics) {
-        reads.add(platformItemId);
+    public int metricsBatchSize() {
+        return batchSize;
+    }
+
+    @Override
+    public Map<String, Map<String, Long>> readMetrics(String accessToken, List<String> platformItemIds,
+                                                     Set<String> metrics) {
+        batches.add(List.copyOf(platformItemIds));
+        reads.addAll(platformItemIds);
         if (!metricsSupported) {
             throw new Unsupported("reading metrics");
         }
-        RuntimeException failed = failureByItem.get(platformItemId);
-        if (failed != null) {
-            throw failed;
-        }
-        Map<String, Long> values = metricsByItem.getOrDefault(platformItemId, Map.of());
-        Map<String, Long> requested = new java.util.LinkedHashMap<>();
-        for (Map.Entry<String, Long> entry : values.entrySet()) {
-            if (metrics.contains(entry.getKey())) {
-                requested.put(entry.getKey(), entry.getValue());
+        Map<String, Map<String, Long>> result = new java.util.LinkedHashMap<>();
+        for (String platformItemId : platformItemIds) {
+            RuntimeException failed = failureByItem.get(platformItemId);
+            if (failed != null) {
+                throw failed;
             }
+            Map<String, Long> values = metricsByItem.get(platformItemId);
+            if (values == null) {
+                continue;
+            }
+            Map<String, Long> requested = new java.util.LinkedHashMap<>();
+            for (Map.Entry<String, Long> entry : values.entrySet()) {
+                if (metrics.contains(entry.getKey())) {
+                    requested.put(entry.getKey(), entry.getValue());
+                }
+            }
+            result.put(platformItemId, requested);
         }
-        return requested;
+        return result;
+    }
+
+    /** The batches of the metrics operation so far, in call order: the item identifiers of each call. */
+    public List<List<String>> batches() {
+        return List.copyOf(batches);
+    }
+
+    /** Sets the largest number of items one metrics call may request. */
+    public void batchSize(int size) {
+        this.batchSize = size;
     }
 
     /** An item as the platform lists it. */

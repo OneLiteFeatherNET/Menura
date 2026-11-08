@@ -30,6 +30,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -139,7 +140,7 @@ class JdbcMetricStoreIntegrationTest {
 
         assertNull(stored.get(0).value(), "the watch time of the snapshot is absent, not zero");
         assertTrue(!stored.get(0).asOf().isBefore(T0), "the snapshot keeps its as-of time");
-        assertEquals(LocalDate.parse("2026-11-02"), LocalDate.ofInstant(stored.get(0).asOf(), PublishSlot.ZONE),
+        assertEquals(LocalDate.parse("2026-11-02"), LocalDate.ofInstant(stored.get(0).asOf(), ZoneId.of("Europe/Berlin")),
                 "the as-of time is the collection day in the team's zone");
     }
 
@@ -190,7 +191,8 @@ class JdbcMetricStoreIntegrationTest {
         final DataSourceTransactions transactions;
         final JdbcChannelStore channels;
         final JdbcExternalPostStore posts = new JdbcExternalPostStore();
-        final JdbcMetricStore metrics = new JdbcMetricStore(new IdentifierGenerator(new SecureRandom()));
+        final JdbcMetricStore metrics = new JdbcMetricStore(new IdentifierGenerator(new SecureRandom()),
+            new PublishSlot(ZoneId.of("Europe/Berlin")));
         final UUID channel = UUID.nameUUIDFromBytes("channel-metrics".getBytes(StandardCharsets.UTF_8));
 
         World() throws SQLException {

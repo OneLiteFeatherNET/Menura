@@ -87,7 +87,7 @@ class AnalyticsReaderTest {
         UUID channel = world.connectedChannel("UC4");
         publishAndReport(world, channel, "a", world.now().minus(Duration.ofHours(5)), 100L);
         world.collector.collect();
-        world.advance(Duration.ofHours(1));
+        world.advance(Duration.ofHours(4));
         world.platform.report("a", Map.of(Metrics.VIEWS, 130L));
         world.collector.collect();
 

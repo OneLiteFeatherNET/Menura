@@ -82,6 +82,11 @@ web:
 # job (`jobs run <name>`). The skeleton has only `ping`, and the deployment
 # stays at zero replicas until a long-running job exists; scheduled jobs come
 # with the changes that add them.
+# The time zone of the team (change add-content-analytics): the publish hour and weekday of the equal-age comparison and
+# the weeks of the analytics are taken in it. Any IANA zone name; Europe/Berlin by default.
+analytics:
+  timeZone: Europe/Berlin
+
 jobs:
   image:
     repository: harbor.onelitefeather.dev/onelitefeather/menura-jobs

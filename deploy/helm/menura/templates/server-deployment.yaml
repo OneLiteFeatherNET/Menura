@@ -35,6 +35,9 @@ spec:
             {{- include "menura.databaseEnv" . | nindent 12 }}
             {{- include "menura.libraryEnv" . | nindent 12 }}
             {{- include "menura.channelEnv" . | nindent 12 }}
+            # The team's time zone for the publish hour and weekday of the analytics (change add-content-analytics).
+            - name: MENURA_ANALYTICS_TIME_ZONE
+              value: {{ .Values.analytics.timeZone | quote }}
             {{- range $name, $value := .Values.server.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}

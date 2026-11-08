@@ -27,14 +27,18 @@ import java.util.UUID;
 
 /**
  * The scheduled collection of metrics of every external post (change add-content-analytics). For each connected channel
- * whose platform reports metrics it reads every live post through the metrics operation of the adapter port, stores the
- * points, refreshes the latest values, and takes the snapshots that are due.
+ * whose platform reports metrics it reads only the posts that are due (see {@link #isDue}) through the metrics operation of
+ * the adapter port, in batches of the platform's batch size, stores the points, refreshes the latest values, and takes the
+ * snapshots that are due. A channel with nothing due makes no platform call.
  *
  * <p>Each post is written in its own transaction, so a channel that fails part way keeps the points of the posts before
  * the failure. A channel whose platform does not report metrics is recorded as not supported, never as zero. Nothing is
  * read through a wall-clock wait; the time comes from the injected clock.
  */
 public final class MetricCollector {
+
+    /** A post whose latest value is older than this is read again, even when no snapshot offset is due. */
+    public static final Duration STALE_AFTER = Duration.ofHours(24);
 
     static final String UNREACHABLE = "The platform could not be reached.";
     static final String REFUSED = "The platform refused the request. The channel may need reconnection.";
@@ -109,6 +113,20 @@ public final class MetricCollector {
                 live.add(post);
             }
         }
+        Map<UUID, Set<Long>> taken = transactions.inTransaction(c -> metrics.takenOffsetMinutes(c, channel.id()));
+        Map<UUID, Instant> lastCollected = transactions.inTransaction(c -> metrics.lastCollectedAt(c, channel.id()));
+        List<ExternalPost> due = new ArrayList<>();
+        for (ExternalPost post : live) {
+            if (isDue(post, now, taken.getOrDefault(post.id(), Set.of()), lastCollected.get(post.id()))) {
+                due.add(post);
+            }
+        }
+        if (due.isEmpty()) {
+            // Nothing is due: the platform is not called, and the channel's last run succeeded.
+            tally.collected++;
+            save(channel.id(), COLLECTED, now, null, null);
+            return;
+        }
         String token;
         try {
             token = connections.freshGrant(channel.id()).accessToken();
@@ -123,12 +141,14 @@ public final class MetricCollector {
             fail(channel.id(), reasonOf(failure), now, tally);
             return;
         }
-        Map<UUID, Set<Long>> taken = transactions.inTransaction(c -> metrics.takenOffsetMinutes(c, channel.id()));
         Map<UUID, UUID> series = transactions.inTransaction(c -> metrics.seriesOfPosts(c, channel.id()));
-        for (ExternalPost post : live) {
-            Map<String, Long> values;
+        int batchSize = Math.max(1, adapter.metricsBatchSize());
+        for (int from = 0; from < due.size(); from += batchSize) {
+            List<ExternalPost> batch = due.subList(from, Math.min(due.size(), from + batchSize));
+            List<String> ids = batch.stream().map(ExternalPost::platformItemId).toList();
+            Map<String, Map<String, Long>> readings;
             try {
-                values = adapter.readMetrics(token, post.platformItemId(), Metrics.requested());
+                readings = adapter.readMetrics(token, ids, Metrics.requested());
             } catch (PlatformAdapter.Unsupported unsupported) {
                 tally.notSupported++;
                 save(channel.id(), NOT_SUPPORTED_OUTCOME, null, null, NOT_SUPPORTED);
@@ -137,10 +157,29 @@ public final class MetricCollector {
                 fail(channel.id(), reasonOf(failure), now, tally);
                 return;
             }
-            storePost(post, values, series.get(post.id()), taken.getOrDefault(post.id(), Set.of()), now, tally);
+            for (ExternalPost post : batch) {
+                Map<String, Long> values = readings.get(post.platformItemId());
+                if (values == null) {
+                    // The platform returned nothing for this item: it is left unchanged, never written as zero.
+                    continue;
+                }
+                storePost(post, values, series.get(post.id()), taken.getOrDefault(post.id(), Set.of()), now, tally);
+            }
         }
         tally.collected++;
         save(channel.id(), COLLECTED, now, null, null);
+    }
+
+    /**
+     * A post is read in a run only when a snapshot offset is reached that is not stored yet, or when its latest value is
+     * older than {@link #STALE_AFTER}, or when it has never been read. Every other post is skipped by the run.
+     */
+    static boolean isDue(ExternalPost post, Instant now, Set<Long> takenMinutes, Instant lastCollected) {
+        Duration age = Duration.between(post.publishedAt(), now);
+        if (!Offsets.due(age, takenMinutes).isEmpty()) {
+            return true;
+        }
+        return lastCollected == null || lastCollected.isBefore(now.minus(STALE_AFTER));
     }
 
     private void storePost(ExternalPost post, Map<String, Long> values, UUID seriesId, Set<Long> takenMinutes,

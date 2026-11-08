@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.jobs;
 
+import net.onelitefeather.menura.core.config.AnalyticsSettings;
 import net.onelitefeather.menura.core.config.ChannelSettings;
 import net.onelitefeather.menura.core.config.MenuraSettings;
 
@@ -18,7 +19,8 @@ public final class JobsMain {
                 new ChannelHealthJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC()),
                 new ExternalPostSyncJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC(),
                         ExternalPostSyncJob.intervalFrom(System.getenv())),
-                new MetricCollectionJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC()),
+                new MetricCollectionJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC(),
+                        AnalyticsSettings.from(System.getenv())),
                 new RetentionJob(System.getenv(), Clock.systemUTC())));
         System.exit(dispatcher.dispatch(args, System.out, System.err));
     }

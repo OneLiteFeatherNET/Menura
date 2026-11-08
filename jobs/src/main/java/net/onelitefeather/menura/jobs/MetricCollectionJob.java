@@ -2,12 +2,14 @@ package net.onelitefeather.menura.jobs;
 
 import net.onelitefeather.menura.core.analytics.JdbcMetricStore;
 import net.onelitefeather.menura.core.analytics.MetricCollector;
+import net.onelitefeather.menura.core.analytics.PublishSlot;
 import net.onelitefeather.menura.core.channel.ChannelAudit;
 import net.onelitefeather.menura.core.channel.ConnectionService;
 import net.onelitefeather.menura.core.channel.JdbcChannelStore;
 import net.onelitefeather.menura.core.channel.JdkHttpTransport;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
 import net.onelitefeather.menura.core.channel.youtube.YouTubeAdapter;
+import net.onelitefeather.menura.core.config.AnalyticsSettings;
 import net.onelitefeather.menura.core.config.ChannelSettings;
 import net.onelitefeather.menura.core.config.MenuraSettings;
 import net.onelitefeather.menura.core.db.DataSourceTransactions;
@@ -34,11 +36,14 @@ public final class MetricCollectionJob implements Job {
     private final MenuraSettings database;
     private final ChannelSettings channels;
     private final Clock clock;
+    private final AnalyticsSettings analytics;
 
-    public MetricCollectionJob(MenuraSettings database, ChannelSettings channels, Clock clock) {
+    public MetricCollectionJob(MenuraSettings database, ChannelSettings channels, Clock clock,
+                               AnalyticsSettings analytics) {
         this.database = Objects.requireNonNull(database, "database");
         this.channels = Objects.requireNonNull(channels, "channels");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.analytics = Objects.requireNonNull(analytics, "analytics");
     }
 
     @Override
@@ -65,7 +70,7 @@ public final class MetricCollectionJob implements Job {
         ConnectionService connections = new ConnectionService(transactions, clock, new IdentifierGenerator(random),
                 new SecretGenerator(random), channelStore, NO_AUDIT, registry, channels.refreshMargin(), 0.8);
         MetricCollector collector = new MetricCollector(transactions, clock,
-                new JdbcMetricStore(new IdentifierGenerator(random)), new JdbcExternalPostStore(), channelStore,
+                new JdbcMetricStore(new IdentifierGenerator(random), new PublishSlot(analytics.timeZone())), new JdbcExternalPostStore(), channelStore,
                 connections, registry);
 
         MetricCollector.Report report = collector.collect();

@@ -74,10 +74,20 @@ public interface PlatformAdapter {
     }
 
     /**
-     * Reads the requested metrics of one item. A metric the platform does not expose is left out of the map; callers
-     * record it as unavailable, never as zero.
+     * The most items one {@link #readMetrics} call may request: the platform's own batch limit, for example 50 items per
+     * videos.list call. An adapter that reads one item per call keeps the default of one.
      */
-    Map<String, Long> readMetrics(String accessToken, String platformItemId, Set<String> metrics);
+    default int metricsBatchSize() {
+        return 1;
+    }
+
+    /**
+     * Reads the requested metrics of several items in one call of at most {@link #metricsBatchSize()} items. The result
+     * maps each platform item identifier to its metrics. A metric the platform does not expose is left out of that item's
+     * map, and an item the platform does not return is left out of the result; callers record both as unavailable, never
+     * as zero. A failure of the call (a {@link PlatformException}) makes the whole call fail: none of its items are read.
+     */
+    Map<String, Map<String, Long>> readMetrics(String accessToken, List<String> platformItemIds, Set<String> metrics);
 
     /**
      * The scopes to request for the given feature names, always including the base account feature. A feature name

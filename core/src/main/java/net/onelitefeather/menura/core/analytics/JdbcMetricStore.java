@@ -31,9 +31,27 @@ public final class JdbcMetricStore implements MetricStore {
     private static final String OBSERVATION_COLUMNS = "m.channel_id, m.platform, m.format, m.series_id, m.published_at";
 
     private final IdentifierGenerator identifiers;
+    private final PublishSlot slots;
 
-    public JdbcMetricStore(IdentifierGenerator identifiers) {
+    public JdbcMetricStore(IdentifierGenerator identifiers, PublishSlot slots) {
         this.identifiers = identifiers;
+        this.slots = slots;
+    }
+
+    @Override
+    public Map<UUID, Instant> lastCollectedAt(Connection connection, UUID channelId) throws SQLException {
+        Map<UUID, Instant> last = new HashMap<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select external_post_id, max(collected_at) from menura.metric_latest where channel_id = ? "
+                        + "group by external_post_id")) {
+            statement.setObject(1, channelId);
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    last.put(row.getObject(1, UUID.class), row.getTimestamp(2).toInstant());
+                }
+            }
+        }
+        return last;
     }
 
     @Override
@@ -86,8 +104,8 @@ public final class JdbcMetricStore implements MetricStore {
     @Override
     public void storeReading(Connection connection, Reading reading) throws SQLException {
         UUID postId = reading.post().id();
-        int hour = PublishSlot.hour(reading.post().publishedAt());
-        int weekday = PublishSlot.weekday(reading.post().publishedAt());
+        int hour = slots.hour(reading.post().publishedAt());
+        int weekday = slots.weekday(reading.post().publishedAt());
         try (PreparedStatement delete = connection.prepareStatement(
                 "delete from menura.metric_latest where external_post_id = ?")) {
             delete.setObject(1, postId);

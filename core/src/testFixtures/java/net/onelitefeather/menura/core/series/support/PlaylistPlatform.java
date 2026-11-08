@@ -111,7 +111,8 @@ public final class PlaylistPlatform implements PlatformAdapter {
     }
 
     @Override
-    public Map<String, Long> readMetrics(String accessToken, String platformItemId, Set<String> metrics) {
+    public Map<String, Map<String, Long>> readMetrics(String accessToken, List<String> platformItemIds,
+                                                     Set<String> metrics) {
         return Map.of();
     }
 }

@@ -30,8 +30,18 @@ public interface MetricStore {
     /** Stores the points of one reading and replaces the latest values of the post. */
     void storeReading(Connection connection, Reading reading) throws SQLException;
 
-    /** Stores snapshots that are not stored yet. A snapshot that exists keeps its value. */
+    /**
+     * Stores snapshots that are not stored yet. A snapshot that exists keeps its value.
+     *
+     * <p>Overwriting a snapshot when the platform revises its value is not done here yet: the port reports one value per
+     * metric per read, not a value for each point in time, so there is no revised value per offset to store. Once an
+     * adapter reports values per point in time, the conflict rule of this method changes to overwrite the snapshot of the
+     * revised offset, while the raw points keep every collected value.
+     */
     void storeSnapshots(Connection connection, List<SnapshotValue> snapshots) throws SQLException;
+
+    /** When each post of a channel was last collected, from the latest values. A post never collected is absent. */
+    Map<UUID, Instant> lastCollectedAt(Connection connection, UUID channelId) throws SQLException;
 
     void saveStatus(Connection connection, CollectionStatus status) throws SQLException;
 

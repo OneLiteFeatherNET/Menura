@@ -128,6 +128,19 @@ public final class InMemoryMetricStore implements MetricStore {
     }
 
     @Override
+    public Map<UUID, Instant> lastCollectedAt(Connection connection, UUID channelId) {
+        Map<UUID, Instant> last = new HashMap<>();
+        for (Map.Entry<String, Observation> entry : latest.entrySet()) {
+            if (!channelId.equals(entry.getValue().channelId())) {
+                continue;
+            }
+            last.merge(entry.getValue().postId(), latestCollectedAt.get(entry.getKey()),
+                    (a, b) -> a.isAfter(b) ? a : b);
+        }
+        return last;
+    }
+
+    @Override
     public void saveStatus(Connection connection, CollectionStatus status) {
         statuses.put(status.channelId(), status);
     }

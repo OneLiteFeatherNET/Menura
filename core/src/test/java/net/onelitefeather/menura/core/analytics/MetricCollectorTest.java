@@ -54,6 +54,8 @@ class MetricCollectorTest {
     @Test
     void aFailingPostKeepsThePointsOfThePostsCollectedBeforeIt() throws SQLException {
         AnalyticsFixture world = new AnalyticsFixture(true);
+        // One item per call: a failing call loses its own batch, so the posts before it must be in earlier calls.
+        world.platform.batchSize(1);
         UUID channel = world.connectedChannel("UC3");
         ExternalPost first = world.publishedPost(channel, "v1", world.now().minus(Duration.ofHours(5)), "short");
         world.publishedPost(channel, "v2", world.now().minus(Duration.ofHours(4)), "short");
@@ -163,7 +165,7 @@ class MetricCollectorTest {
         ExternalPost post = world.publishedPost(channel, "v1", world.now().minus(Duration.ofHours(5)), "short");
         world.platform.report("v1", Map.of(Metrics.VIEWS, 100L));
         world.collector.collect();
-        world.advance(Duration.ofHours(1));
+        world.advance(Duration.ofHours(4));
         world.platform.report("v1", Map.of(Metrics.VIEWS, 150L));
 
         world.collector.collect();
@@ -174,6 +176,68 @@ class MetricCollectorTest {
                 "the latest views are the cumulative value of the newest run");
         assertEquals(latest, world.metrics.latestOf(null, post.id()).get(0).collectedAt(),
                 "the latest value carries the time of the newest run");
+    }
+
+    @Test
+    void aPostWithNoDueOffsetAndAFreshValueMakesNoPlatformCall() throws SQLException {
+        AnalyticsFixture world = new AnalyticsFixture(true);
+        UUID channel = world.connectedChannel("UC11");
+        world.publishedPost(channel, "v1", world.now(), "short");
+        world.platform.report("v1", Map.of(Metrics.VIEWS, 5L));
+        world.collector.collect();
+        int callsAfterFirstRun = world.platform.batches().size();
+        world.advance(Duration.ofMinutes(10));
+
+        world.collector.collect();
+
+        assertEquals(callsAfterFirstRun, world.platform.batches().size(),
+                "a post with no due offset and a value of the last day makes no platform call");
+    }
+
+    @Test
+    void severalDuePostsOfOneChannelMakeExactlyOneBatchCall() throws SQLException {
+        AnalyticsFixture world = new AnalyticsFixture(true);
+        UUID channel = world.connectedChannel("UC12");
+        for (String item : List.of("v1", "v2", "v3")) {
+            world.publishedPost(channel, item, world.now().minus(Duration.ofHours(5)), "short");
+            world.platform.report(item, Map.of(Metrics.VIEWS, 1L));
+        }
+
+        world.collector.collect();
+
+        assertEquals(1, world.platform.batches().size(), "three due posts of one channel are read in one call");
+        assertEquals(3, world.platform.batches().get(0).size(), "the one call names all three posts");
+    }
+
+    @Test
+    void thePlatformsBatchSizeSplitsTheCallsOfAChannel() throws SQLException {
+        AnalyticsFixture world = new AnalyticsFixture(true);
+        UUID channel = world.connectedChannel("UC13");
+        world.platform.batchSize(2);
+        for (String item : List.of("v1", "v2", "v3")) {
+            world.publishedPost(channel, item, world.now().minus(Duration.ofHours(5)), "short");
+            world.platform.report(item, Map.of(Metrics.VIEWS, 1L));
+        }
+
+        world.collector.collect();
+
+        assertEquals(List.of(2, 1), world.platform.batches().stream().map(List::size).toList(),
+                "three posts with a batch size of two make a call for two and a call for one");
+    }
+
+    @Test
+    void aPostPastTheDailySnapshotsIsCollectedAgainOnceItsValueIsADayOld() throws SQLException {
+        AnalyticsFixture world = new AnalyticsFixture(true);
+        UUID channel = world.connectedChannel("UC14");
+        world.publishedPost(channel, "v1", world.now().minus(Duration.ofDays(400)), "short");
+        world.platform.report("v1", Map.of(Metrics.VIEWS, 9L));
+        world.collector.collect();
+        world.advance(Duration.ofHours(25));
+
+        world.collector.collect();
+
+        assertEquals(2, world.platform.batches().size(),
+                "no offset is left, but the value is a day old, so the post is read again");
     }
 
     private static SnapshotValue snapshot(List<SnapshotValue> snapshots, int minutes, String metric) {

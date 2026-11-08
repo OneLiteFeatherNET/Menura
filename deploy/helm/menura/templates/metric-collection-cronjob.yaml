@@ -37,6 +37,8 @@ spec:
               env:
                 {{- include "menura.databaseEnv" . | nindent 16 }}
                 {{- include "menura.channelEnv" . | nindent 16 }}
+                - name: MENURA_ANALYTICS_TIME_ZONE
+                  value: {{ .Values.analytics.timeZone | quote }}
               {{- include "menura.secretEnvFrom" . | nindent 14 }}
               {{- include "menura.containerSecurity" . | nindent 14 }}
               {{- with .Values.jobs.resources }}

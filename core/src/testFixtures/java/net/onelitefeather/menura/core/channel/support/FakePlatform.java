@@ -98,7 +98,12 @@ public final class FakePlatform implements PlatformAdapter {
     }
 
     @Override
-    public Map<String, Long> readMetrics(String accessToken, String platformItemId, Set<String> requested) {
-        return metrics;
+    public Map<String, Map<String, Long>> readMetrics(String accessToken, List<String> platformItemIds,
+                                                     Set<String> requested) {
+        Map<String, Map<String, Long>> result = new java.util.LinkedHashMap<>();
+        for (String platformItemId : platformItemIds) {
+            result.put(platformItemId, metrics);
+        }
+        return result;
     }
 }

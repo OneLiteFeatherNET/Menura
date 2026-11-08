@@ -35,6 +35,9 @@ import java.util.stream.Collectors;
 public final class YouTubeAdapter implements PlatformAdapter {
 
     public static final String PLATFORM = "youtube";
+
+    /** The videos.list call takes at most 50 video identifiers; one metrics read batches up to that many. */
+    static final int YOUTUBE_BATCH_SIZE = 50;
     static final String AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
     static final String TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
     static final String REVOCATION_ENDPOINT = "https://oauth2.googleapis.com/revoke";
@@ -184,7 +187,13 @@ public final class YouTubeAdapter implements PlatformAdapter {
     }
 
     @Override
-    public Map<String, Long> readMetrics(String accessToken, String platformItemId, Set<String> metrics) {
+    public int metricsBatchSize() {
+        return YOUTUBE_BATCH_SIZE;
+    }
+
+    @Override
+    public Map<String, Map<String, Long>> readMetrics(String accessToken, List<String> platformItemIds,
+                                                     Set<String> metrics) {
         throw new Unsupported("reading YouTube metrics");
     }
 

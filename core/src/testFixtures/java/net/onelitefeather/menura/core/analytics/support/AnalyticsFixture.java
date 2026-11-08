@@ -2,6 +2,7 @@ package net.onelitefeather.menura.core.analytics.support;
 
 import net.onelitefeather.menura.core.analytics.AnalyticsReader;
 import net.onelitefeather.menura.core.analytics.MetricCollector;
+import net.onelitefeather.menura.core.analytics.PublishSlot;
 import net.onelitefeather.menura.core.channel.Channel;
 import net.onelitefeather.menura.core.channel.ChannelGrant;
 import net.onelitefeather.menura.core.channel.ConnectionService;
@@ -16,6 +17,7 @@ import net.onelitefeather.menura.core.series.support.InMemorySeriesStore;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -44,7 +46,8 @@ public final class AnalyticsFixture {
         this.connections = channels.service(channels.store, registry);
         this.collector = new MetricCollector(new DirectTransactions(), channels.clock, metrics, posts, channels.store,
                 connections, registry);
-        this.reader = new AnalyticsReader(new DirectTransactions(), channels.clock, metrics, posts, channels.store, series);
+        this.reader = new AnalyticsReader(new DirectTransactions(), channels.clock,
+                new PublishSlot(ZoneId.of("Europe/Berlin")), metrics, posts, channels.store, series);
     }
 
     /** Stores a connected channel of the metrics platform with a grant that does not expire during the test. */

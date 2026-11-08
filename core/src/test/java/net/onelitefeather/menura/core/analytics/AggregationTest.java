@@ -90,7 +90,7 @@ class AggregationTest {
                 new Observation(UUID.randomUUID(), null, "metrics", "short", null, PUBLISHED, Metrics.VIEWS, null));
 
         List<Aggregation.Slot> slots = Aggregation.medianBySlot(snapshots, Metrics.VIEWS, 0, 23,
-                o -> PublishSlot.hour(o.publishedAt()));
+                o -> new PublishSlot(java.time.ZoneId.of("Europe/Berlin")).hour(o.publishedAt()));
 
         assertEquals(24, slots.size(), "every hour of the day is reported");
         Aggregation.Slot eighteen = slots.get(18);

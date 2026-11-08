@@ -51,15 +51,17 @@ public final class AnalyticsReader {
 
     private final Transactions transactions;
     private final Clock clock;
+    private final PublishSlot slots;
     private final MetricStore metrics;
     private final ExternalPostStore posts;
     private final ChannelStore channels;
     private final SeriesStore series;
 
-    public AnalyticsReader(Transactions transactions, Clock clock, MetricStore metrics, ExternalPostStore posts,
-                           ChannelStore channels, SeriesStore series) {
+    public AnalyticsReader(Transactions transactions, Clock clock, PublishSlot slots, MetricStore metrics,
+                           ExternalPostStore posts, ChannelStore channels, SeriesStore series) {
         this.transactions = transactions;
         this.clock = clock;
+        this.slots = slots;
         this.metrics = metrics;
         this.posts = posts;
         this.channels = channels;
@@ -128,7 +130,8 @@ public final class AnalyticsReader {
     }
 
     /** The comparison at equal age: the median of one metric at one offset per slot, with the posts used. */
-    public record EqualAge(String metric, Duration offset, By by, UUID channelId, List<Aggregation.Slot> slots) {
+    public record EqualAge(String metric, Duration offset, By by, UUID channelId, String timeZone,
+                           List<Aggregation.Slot> slots) {
     }
 
     /** The analytics of one post: its latest values, its snapshots and its record. */
@@ -185,12 +188,12 @@ public final class AnalyticsReader {
                 List<WeekRow> weeks = new ArrayList<>();
                 Map<String, List<Observation>> byWeek = new TreeMap<>();
                 for (Observation observation : own) {
-                    byWeek.computeIfAbsent(PublishSlot.isoWeek(observation.publishedAt()), k -> new ArrayList<>())
+                    byWeek.computeIfAbsent(slots.isoWeek(observation.publishedAt()), k -> new ArrayList<>())
                             .add(observation);
                 }
                 for (Map.Entry<String, List<Observation>> week : byWeek.entrySet()) {
                     Instant anyPublish = week.getValue().get(0).publishedAt();
-                    weeks.add(new WeekRow(week.getKey(), PublishSlot.weekStart(anyPublish),
+                    weeks.add(new WeekRow(week.getKey(), slots.weekStart(anyPublish),
                             Aggregation.total(week.getKey(), week.getValue())));
                 }
                 rows.add(new SeriesRow(seriesId, label, Aggregation.total(entry.getKey(), own), weeks));
@@ -217,10 +220,10 @@ public final class AnalyticsReader {
         return transactions.inTransaction(c -> {
             List<Observation> observations = metrics.snapshots(c, offset, metric, channelId);
             ToIntFunction<Observation> slot = by == By.HOUR
-                    ? o -> PublishSlot.hour(o.publishedAt())
-                    : o -> PublishSlot.weekday(o.publishedAt());
-            List<Aggregation.Slot> slots = Aggregation.medianBySlot(observations, metric, by.first(), by.last(), slot);
-            return new EqualAge(metric, offset, by, channelId, slots);
+                    ? o -> slots.hour(o.publishedAt())
+                    : o -> slots.weekday(o.publishedAt());
+            List<Aggregation.Slot> buckets = Aggregation.medianBySlot(observations, metric, by.first(), by.last(), slot);
+            return new EqualAge(metric, offset, by, channelId, this.slots.zone().getId(), buckets);
         });
     }
 
@@ -248,12 +251,12 @@ public final class AnalyticsReader {
 
     /** The period in days, both included, with the default when no date is given. */
     public LocalDate defaultFrom() {
-        return LocalDate.now(clock.withZone(PublishSlot.ZONE)).minusDays(DEFAULT_DAYS - 1L);
+        return LocalDate.now(clock.withZone(slots.zone())).minusDays(DEFAULT_DAYS - 1L);
     }
 
     /** Today in the team's time zone. */
     public LocalDate today() {
-        return LocalDate.now(clock.withZone(PublishSlot.ZONE));
+        return LocalDate.now(clock.withZone(slots.zone()));
     }
 
     static double engagedViews(Aggregation.Group group) {
@@ -265,14 +268,14 @@ public final class AnalyticsReader {
         return 0;
     }
 
-    private static Period period(LocalDate from, LocalDate to) {
+    private Period period(LocalDate from, LocalDate to) {
         if (from == null || to == null || to.isBefore(from)) {
             throw new ProblemException(400, "Invalid period", "The period must start on or before its end date.");
         }
         if (from.plusDays(MAX_DAYS).isBefore(to)) {
             throw new ProblemException(400, "Invalid period", "The period may cover at most " + MAX_DAYS + " days.");
         }
-        return new Period(PublishSlot.startOf(from), PublishSlot.startOf(to.plusDays(1)));
+        return new Period(slots.startOf(from), slots.startOf(to.plusDays(1)));
     }
 
     private static Set<String> roleNames(Set<Role> roles) {
