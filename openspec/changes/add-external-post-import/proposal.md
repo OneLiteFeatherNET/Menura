@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(publish)` (code PR). Phase: 1 (Recognition & Measurability). Depends on: `add-access-control`, `add-channel-connections`.
+Conventional Commits: `feat(publish)` (code PR). Phase: 1 (Pool, Calendar & Analytics). Depends on: `add-access-control`, `add-channel-connections`.
 
 Strand: platform.
 
