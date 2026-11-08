@@ -37,6 +37,10 @@ tags:
       Content series: badge, opening formula, hashtag and colour token per series; the assignment of external posts with
       their episode numbers; the weekly coverage; and the render bundle for the external renderer. Every signed-in role
       reads them; the editor role writes them.
+  - name: Analytics
+    description: >-
+      Performance of external posts across channels, per channel, per series, and by publish hour and weekday at equal age
+      (snapshots at fixed offsets after publication). Every signed-in role reads them; no endpoint changes a post.
 paths:
   /health:
     get:
@@ -1783,6 +1787,168 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+  /analytics/overview:
+    get:
+      tags:
+        - Analytics
+      operationId: getAnalyticsOverview
+      summary: Totals of the posts published in a period, across channels, per channel and per format, with the last collection of every channel.
+      description: |
+        Aggregates read the latest value of each metric of each post. An unavailable metric is null with a count of zero,
+        never zero. Averages are taken for the average view percentage, sums for every other metric.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsFrom"
+        - $ref: "#/components/parameters/AnalyticsTo"
+      responses:
+        "200":
+          description: The overview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsOverview"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /analytics/series:
+    get:
+      tags:
+        - Analytics
+      operationId: getAnalyticsSeries
+      summary: The series comparison of a period, per series and per ISO week, ranked by engaged views.
+      description: Posts in no series form one row with a null series. Series the caller may not see are left out.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsFrom"
+        - $ref: "#/components/parameters/AnalyticsTo"
+      responses:
+        "200":
+          description: The comparison.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsSeriesComparison"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /analytics/equal-age:
+    get:
+      tags:
+        - Analytics
+      operationId: getAnalyticsEqualAge
+      summary: The median of one metric per publish hour or weekday, at equal age.
+      description: |
+        Each post is compared at the same age through its snapshot at the chosen offset. Posts younger than the offset have
+        no snapshot and are not counted. The hour and weekday are in Europe/Berlin.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: metric
+          in: query
+          required: false
+          description: The metric to compare. Default views.
+          schema:
+            $ref: "#/components/schemas/AnalyticsMetricName"
+        - name: offsetHours
+          in: query
+          required: false
+          description: >-
+            The offset in hours: 1, 2, 4, 8, 24, 48 or 168 (seven days), or a whole number of days from 8 to 365 times 24.
+            Default 24.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 8760
+            default: 24
+        - name: by
+          in: query
+          required: false
+          description: hour (24 slots, 0 to 23) or weekday (7 slots, 1 is Monday). Default hour.
+          schema:
+            type: string
+            enum:
+              - hour
+              - weekday
+            default: hour
+        - name: channelId
+          in: query
+          required: false
+          description: Restricts the comparison to the posts of one channel.
+          schema:
+            $ref: "#/components/schemas/Identifier"
+      responses:
+        "200":
+          description: The comparison.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsEqualAge"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /analytics/external-posts/{id}:
+    get:
+      tags:
+        - Analytics
+      operationId: getAnalyticsExternalPost
+      summary: The latest values and the snapshots of one external post.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsPostId"
+      responses:
+        "200":
+          description: The analytics of the post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsPost"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /analytics/external-posts/{id}/points:
+    get:
+      tags:
+        - Analytics
+      operationId: getAnalyticsExternalPostPoints
+      summary: The raw collected points of one external post, in collection-time order.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsPostId"
+        - name: metric
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AnalyticsMetricName"
+        - name: limit
+          in: query
+          required: false
+          description: At most this many points, 1 to 1000. Default 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: The points.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsPoints"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -1906,6 +2072,29 @@ components:
       schema:
         type: string
         format: date
+    AnalyticsFrom:
+      name: from
+      in: query
+      required: false
+      description: First publication day in Europe/Berlin, inclusive. Default 89 days before to.
+      schema:
+        type: string
+        format: date
+    AnalyticsTo:
+      name: to
+      in: query
+      required: false
+      description: Last publication day in Europe/Berlin, inclusive. Default today. At most 800 days after from.
+      schema:
+        type: string
+        format: date
+    AnalyticsPostId:
+      name: id
+      in: path
+      required: true
+      description: The external post.
+      schema:
+        $ref: "#/components/schemas/Identifier"
   responses:
     Problem:
       description: An error, described by RFC 9457 Problem Details.
@@ -3724,3 +3913,340 @@ components:
             - string
             - "null"
           description: One text for all channels that names the join domain. Null when no join domain is configured.
+    AnalyticsMetricName:
+      type: string
+      enum:
+        - views
+        - engaged_views
+        - average_view_percentage
+        - watch_time
+        - likes
+        - comments
+        - shares
+    AnalyticsMetric:
+      type: object
+      description: One metric of an aggregate. A null value means no post of the group provides the metric.
+      required:
+        - name
+        - value
+        - posts
+        - average
+      properties:
+        name:
+          $ref: "#/components/schemas/AnalyticsMetricName"
+        value:
+          type:
+            - number
+            - "null"
+        posts:
+          type: integer
+          description: How many posts contributed a value.
+        average:
+          type: boolean
+          description: True for the average view percentage, which is an average over posts and not a sum.
+    AnalyticsAggregate:
+      type: object
+      required:
+        - key
+        - label
+        - posts
+        - metrics
+      properties:
+        key:
+          type: string
+        label:
+          type:
+            - string
+            - "null"
+        posts:
+          type: integer
+        metrics:
+          type: array
+          description: Every metric in the fixed order views, engaged_views, average_view_percentage, watch_time, likes, comments, shares.
+          items:
+            $ref: "#/components/schemas/AnalyticsMetric"
+    AnalyticsCollection:
+      type: object
+      description: The last collection of one channel. A channel whose platform reports no metrics is not_supported.
+      required:
+        - channelId
+        - displayName
+        - platform
+        - outcome
+        - lastSuccessAt
+        - lastFailureAt
+        - failureReason
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        displayName:
+          type: string
+        platform:
+          type: string
+        outcome:
+          type: string
+          enum:
+            - collected
+            - not_supported
+            - failed
+        lastSuccessAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        lastFailureAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        failureReason:
+          type:
+            - string
+            - "null"
+    AnalyticsOverview:
+      type: object
+      required:
+        - from
+        - to
+        - totals
+        - channels
+        - formats
+        - collections
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        totals:
+          $ref: "#/components/schemas/AnalyticsAggregate"
+        channels:
+          type: array
+          description: One row per channel, the key is the channel identifier.
+          items:
+            $ref: "#/components/schemas/AnalyticsAggregate"
+        formats:
+          type: array
+          description: One row per format, for example short or video.
+          items:
+            $ref: "#/components/schemas/AnalyticsAggregate"
+        collections:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalyticsCollection"
+    AnalyticsWeek:
+      type: object
+      required:
+        - isoWeek
+        - weekStart
+        - posts
+        - metrics
+      properties:
+        isoWeek:
+          type: string
+          example: "2026-W45"
+        weekStart:
+          type: string
+          format: date
+        posts:
+          type: integer
+        metrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalyticsMetric"
+    AnalyticsSeriesRow:
+      type: object
+      description: One series of the comparison, or the posts in no series (seriesId and label null).
+      required:
+        - seriesId
+        - label
+        - posts
+        - metrics
+        - weeks
+      properties:
+        seriesId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        label:
+          type:
+            - string
+            - "null"
+        posts:
+          type: integer
+        metrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalyticsMetric"
+        weeks:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalyticsWeek"
+    AnalyticsSeriesComparison:
+      type: object
+      required:
+        - from
+        - to
+        - series
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        series:
+          type: array
+          description: Ranked by engaged views, highest first.
+          items:
+            $ref: "#/components/schemas/AnalyticsSeriesRow"
+    AnalyticsSlot:
+      type: object
+      required:
+        - slot
+        - posts
+        - median
+      properties:
+        slot:
+          type: integer
+          description: The hour 0 to 23, or the ISO weekday 1 to 7 (1 is Monday).
+        posts:
+          type: integer
+          description: How many posts of the slot have a snapshot value at the offset.
+        median:
+          type:
+            - number
+            - "null"
+    AnalyticsEqualAge:
+      type: object
+      required:
+        - metric
+        - offsetHours
+        - by
+        - timeZone
+        - channelId
+        - slots
+      properties:
+        metric:
+          $ref: "#/components/schemas/AnalyticsMetricName"
+        offsetHours:
+          type: integer
+        by:
+          type: string
+          enum:
+            - hour
+            - weekday
+        timeZone:
+          type: string
+          example: Europe/Berlin
+        channelId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalyticsSlot"
+    AnalyticsValue:
+      type: object
+      required:
+        - metric
+        - value
+        - collectedAt
+      properties:
+        metric:
+          $ref: "#/components/schemas/AnalyticsMetricName"
+        value:
+          type: integer
+        collectedAt:
+          type: string
+          format: date-time
+    AnalyticsSnapshot:
+      type: object
+      description: The value of one metric at one offset after publication. A null value means the platform did not provide it.
+      required:
+        - offsetMinutes
+        - metric
+        - value
+        - asOf
+        - ageMinutes
+      properties:
+        offsetMinutes:
+          type: integer
+        metric:
+          $ref: "#/components/schemas/AnalyticsMetricName"
+        value:
+          type:
+            - integer
+            - "null"
+        asOf:
+          type: string
+          format: date-time
+        ageMinutes:
+          type: integer
+    AnalyticsPost:
+      type: object
+      required:
+        - postId
+        - channelId
+        - platform
+        - format
+        - title
+        - url
+        - publishedAt
+        - removedAt
+        - latest
+        - snapshots
+      properties:
+        postId:
+          $ref: "#/components/schemas/Identifier"
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        platform:
+          type: string
+        format:
+          type: string
+        title:
+          type: string
+        url:
+          type:
+            - string
+            - "null"
+          description: The platform link. Null for a removed post.
+        publishedAt:
+          type: string
+          format: date-time
+        removedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        latest:
+          type: array
+          description: The latest value of each metric the platform provided. A metric missing here is unavailable.
+          items:
+            $ref: "#/components/schemas/AnalyticsValue"
+        snapshots:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalyticsSnapshot"
+    AnalyticsPoints:
+      type: object
+      required:
+        - postId
+        - metric
+        - points
+      properties:
+        postId:
+          $ref: "#/components/schemas/Identifier"
+        metric:
+          type:
+            - string
+            - "null"
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalyticsValue"

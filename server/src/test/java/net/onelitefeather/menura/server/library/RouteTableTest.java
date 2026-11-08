@@ -85,7 +85,12 @@ class RouteTableTest {
             "GET /series/{id}",
             "PUT /series/{id}",
             "PUT /external-posts/{id}/series",
-            "GET /channels/{id}/series-render-bundle");
+            "GET /channels/{id}/series-render-bundle",
+            "GET /analytics/overview",
+            "GET /analytics/series",
+            "GET /analytics/equal-age",
+            "GET /analytics/external-posts/{id}",
+            "GET /analytics/external-posts/{id}/points");
 
     private static final Set<Class<?>> BINARY_BODIES = Set.of(byte[].class, InputStream.class, ByteBuffer.class,
             StreamingFileUpload.class, CompletedFileUpload.class);
