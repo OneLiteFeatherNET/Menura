@@ -20,7 +20,7 @@ final class ContentFixture {
     final LibraryFixture base = new LibraryFixture();
     final InMemoryContentRepository content = new InMemoryContentRepository();
     final ContentLibrary library = new ContentLibrary(base.transactions, base.clock, base.identifiers, content,
-            base.assets, base.auditLog);
+            base.auditLog);
     final Transcripts transcripts = new Transcripts(base.transactions, base.clock, content, base.auditLog,
             TRANSCRIPT_LIMIT);
     final Timelines timelines = new Timelines(base.transactions, base.clock, base.identifiers, content, base.assets,

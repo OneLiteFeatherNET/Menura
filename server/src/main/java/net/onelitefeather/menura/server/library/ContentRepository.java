@@ -82,6 +82,9 @@ public interface ContentRepository {
     List<PoolRow> pool(Connection connection, PoolFilter filter, Instant afterCreatedAt, UUID afterId, int limit)
             throws SQLException;
 
+    /** Whether a raw item already has a transcript. */
+    boolean hasTranscript(Connection connection, UUID rawItem) throws SQLException;
+
     /**
      * Replaces all transcript segments of a raw item and records the transcript. Returns true when a transcript was
      * already there and has been replaced.

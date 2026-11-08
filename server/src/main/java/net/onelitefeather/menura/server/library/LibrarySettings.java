@@ -41,6 +41,9 @@ public class LibrarySettings {
     @Value("${menura.library.link-lifetime}")
     String linkLifetime;
 
+    @Value("${menura.library.transcript-max-bytes:10485760}")
+    long transcriptMaxBytes;
+
     /** The S3 endpoint, which is also the host the browser sends parts to (principle 14). */
     public String endpoint() {
         return endpoint;

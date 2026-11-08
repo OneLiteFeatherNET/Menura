@@ -153,6 +153,11 @@ public final class InMemoryContentRepository implements ContentRepository {
     }
 
     @Override
+    public boolean hasTranscript(Connection connection, UUID rawItem) {
+        return transcriptFormats.containsKey(rawItem);
+    }
+
+    @Override
     public boolean replaceTranscript(Connection connection, UUID rawItem, String format, UUID uploaderId, Instant uploadedAt,
                                      List<TranscriptSegment> replacement) {
         boolean replaced = transcriptFormats.containsKey(rawItem);

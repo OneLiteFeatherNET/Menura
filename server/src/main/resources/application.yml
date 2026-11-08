@@ -51,6 +51,8 @@ menura:
     raw-material-max-bytes: ${MENURA_LIBRARY_RAW_MATERIAL_MAX_BYTES:`53687091200`}
     upload-url-lifetime: ${MENURA_LIBRARY_UPLOAD_URL_LIFETIME:`PT15M`}
     link-lifetime: ${MENURA_LIBRARY_LINK_LIFETIME:`PT5M`}
+    # A transcript (WebVTT or SRT) is text: the default limit is 10 MB.
+    transcript-max-bytes: ${MENURA_LIBRARY_TRANSCRIPT_MAX_BYTES:`10485760`}
   # Person budget of the server (see PersonRateLimiter). Anonymous requests are limited per IP at the gateway.
   ratelimit:
     person:

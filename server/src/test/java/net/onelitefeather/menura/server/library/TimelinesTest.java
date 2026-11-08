@@ -87,7 +87,7 @@ class TimelinesTest {
         UUID second = clip(f, raw, 100);
         UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short",
                 document(List.of(first, second), List.of()), "req-tl").id();
-        UUID video = f.finishedVideo(LibraryFixture.editor());
+        UUID video = f.finishedVideo(LibraryFixture.EDITOR);
 
         ContentViews.RegisteredAssetView registered = f.timelines.register(LibraryFixture.editor(), video, timeline,
                 "Short 9x16", "req-reg");
@@ -102,7 +102,7 @@ class TimelinesTest {
     @Test
     void registrationWithMissingTimelineIsRejectedAndNothingIsRegistered() throws Exception {
         ContentFixture f = new ContentFixture();
-        UUID video = f.finishedVideo(LibraryFixture.editor());
+        UUID video = f.finishedVideo(LibraryFixture.EDITOR);
 
         ProblemException refused = assertThrows(ProblemException.class, () -> f.timelines.register(LibraryFixture.editor(),
                 video, UUID.fromString("7b8c9d0e-1f2a-4b3c-8d4e-6f708192a3b4"), "Ghost", "req-reg"));
@@ -131,7 +131,7 @@ class TimelinesTest {
         UUID first = clip(f, raw, 10);
         UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short", document(List.of(first), List.of()), "req-tl")
                 .id();
-        UUID recording = f.rawMaterialAsset(LibraryFixture.editor());
+        UUID recording = f.rawMaterialAsset(LibraryFixture.EDITOR);
 
         assertEquals(400, assertThrows(ProblemException.class, () -> f.timelines.register(LibraryFixture.editor(),
                 recording, timeline, "Recording", "req-reg")).status(), "only video and image are finished assets");
@@ -159,13 +159,13 @@ class TimelinesTest {
             UUID clip = clip(f, stream, 10 + i * 100);
             UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short " + i, document(List.of(clip), List.of()),
                     "req-tl-" + i).id();
-            f.timelines.register(LibraryFixture.editor(), f.finishedVideo(LibraryFixture.editor()), timeline, "Short " + i,
+            f.timelines.register(LibraryFixture.editor(), f.finishedVideo(LibraryFixture.EDITOR), timeline, "Short " + i,
                     "req-reg-" + i);
         }
         UUID foreignClip = clip(f, other, 10);
         UUID foreignTimeline = f.timelines.store(LibraryFixture.editor(), "Other", document(List.of(foreignClip), List.of()),
                 "req-tl-o").id();
-        f.timelines.register(LibraryFixture.editor(), f.finishedVideo(LibraryFixture.editor()), foreignTimeline, "Other",
+        f.timelines.register(LibraryFixture.editor(), f.finishedVideo(LibraryFixture.EDITOR), foreignTimeline, "Other",
                 "req-reg-o");
 
         ContentViews.RawLineageView lineage = f.library.lineage(LibraryFixture.viewer(), stream);
