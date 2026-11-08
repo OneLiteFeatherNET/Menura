@@ -38,4 +38,4 @@
 
 ## Implemented elsewhere
 
-- Native metrics from the TikTok video list: `add-tiktok-insights` (phase 1).
+- Native metrics from the TikTok video list: `add-tiktok-insights` (phase 2).

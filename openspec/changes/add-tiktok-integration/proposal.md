@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(tiktok)` (code PR). Phase: 2 (Planning & Scheduling). Depends on: `add-channel-connections`, `add-content-distribution`, `add-asset-upload`, `add-tiktok-insights`.
+Conventional Commits: `feat(tiktok)` (code PR). Phase: 2 (Platforms & Join Attribution). Depends on: `add-channel-connections`, `add-content-distribution`, `add-asset-upload`, `add-tiktok-insights`.
 
 Strand: content.
 
