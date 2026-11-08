@@ -17,7 +17,8 @@ public final class JobsMain {
         JobDispatcher dispatcher = new JobDispatcher(List.of(new PingJob(), new MigrateJob(settings),
                 new ChannelHealthJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC()),
                 new ExternalPostSyncJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC(),
-                        ExternalPostSyncJob.intervalFrom(System.getenv()))));
+                        ExternalPostSyncJob.intervalFrom(System.getenv())),
+                new RetentionJob(System.getenv(), Clock.systemUTC())));
         System.exit(dispatcher.dispatch(args, System.out, System.err));
     }
 }

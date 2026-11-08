@@ -38,7 +38,8 @@ rendered_disabled="$(mktemp)"
 rendered_pull="$(mktemp)"
 rendered_storage="$(mktemp)"
 rendered_channels="$(mktemp)"
-trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull" "$rendered_storage" "$rendered_channels"' EXIT
+rendered_retention="$(mktemp)"
+trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull" "$rendered_storage" "$rendered_channels" "$rendered_retention"' EXIT
 helm template "$release" "$chart" >"$rendered"
 
 # Hosts across all HTTPRoutes, one per line, sorted.
@@ -302,6 +303,24 @@ secret_pods="$({
 if [[ "$secret_pods" -ne 4 ]]; then
   report "expected server, jobs, channel health and external post sync pods to read the channel Secret, found $secret_pods"
 fi
+
+# The retention CronJob (change add-content-library) is off by default: the default render has no retention CronJob.
+if [[ -n "$(yq -N 'select(.kind == "CronJob") | select(.metadata.name | test("retention$")) | .metadata.name' "$rendered")" ]]; then
+  report "the retention CronJob must not be rendered by default"
+fi
+
+# Enabled, it runs 'jobs run retention' with the retention policy switch and the object storage variables.
+helm template "$release" "$chart" --set jobs.retention.enabled=true >"$rendered_retention"
+retention_command="$(yq -N 'select(.kind == "CronJob") | select(.metadata.name | test("retention$")) | .spec.jobTemplate.spec.template.spec.containers[0].command | join(" ")' "$rendered_retention")"
+if [[ "$retention_command" != "jobs run retention" ]]; then
+  report "the retention CronJob must run 'jobs run retention' (found '$retention_command')"
+fi
+retention_env="$(yq -N 'select(.kind == "CronJob") | select(.metadata.name | test("retention$")) | .spec.jobTemplate.spec.template.spec.containers[0].env[].name' "$rendered_retention")"
+for variable in MENURA_RETENTION_ENABLED MENURA_RETENTION_RAW_MAX_AGE MENURA_RETENTION_BATCH_SIZE MENURA_S3_BUCKET MENURA_DB_URL; do
+  if ! grep -qx "$variable" <<<"$retention_env"; then
+    report "the retention CronJob must set $variable"
+  fi
+done
 
 if [[ "$fail" -ne 0 ]]; then
   exit 1

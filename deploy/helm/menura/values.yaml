@@ -108,6 +108,19 @@ jobs:
     schedule: "17 */6 * * *"
     interval: PT6H
 
+  # The retention CronJob (jobs run retention, change add-content-library). It is rendered only when enabled, and the
+  # policy itself is switched on separately, so a deployment can render the job and keep the policy off.
+  #   policyEnabled  -> MENURA_RETENTION_ENABLED: true moves raw recordings older than rawMaxAge to cold storage.
+  #   rawMaxAge      -> MENURA_RETENTION_RAW_MAX_AGE: an ISO-8601 duration, P30D by default.
+  #   batchSize      -> MENURA_RETENTION_BATCH_SIZE: items per run, 1 to 1000, 100 by default.
+  # The object storage credentials come from storage.existingSecret, as for the server.
+  retention:
+    enabled: false
+    schedule: "30 3 * * *"
+    policyEnabled: false
+    rawMaxAge: P30D
+    batchSize: 100
+
 # Channel connections (change add-channel-connections). The server and the channel health job read these from an
 # existing Secret created outside this chart, with the keys MENURA_TOKEN_ENCRYPTION_KEY (required; the server does not
 # start without it), MENURA_YOUTUBE_CLIENT_ID and MENURA_YOUTUBE_CLIENT_SECRET, and optionally
