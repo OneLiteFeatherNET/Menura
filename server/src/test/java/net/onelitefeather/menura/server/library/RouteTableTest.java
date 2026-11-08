@@ -53,6 +53,7 @@ class RouteTableTest {
             "POST /channels/connections",
             "POST /channels/{id}/consent",
             "DELETE /channels/{id}",
+            "GET /channels/{id}/external-posts",
             "GET /channel-connections/callback",
             "GET /brand-kit",
             "GET /brand-kit/versions/{version}",
