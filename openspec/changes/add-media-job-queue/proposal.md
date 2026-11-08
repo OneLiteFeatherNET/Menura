@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(jobs)` (code PR). Phase: 4 (S3 & Recording). Depends on: `add-recording-ingest`, `add-access-control`, `add-hub-mcp-server`.
+Conventional Commits: `feat(jobs)` (code PR). Phase: 4 (Recording & Jobs). Depends on: `add-recording-ingest`, `add-access-control`, `add-hub-mcp-server`.
 
 Strand: content.
 
