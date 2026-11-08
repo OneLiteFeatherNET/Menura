@@ -45,6 +45,18 @@ public final class InMemoryMetricStore implements MetricStore {
     public record Point(UUID postId, String metric, long value, Instant collectedAt, UUID seriesId) {
     }
 
+    /** Forgets every row and partition, so a test starts from an empty store. */
+    public void clear() {
+        partitions.clear();
+        points.clear();
+        latest.clear();
+        latestCollectedAt.clear();
+        snapshots.clear();
+        seen.clear();
+        assignments.clear();
+        statuses.clear();
+    }
+
     /** Assigns a post to a series, as the series assignment does; the next reading carries it. */
     public void assign(UUID postId, UUID seriesId) {
         assignments.put(postId, seriesId);
