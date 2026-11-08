@@ -1,6 +1,7 @@
 package net.onelitefeather.menura.core.channel.youtube;
 
 import com.nimbusds.jose.util.JSONObjectUtils;
+import net.onelitefeather.menura.core.analytics.Metrics;
 import net.onelitefeather.menura.core.channel.HttpTransport;
 import net.onelitefeather.menura.core.channel.PlatformAdapter;
 import net.onelitefeather.menura.core.channel.PlatformCapabilities;
@@ -16,6 +17,12 @@ import java.text.ParseException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,11 +49,33 @@ public final class YouTubeAdapter implements PlatformAdapter {
     static final String TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
     static final String REVOCATION_ENDPOINT = "https://oauth2.googleapis.com/revoke";
     static final String CHANNELS_ENDPOINT = "https://www.googleapis.com/youtube/v3/channels";
-    static final Set<String> HOSTS = Set.of("accounts.google.com", "oauth2.googleapis.com", "www.googleapis.com");
+    static final String PLAYLIST_ITEMS_ENDPOINT = "https://www.googleapis.com/youtube/v3/playlistItems";
+    static final String VIDEOS_ENDPOINT = "https://www.googleapis.com/youtube/v3/videos";
+    static final String ANALYTICS_ENDPOINT = "https://youtubeanalytics.googleapis.com/v2/reports";
+    static final Set<String> HOSTS = Set.of("accounts.google.com", "oauth2.googleapis.com", "www.googleapis.com",
+            "youtubeanalytics.googleapis.com");
 
     static final String READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
     static final String UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload";
+    static final String ANALYTICS_READONLY_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly";
     static final String PUBLISH_FEATURE = "publish";
+    static final String INSIGHTS_FEATURE = "insights";
+
+    /** The first day the Analytics reads cover; YouTube was launched in 2005, so every video is inside the range. */
+    static final String ANALYTICS_START_DATE = "2005-01-01";
+    static final String WATCH_URL = "https://www.youtube.com/watch?v=";
+
+    /**
+     * Data API statistics fields and the metric each one feeds. A count the platform hides (for example likes of a channel
+     * that turned them off) is absent from the response and stays unavailable.
+     */
+    static final Map<String, String> STATISTICS = Map.of("viewCount", Metrics.VIEWS, "likeCount", Metrics.LIKES,
+            "commentCount", Metrics.COMMENTS);
+
+    /** Analytics API metric names and the metric each one feeds; watch time arrives in minutes and is stored in seconds. */
+    static final Map<String, String> ANALYTICS = Map.of("engagedViews", Metrics.ENGAGED_VIEWS,
+            "averageViewPercentage", Metrics.AVERAGE_VIEW_PERCENTAGE, "estimatedMinutesWatched", Metrics.WATCH_TIME,
+            "shares", Metrics.SHARES);
 
     /** The app's client settings. The secret is redacted from the text form. */
     public record Settings(String clientId, String clientSecret, String redirectUri) {
@@ -90,14 +119,15 @@ public final class YouTubeAdapter implements PlatformAdapter {
 
     @Override
     public PlatformCapabilities capabilities() {
-        return new PlatformCapabilities(false, false, false, false, true);
+        return new PlatformCapabilities(false, false, true, true, true);
     }
 
     @Override
     public List<PlatformFeature> features() {
         return List.of(
                 new PlatformFeature(ACCOUNT_FEATURE, Set.of(READONLY_SCOPE)),
-                new PlatformFeature(PUBLISH_FEATURE, Set.of(UPLOAD_SCOPE)));
+                new PlatformFeature(PUBLISH_FEATURE, Set.of(UPLOAD_SCOPE)),
+                new PlatformFeature(INSIGHTS_FEATURE, Set.of(READONLY_SCOPE, ANALYTICS_READONLY_SCOPE)));
     }
 
     @Override
@@ -181,9 +211,70 @@ public final class YouTubeAdapter implements PlatformAdapter {
         throw new Unsupported("deleting a YouTube video");
     }
 
+    /**
+     * The public and unlisted videos of the channel, newest first, at most {@code limit}. Private videos are skipped.
+     *
+     * <p>Quota (determine_quota_cost, checked 2026-11-08): channels.list, playlistItems.list and videos.list each cost 1
+     * unit per call. This method makes one channels.list call, one playlistItems.list call per page of 50 uploads read
+     * (stopping at the limit), and one videos.list call per 50 listed videos for the duration that decides the format.
+     *
+     * <p>Format: the Data API has no Shorts flag; see {@link YouTubeFormat} for the duration rule. The description is the
+     * snippet description of the upload.
+     */
     @Override
     public List<PublishedItem> listPublished(String accessToken, int limit) {
-        throw new Unsupported("listing YouTube videos");
+        String uploads = uploadsPlaylistId(accessToken);
+        if (uploads == null || limit <= 0) {
+            return List.of();
+        }
+        List<Entry> entries = new ArrayList<>();
+        String pageToken = null;
+        do {
+            Map<String, Object> page = parse(send("GET", endpoint(PLAYLIST_ITEMS_ENDPOINT,
+                    "part", "snippet,contentDetails,status", "playlistId", uploads, "maxResults", "50",
+                    "pageToken", pageToken), null, accessToken, "the listing of the uploads"));
+            for (Map<?, ?> item : objects(page.get("items"))) {
+                Entry entry = entryOf(item);
+                if (entry != null) {
+                    entries.add(entry);
+                }
+                if (entries.size() >= limit) {
+                    break;
+                }
+            }
+            pageToken = nextPageToken(page);
+        } while (pageToken != null && entries.size() < limit);
+        List<Entry> chosen = entries.subList(0, Math.min(limit, entries.size()));
+        Map<String, String> durations = durationsOf(accessToken, chosen.stream().map(Entry::videoId).toList());
+        List<PublishedItem> items = new ArrayList<>();
+        for (Entry entry : chosen) {
+            items.add(new PublishedItem(entry.videoId(), WATCH_URL + entry.videoId(), entry.title(),
+                    entry.publishedAt(), YouTubeFormat.of(durations.get(entry.videoId())), entry.description()));
+        }
+        return List.copyOf(items);
+    }
+
+    /**
+     * The video identifiers a playlist of the channel contains, read from every page. Quota: one playlistItems.list call
+     * (1 unit) per page of 50 items.
+     */
+    @Override
+    public Set<String> playlistItemIds(String accessToken, String playlistId) {
+        Set<String> members = new HashSet<>();
+        String pageToken = null;
+        do {
+            Map<String, Object> page = parse(send("GET", endpoint(PLAYLIST_ITEMS_ENDPOINT,
+                    "part", "contentDetails", "playlistId", playlistId, "maxResults", "50", "pageToken", pageToken),
+                    null, accessToken, "the playlist read"));
+            for (Map<?, ?> item : objects(page.get("items"))) {
+                String videoId = text(mapOf(item.get("contentDetails")), "videoId");
+                if (!videoId.isBlank()) {
+                    members.add(videoId);
+                }
+            }
+            pageToken = nextPageToken(page);
+        } while (pageToken != null);
+        return Set.copyOf(members);
     }
 
     @Override
@@ -191,10 +282,73 @@ public final class YouTubeAdapter implements PlatformAdapter {
         return YOUTUBE_BATCH_SIZE;
     }
 
+    /**
+     * The requested metrics of up to 50 videos. Views, likes and comments come from one videos.list call with the
+     * statistics part (1 unit); engaged views, average view percentage, watch time and shares come from one Analytics
+     * reports.query call per batch, with a per-video dimension. The Analytics reference checked 2026-11-08 states no quota
+     * cost, so none is assumed here. Analytics has no hour dimension: per-hour figures come from Menura's own snapshots.
+     *
+     * <p>A call that fails fails the whole batch. A metric or video missing from a response is left out of the result.
+     */
     @Override
     public Map<String, Map<String, Long>> readMetrics(String accessToken, List<String> platformItemIds,
                                                      Set<String> metrics) {
-        throw new Unsupported("reading YouTube metrics");
+        if (platformItemIds.size() > YOUTUBE_BATCH_SIZE) {
+            throw new IllegalArgumentException("a metrics read takes at most " + YOUTUBE_BATCH_SIZE + " items");
+        }
+        if (platformItemIds.isEmpty()) {
+            return Map.of();
+        }
+        Set<String> requested = new HashSet<>(platformItemIds);
+        Map<String, Map<String, Long>> out = new HashMap<>();
+        if (STATISTICS.values().stream().anyMatch(metrics::contains)) {
+            Map<String, Object> document = parse(send("GET", endpoint(VIDEOS_ENDPOINT,
+                    "part", "statistics", "id", String.join(",", platformItemIds)), null, accessToken,
+                    "the statistics read"));
+            for (Map<?, ?> video : objects(document.get("items"))) {
+                String id = text(video, "id");
+                if (!requested.contains(id)) {
+                    continue;
+                }
+                Map<String, Long> values = out.computeIfAbsent(id, key -> new HashMap<>());
+                Map<?, ?> statistics = mapOf(video.get("statistics"));
+                for (Map.Entry<String, String> field : STATISTICS.entrySet()) {
+                    Long value = longOf(statistics.get(field.getKey()));
+                    if (value != null && metrics.contains(field.getValue())) {
+                        values.put(field.getValue(), value);
+                    }
+                }
+            }
+        }
+        List<String> analytics = ANALYTICS.entrySet().stream().filter(field -> metrics.contains(field.getValue()))
+                .map(Map.Entry::getKey).sorted().toList();
+        if (!analytics.isEmpty()) {
+            String today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC).toString();
+            Map<String, Object> report = parse(send("GET", endpoint(ANALYTICS_ENDPOINT,
+                    "ids", "channel==MINE", "startDate", ANALYTICS_START_DATE, "endDate", today,
+                    "dimensions", "video", "metrics", String.join(",", analytics),
+                    "filters", "video==" + String.join(",", platformItemIds)), null, accessToken,
+                    "the analytics read"));
+            List<String> columns = objects(report.get("columnHeaders")).stream().map(header -> text(header, "name"))
+                    .toList();
+            int videoColumn = columns.indexOf("video");
+            if (report.get("rows") instanceof List<?> rows && videoColumn >= 0) {
+                for (Object rowValue : rows) {
+                    if (rowValue instanceof List<?> row && videoColumn < row.size()
+                            && row.get(videoColumn) instanceof String id && requested.contains(id)) {
+                        Map<String, Long> values = out.computeIfAbsent(id, key -> new HashMap<>());
+                        for (Map.Entry<String, String> field : ANALYTICS.entrySet()) {
+                            int column = columns.indexOf(field.getKey());
+                            if (metrics.contains(field.getValue()) && column >= 0 && column < row.size()
+                                    && row.get(column) instanceof Number number) {
+                                values.put(field.getValue(), toMetric(field.getValue(), number));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     // ------------------------------------------------------------ helpers
@@ -238,7 +392,8 @@ public final class YouTubeAdapter implements PlatformAdapter {
             return new PlatformException(PlatformException.Kind.RATE_LIMITED,
                     "YouTube is rate limiting " + what + ".", retryAfter(reply));
         }
-        if (reply.status() == 400 || reply.status() == 401) {
+        if (reply.status() == 400 || reply.status() == 401
+                || (reply.status() == 403 && body.contains("insufficientPermissions"))) {
             return new PlatformException(PlatformException.Kind.REJECTED,
                     "YouTube rejected " + what + ".", null);
         }
@@ -279,6 +434,128 @@ public final class YouTubeAdapter implements PlatformAdapter {
             throw new PlatformException(PlatformException.Kind.UNAVAILABLE,
                     "YouTube answered with a body that is not JSON.", null);
         }
+    }
+
+    /** The uploads playlist of the channel of the token, or null when the account has no channel. Quota: 1 unit. */
+    private String uploadsPlaylistId(String accessToken) {
+        Map<String, Object> document = parse(send("GET", endpoint(CHANNELS_ENDPOINT,
+                "part", "contentDetails", "mine", "true"), null, accessToken, "the channel lookup"));
+        for (Map<?, ?> channel : objects(document.get("items"))) {
+            String uploads = text(mapOf(mapOf(channel.get("contentDetails")).get("relatedPlaylists")), "uploads");
+            if (!uploads.isBlank()) {
+                return uploads;
+            }
+        }
+        return null;
+    }
+
+    /** The durations of the given videos, in batches of the platform limit. Quota: 1 unit per batch. */
+    private Map<String, String> durationsOf(String accessToken, List<String> videoIds) {
+        Map<String, String> durations = new HashMap<>();
+        for (int from = 0; from < videoIds.size(); from += YOUTUBE_BATCH_SIZE) {
+            List<String> batch = videoIds.subList(from, Math.min(videoIds.size(), from + YOUTUBE_BATCH_SIZE));
+            Map<String, Object> document = parse(send("GET", endpoint(VIDEOS_ENDPOINT,
+                    "part", "contentDetails", "id", String.join(",", batch)), null, accessToken, "the video details"));
+            for (Map<?, ?> video : objects(document.get("items"))) {
+                String id = text(video, "id");
+                if (!id.isBlank()) {
+                    durations.put(id, text(mapOf(video.get("contentDetails")), "duration"));
+                }
+            }
+        }
+        return durations;
+    }
+
+    /** One upload of the channel: a public or unlisted video with its title, description and publish time. */
+    private record Entry(String videoId, String title, String description, Instant publishedAt) {
+    }
+
+    /** The upload as an entry, or null for a private video or an item without an identifier or a publish time. */
+    private static Entry entryOf(Map<?, ?> item) {
+        String privacy = text(mapOf(item.get("status")), "privacyStatus");
+        if (!"public".equals(privacy) && !"unlisted".equals(privacy)) {
+            return null;
+        }
+        Map<?, ?> details = mapOf(item.get("contentDetails"));
+        Map<?, ?> snippet = mapOf(item.get("snippet"));
+        String videoId = text(details, "videoId");
+        String when = text(details, "videoPublishedAt");
+        Instant publishedAt = instantOf(when.isBlank() ? text(snippet, "publishedAt") : when);
+        if (videoId.isBlank() || publishedAt == null) {
+            return null;
+        }
+        return new Entry(videoId, text(snippet, "title"), text(snippet, "description"), publishedAt);
+    }
+
+    private static Long longOf(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException notNumber) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /** Analytics values as stored: percentages and counts rounded to whole numbers, watch time from minutes to seconds. */
+    private static long toMetric(String metric, Number value) {
+        if (Metrics.WATCH_TIME.equals(metric)) {
+            return Math.round(value.doubleValue() * 60.0);
+        }
+        return Math.round(value.doubleValue());
+    }
+
+    private static Instant instantOf(String text) {
+        if (text.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(text);
+        } catch (DateTimeParseException notInstant) {
+            return null;
+        }
+    }
+
+    private static String endpoint(String base, String... pairs) {
+        StringBuilder query = new StringBuilder();
+        for (int i = 0; i < pairs.length; i += 2) {
+            if (pairs[i + 1] == null) {
+                continue;
+            }
+            query.append(query.isEmpty() ? '?' : '&')
+                    .append(URLEncoder.encode(pairs[i], StandardCharsets.UTF_8)).append('=')
+                    .append(URLEncoder.encode(pairs[i + 1], StandardCharsets.UTF_8));
+        }
+        return base + query;
+    }
+
+    private static Map<?, ?> mapOf(Object value) {
+        return value instanceof Map<?, ?> map ? map : Map.of();
+    }
+
+    private static String text(Map<?, ?> map, String key) {
+        return map.get(key) instanceof String value ? value : "";
+    }
+
+    private static List<Map<?, ?>> objects(Object value) {
+        List<Map<?, ?>> out = new ArrayList<>();
+        if (value instanceof List<?> list) {
+            for (Object element : list) {
+                if (element instanceof Map<?, ?> map) {
+                    out.add(map);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static String nextPageToken(Map<?, ?> page) {
+        String token = text(page, "nextPageToken");
+        return token.isBlank() ? null : token;
     }
 
     private static String form(String... pairs) {

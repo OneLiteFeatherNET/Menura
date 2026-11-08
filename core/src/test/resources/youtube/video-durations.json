@@ -1,0 +1,5 @@
+{"items":[
+ {"id":"vid-long","contentDetails":{"duration":"PT15M33S"}},
+ {"id":"vid-short","contentDetails":{"duration":"PT45S"}},
+ {"id":"vid-old","contentDetails":{"duration":"PT2M"}}
+]}

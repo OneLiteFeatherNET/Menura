@@ -1,0 +1,5 @@
+{"nextPageToken":"PAGE2","items":[
+ {"contentDetails":{"videoId":"vid-long","videoPublishedAt":"2026-10-01T12:00:00Z"},"snippet":{"title":"Long video","description":"Part of #series-one","publishedAt":"2026-10-01T12:05:00Z"},"status":{"privacyStatus":"public"}},
+ {"contentDetails":{"videoId":"vid-short","videoPublishedAt":"2026-10-03T08:00:00Z"},"snippet":{"title":"Short clip","description":"","publishedAt":"2026-10-03T08:01:00Z"},"status":{"privacyStatus":"unlisted"}},
+ {"contentDetails":{"videoId":"vid-private","videoPublishedAt":"2026-10-04T08:00:00Z"},"snippet":{"title":"Draft","description":"","publishedAt":"2026-10-04T08:00:00Z"},"status":{"privacyStatus":"private"}}
+]}
