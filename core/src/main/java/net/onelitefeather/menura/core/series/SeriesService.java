@@ -7,6 +7,7 @@ import net.onelitefeather.menura.core.channel.ChannelStore;
 import net.onelitefeather.menura.core.channel.PlatformAdapter.PublishedItem;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
 import net.onelitefeather.menura.core.post.ExternalPost;
+import net.onelitefeather.menura.core.post.ExternalPostFormat;
 import net.onelitefeather.menura.core.post.ExternalPostListener;
 import net.onelitefeather.menura.core.post.ExternalPostStore;
 import net.onelitefeather.menura.core.problem.ProblemException;
@@ -51,9 +52,6 @@ public final class SeriesService implements ExternalPostListener {
 
     /** A week below this share of covered shorts is flagged. */
     public static final int COVERAGE_PERCENT = 90;
-
-    /** The format value that platform adapters report for a short. */
-    public static final String SHORT_FORMAT = "short";
 
     /** The warning code shown while no active series targets players. */
     public static final String NO_PLAYERS_SERIES = "no_players_series";
@@ -217,7 +215,7 @@ public final class SeriesService implements ExternalPostListener {
         for (Channel channel : channels.listChannels(connection, null, MAX_CHANNELS)) {
             Map<LocalDate, int[]> counts = new HashMap<>();
             for (ExternalPost post : posts.listForChannel(connection, channel.id())) {
-                if (post.removed() || !SHORT_FORMAT.equals(post.format()) || post.publishedAt().isAfter(now)) {
+                if (post.removed() || !ExternalPostFormat.SHORT.equals(post.format()) || post.publishedAt().isAfter(now)) {
                     continue;
                 }
                 LocalDate week = weekStart(post.publishedAt());

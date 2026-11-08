@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.series;
 
+import net.onelitefeather.menura.core.post.ExternalPostFormat;
 import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.series.SeriesService.AssignmentCommand;
 import net.onelitefeather.menura.core.series.SeriesReports.Episode;
@@ -74,7 +75,7 @@ class EpisodeNumberTest {
         SeriesFixture world = new SeriesFixture();
         ContentSeries series = world.service.create(null, SeriesFixture.draft("Serie", "#serie"));
         UUID channel = world.channel("UC1");
-        ExternalPost post = SeriesFixture.post(channel, "v1", "short", SeriesFixture.NOW);
+        ExternalPost post = SeriesFixture.post(channel, "v1", ExternalPostFormat.SHORT, SeriesFixture.NOW);
         world.posts.insert(null, post);
         world.service.assign(null, post.id(), new AssignmentCommand(null, true, false), EDITOR);
 
@@ -86,7 +87,7 @@ class EpisodeNumberTest {
     }
 
     private static ExternalPost assignNew(SeriesFixture world, UUID channel, String itemId, UUID series) throws SQLException {
-        ExternalPost post = SeriesFixture.post(channel, itemId, "short", SeriesFixture.NOW.minus(Duration.ofDays(1)));
+        ExternalPost post = SeriesFixture.post(channel, itemId, ExternalPostFormat.SHORT, SeriesFixture.NOW.minus(Duration.ofDays(1)));
         world.posts.insert(null, post);
         world.service.assign(null, post.id(), new AssignmentCommand(series, false, false), EDITOR);
         return post;

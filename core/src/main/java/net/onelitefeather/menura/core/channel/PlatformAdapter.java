@@ -124,6 +124,10 @@ public interface PlatformAdapter {
     /**
      * One item the platform lists for a channel. The description is the text the platform shows under the item; it is
      * empty when the platform does not report one. Series assignment reads the hashtags in it.
+     *
+     * <p>The format is one of the values of {@code ExternalPostFormat}: an adapter reports {@code short} for every
+     * vertical short of the channel and {@code video} for everything else, so that the series coverage counts the shorts
+     * on every platform the same way. Another value is kept as it is and never counted as a short.
      */
     record PublishedItem(String platformItemId, String url, String title, Instant publishedAt, String format,
                          String description) {

@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.series;
 
+import net.onelitefeather.menura.core.post.ExternalPostFormat;
 import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.series.SeriesReports.Overview;
 import net.onelitefeather.menura.core.series.SeriesReports.WeekCoverage;
@@ -55,7 +56,7 @@ class CoverageTest {
         UUID channel = world.channel("UC1");
         publishShorts(world, channel, 10, 10);
         for (int i = 0; i < 2; i++) {
-            ExternalPost draft = SeriesFixture.post(channel, "draft" + i, "short",
+            ExternalPost draft = SeriesFixture.post(channel, "draft" + i, ExternalPostFormat.SHORT,
                     SeriesFixture.NOW.plus(Duration.ofDays(1)));
             world.posts.insert(null, draft);
             world.service.assign(null, draft.id(), new AssignmentCommand(null, true, false), EDITOR);
@@ -65,6 +66,17 @@ class CoverageTest {
 
         assertEquals(10, week.shorts(), "posts that are not published yet are not counted");
         assertEquals(100, week.percent(), "the covered share is measured over the published shorts only");
+    }
+
+    @Test
+    void aPostOfAnotherFormatIsNotCountedAsAShort() throws SQLException {
+        SeriesFixture world = new SeriesFixture();
+        UUID channel = world.channel("UC1");
+        world.posts.insert(null, SeriesFixture.post(channel, "stream", ExternalPostFormat.VIDEO, SeriesFixture.NOW));
+
+        WeekCoverage week = currentWeek(world, channel);
+
+        assertEquals(0, week.shorts(), "a video is not a short and does not enter the coverage");
     }
 
     @Test
@@ -125,7 +137,7 @@ class CoverageTest {
 
     private static void publishShorts(SeriesFixture world, UUID channel, int total, int covered) throws SQLException {
         for (int i = 0; i < total; i++) {
-            ExternalPost post = SeriesFixture.post(channel, "short" + i, "short", SeriesFixture.NOW);
+            ExternalPost post = SeriesFixture.post(channel, ExternalPostFormat.SHORT + i, ExternalPostFormat.SHORT, SeriesFixture.NOW);
             world.posts.insert(null, post);
             if (i < covered) {
                 world.service.assign(null, post.id(), new AssignmentCommand(null, true, false), EDITOR);

@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.series;
 
+import net.onelitefeather.menura.core.post.ExternalPostFormat;
 import net.onelitefeather.menura.core.channel.Channel;
 import net.onelitefeather.menura.core.channel.ConnectionState;
 import net.onelitefeather.menura.core.channel.JdbcChannelStore;
@@ -189,7 +190,7 @@ class JdbcSeriesStoreIntegrationTest {
         }
 
         UUID insertPost(UUID channel, String item) throws SQLException {
-            ExternalPost post = SeriesFixture.post(channel, item, "short", T0);
+            ExternalPost post = SeriesFixture.post(channel, item, ExternalPostFormat.SHORT, T0);
             transactions.inTransaction(c -> {
                 posts.insert(c, post);
                 return null;

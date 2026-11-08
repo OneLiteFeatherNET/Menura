@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.series;
 
+import net.onelitefeather.menura.core.post.ExternalPostFormat;
 import net.onelitefeather.menura.core.channel.PlatformAdapter.PublishedItem;
 import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.problem.ProblemException;
@@ -184,12 +185,12 @@ class AssignmentTest {
     }
 
     private static ExternalPost post(UUID channel, String itemId) {
-        return SeriesFixture.post(channel, itemId, "short", SeriesFixture.NOW.minus(Duration.ofDays(1)));
+        return SeriesFixture.post(channel, itemId, ExternalPostFormat.SHORT, SeriesFixture.NOW.minus(Duration.ofDays(1)));
     }
 
     private static PublishedItem listed(String itemId, String description) {
         return new PublishedItem(itemId, "https://video.example.test/" + itemId, "Title " + itemId,
-                SeriesFixture.NOW.minus(Duration.ofDays(1)), "short", description);
+                SeriesFixture.NOW.minus(Duration.ofDays(1)), ExternalPostFormat.SHORT, description);
     }
 
     private static SeriesDraft withActive(SeriesDraft d, boolean active) {

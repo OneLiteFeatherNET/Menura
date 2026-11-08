@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.series;
 
+import net.onelitefeather.menura.core.post.ExternalPostFormat;
 import net.onelitefeather.menura.core.channel.ChannelGrant;
 import net.onelitefeather.menura.core.channel.ConnectionService;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
@@ -80,7 +81,7 @@ class PlaylistCheckTest {
                     SeriesFixture.NOW.plus(Duration.ofDays(365)), SeriesFixture.NOW));
             ContentSeries series = world.service.create(null,
                     SeriesFixture.draftWithPlaylist("Serie", "#serie", channel, "PL1"));
-            ExternalPost stored = SeriesFixture.post(channel, itemId, "short", SeriesFixture.NOW.minus(age));
+            ExternalPost stored = SeriesFixture.post(channel, itemId, ExternalPostFormat.SHORT, SeriesFixture.NOW.minus(age));
             world.posts.insert(null, stored);
             world.service.assign(null, stored.id(), new AssignmentCommand(series.id(), false, false), EDITOR);
             this.post = stored.id();
