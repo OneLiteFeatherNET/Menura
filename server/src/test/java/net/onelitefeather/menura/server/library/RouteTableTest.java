@@ -53,7 +53,17 @@ class RouteTableTest {
             "POST /channels/connections",
             "POST /channels/{id}/consent",
             "DELETE /channels/{id}",
-            "GET /channel-connections/callback");
+            "GET /channel-connections/callback",
+            "GET /brand-kit",
+            "GET /brand-kit/versions/{version}",
+            "POST /brand-kit/versions",
+            "GET /brand-kit/render-bundle",
+            "GET /brand-kit/css",
+            "GET /brand-kit/templates/{format}",
+            "GET /brand-kit/texts/{language}",
+            "GET /brand-kit/pins/{consumer}",
+            "PUT /brand-kit/pins/{consumer}",
+            "DELETE /brand-kit/pins/{consumer}");
 
     private static final Set<Class<?>> BINARY_BODIES = Set.of(byte[].class, InputStream.class, ByteBuffer.class,
             StreamingFileUpload.class, CompletedFileUpload.class);
