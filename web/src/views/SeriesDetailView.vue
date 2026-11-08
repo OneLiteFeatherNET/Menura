@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, inject, onMounted } from 'vue';
 import { api } from '../api/client';
+import type { Session } from '../api/types';
+import { canEditSeries, SESSION_KEY } from '../auth/session';
 import FirstJoins from '../components/FirstJoins.vue';
 import LoadState from '../components/LoadState.vue';
 import ViewPercent from '../components/ViewPercent.vue';
@@ -12,10 +14,14 @@ import {
   formatPublished,
   weekdayLabel,
 } from '../domain/format';
+import SeriesPlanForm from '../features/calendar/SeriesPlanForm.vue';
 
 const props = defineProps<{
   id: string;
 }>();
+
+const session = inject(SESSION_KEY, computed<Session | null>(() => null));
+const canEdit = computed(() => session.value !== null && canEditSeries(session.value.roles));
 
 const { data, error, loading, run } = useAsync(async () => {
   const [series, posts, channels] = await Promise.all([
@@ -62,6 +68,10 @@ function channelName(channelId: string): string {
           </div>
           <span class="chip">{{ formatCount(data.series.episodes) }} Episoden vergeben</span>
         </header>
+
+        <section v-if="canEdit" class="section">
+          <SeriesPlanForm :series-id="data.series.id" />
+        </section>
 
         <section class="section">
           <h3 class="section-title">Posts dieser Serie</h3>
