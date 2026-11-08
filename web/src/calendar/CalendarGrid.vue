@@ -18,10 +18,6 @@ const WEEKDAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
 const byDay = computed(() => groupByDay(props.items));
 
-function entryLabel(item: CalendarItem): string {
-  return `${item.localTime} ${item.title}, ${STATUS_LABELS[item.status]}`;
-}
-
 function dayItems(day: string | null): CalendarItem[] {
   return day ? (byDay.value.get(day) ?? []) : [];
 }
@@ -54,7 +50,6 @@ function dayNumber(day: string): number {
             type="button"
             class="calendar-grid__entry"
             :class="{ 'calendar-grid__entry--selected': item.id === selectedId }"
-            :aria-label="entryLabel(item)"
             :aria-pressed="item.id === selectedId ? 'true' : 'false'"
             @click="emit('select', item.id)"
           >

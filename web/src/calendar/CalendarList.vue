@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { CalendarItem } from '../api/posts';
 import { STATUS_LABELS, type DayGroup } from './model';
 
 // The list view: the days that hold posts, each with its posts in local time order. A phone shows it as the calendar.
@@ -10,9 +9,6 @@ defineProps<{
 
 const emit = defineEmits<{ select: [id: string] }>();
 
-function entryLabel(item: CalendarItem): string {
-  return `${item.localTime} ${item.title}, ${STATUS_LABELS[item.status]}`;
-}
 </script>
 
 <template>
@@ -26,7 +22,6 @@ function entryLabel(item: CalendarItem): string {
             type="button"
             class="calendar-list__entry"
             :class="{ 'calendar-list__entry--selected': item.id === selectedId }"
-            :aria-label="entryLabel(item)"
             :aria-pressed="item.id === selectedId ? 'true' : 'false'"
             @click="emit('select', item.id)"
           >

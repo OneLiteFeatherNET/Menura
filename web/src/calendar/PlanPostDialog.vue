@@ -22,15 +22,19 @@ const props = withDefaults(
 
 const emit = defineEmits<{ close: []; submit: [plan: PlanSubmit] }>();
 
-const form = ref<PlanForm>({ ...EMPTY_PLAN_FORM });
+// Each opening starts from an empty form, with the asset chosen when there is only one.
+function freshForm(): PlanForm {
+  return { ...EMPTY_PLAN_FORM, assetId: props.assets.length === 1 ? (props.assets[0]?.value ?? '') : '' };
+}
+
+const form = ref<PlanForm>(freshForm());
 const formError = ref<string | undefined>(undefined);
 
-// Each opening starts from an empty form, with the first asset chosen when there is only one.
 watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    form.value = { ...EMPTY_PLAN_FORM, assetId: props.assets.length === 1 ? (props.assets[0]?.value ?? '') : '' };
+    form.value = freshForm();
     formError.value = undefined;
   },
 );
