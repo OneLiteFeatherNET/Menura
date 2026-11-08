@@ -12,7 +12,7 @@ YouTube channels are connected through `add-channel-connections`, which defines 
 - The consent for this feature asks for read access only.
 
 **Non-Goals:**
-- No upload, edit, delete, playlist, thumbnail or scheduling calls (phase 2, `add-youtube-integration`).
+- No upload, edit, delete, playlist, thumbnail or scheduling calls (phase 1, `add-youtube-integration`).
 - No download of video files, no copy of media into Menura's storage.
 - No scraping of YouTube Studio or public pages, and no third-party analytics service (principle 13).
 - No live stream control and no comment moderation.
@@ -40,7 +40,7 @@ Read-side facts copied from `openspec/changes/add-youtube-integration/design.md`
 
 ## Risks / Trade-offs
 
-- [Risk] The quota of reads competes with uploads in phase 2 on the same project. → Mitigation: reads are counted in the connection's quota state shown by `add-channel-connections`; the re-sync interval is configurable.
+- [Risk] The quota of reads competes with uploads in phase 1 on the same project. → Mitigation: reads are counted in the connection's quota state shown by `add-channel-connections`; the re-sync interval is configurable.
 - [Risk] The Shorts rule differs from the assumption. → Mitigation: format is set from the verified rule, and the test in task 2.1 fails if the classification changes.
 - [Risk] Analytics figures arrive late. → Mitigation: late figures are recorded as unavailable and collected again on later runs, as in `add-content-analytics`.
 - [Trade-off] Two read APIs mean two sets of permissions to verify. Accepted: each is read-only, and watch time cannot be had otherwise.
