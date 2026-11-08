@@ -5,6 +5,7 @@ import { API, expect, signInAs, test } from './fixtures';
 test('an editor opens the pool, filters it by tag and resets the filter', async ({ page }) => {
   await signInAs(page, 'editor');
   await expect(page.getByTestId('session-role')).toBeVisible();
+  await page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Pool', exact: true }).click();
 
   await expect(page.getByRole('table', { name: 'Content-Pool' })).toBeVisible();
   await expect(page.getByText('Keine Einträge gefunden.')).toBeVisible();
@@ -22,6 +23,7 @@ test('an editor opens the pool, filters it by tag and resets the filter', async 
 
 test('a viewer reads the same pool without any editing control', async ({ page }) => {
   await signInAs(page, 'viewer');
+  await page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Pool', exact: true }).click();
 
   await expect(page.getByRole('table', { name: 'Content-Pool' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Entfernen' })).toHaveCount(0);

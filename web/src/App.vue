@@ -1,15 +1,30 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { RouterView, useRoute, useRouter } from 'vue-router';
 import { fetchSession, roleLabel, signInUrl, signOut, type SessionInfo } from './auth/session';
 import LoadState from './components/ui/LoadState.vue';
-import BrandKitPage from './brand/BrandKitPage.vue';
-import PoolPage from './library/PoolPage.vue';
+import NavRail from './components/ui/NavRail.vue';
 import ChannelsPage from './features/channels/ChannelsPage.vue';
+import { canOpen, findArea, normalizePath, visibleAreas } from './navigation/areas';
+import OverviewPage from './navigation/OverviewPage.vue';
 
-// The shell shows who is signed in and with which role. The navigation lists the features a signed-in person can open.
+// The shell shows who is signed in and with which role. The navigation lists the areas that role may open; the
+// areas themselves are routed in router.ts.
+const router = useRouter();
+const route = useRoute();
 const status = ref<'loading' | 'error' | 'ready'>('loading');
 const session = ref<SessionInfo | null>(null);
-const onChannelsPage = computed(() => window.location.pathname.replace(/\/+$/, '') === '/channels');
+
+const roles = computed(() => session.value?.roles ?? []);
+const railItems = computed(() => visibleAreas(roles.value));
+const currentPath = computed(() => normalizePath(route.path));
+// An area that exists but is not open to this role is not shown; a direct link to it gets a notice instead.
+const blocked = computed(() => {
+  const area = findArea(route.path);
+  return area !== undefined && !canOpen(area, roles.value);
+});
+// The start page lists the areas that can be opened from it, that is every area but itself.
+const overviewAreas = computed(() => railItems.value.filter((area) => area.path !== '/'));
 
 async function load() {
   status.value = 'loading';
@@ -24,6 +39,10 @@ async function load() {
 async function endSession() {
   await signOut();
   session.value = null;
+}
+
+function navigate(path: string) {
+  void router.push(path);
 }
 
 onMounted(load);
@@ -44,19 +63,23 @@ onMounted(load);
       </div>
     </header>
     <md-divider></md-divider>
-    <nav v-if="session" class="nav" aria-label="Hauptnavigation">
-      <a class="nav__link" href="/channels" :aria-current="onChannelsPage ? 'page' : undefined">Kanäle</a>
-    </nav>
-    <main class="content">
-      <ChannelsPage v-if="session && onChannelsPage" :roles="session.roles" />
-      <template v-else-if="session">
-        <BrandKitPage />
-        <PoolPage />
-      </template>
-      <p v-else-if="!session && status === 'ready' && onChannelsPage" class="content__hint">
-        Melden Sie sich an, um die Kanäle zu verwalten.
-      </p>
-    </main>
+    <div class="body">
+      <NavRail v-if="session" :items="railItems" :active-path="currentPath" @navigate="navigate" />
+      <main class="content">
+        <p v-if="!session && status === 'ready'" class="content__hint">
+          Melden Sie sich an, um Menura zu nutzen.
+        </p>
+        <p v-else-if="session && blocked" class="content__hint">
+          Für diesen Bereich hat Ihre Rolle keinen Zugriff.
+        </p>
+        <RouterView v-else-if="session" v-slot="{ Component }">
+          <!-- The pages that show per-role content take the roles as a prop; every other page is mounted as it is. -->
+          <OverviewPage v-if="Component.type === OverviewPage" :roles="session.roles" :areas="overviewAreas" />
+          <ChannelsPage v-else-if="Component.type === ChannelsPage" :roles="session.roles" />
+          <component :is="Component" v-else />
+        </RouterView>
+      </main>
+    </div>
   </div>
 </template>
 
@@ -109,36 +132,15 @@ onMounted(load);
   cursor: pointer;
 }
 
-.nav {
+.body {
+  flex: 1;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 16px;
-}
-
-.nav__link {
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 16px;
-  border-radius: 999px;
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: 14px;
-  text-decoration: none;
-}
-
-.nav__link[aria-current='page'] {
-  background: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
-}
-
-.nav__link:focus-visible {
-  outline: 2px solid var(--md-sys-color-primary);
-  outline-offset: 2px;
+  min-height: 0;
 }
 
 .content {
   flex: 1;
+  min-width: 0;
   padding: 16px;
 }
 

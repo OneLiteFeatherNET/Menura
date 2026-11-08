@@ -6,7 +6,7 @@ test('an administrator sees the platforms and an empty channel list, and records
   await signInAs(page, 'admin');
   await expect(page.getByTestId('session-role')).toHaveText('Administration');
 
-  await page.getByRole('link', { name: 'Kanäle' }).click();
+  await page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Kanäle', exact: true }).click();
 
   await expect(page).toHaveURL(`${APP}channels`);
   await expect(page.getByRole('heading', { level: 1, name: 'Kanäle' })).toBeVisible();
