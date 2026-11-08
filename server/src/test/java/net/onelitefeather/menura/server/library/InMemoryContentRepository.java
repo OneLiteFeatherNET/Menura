@@ -32,6 +32,7 @@ public final class InMemoryContentRepository implements ContentRepository {
     private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
 
     private final Map<UUID, RawItem> rawItems = new LinkedHashMap<>();
+    private final Set<UUID> knownPersons = new HashSet<>();
     private final Map<UUID, ClipRecord> clips = new LinkedHashMap<>();
     private final Map<UUID, ItemTags> tags = new HashMap<>();
     private final Map<UUID, RegisteredAsset> registrations = new LinkedHashMap<>();
@@ -49,6 +50,23 @@ public final class InMemoryContentRepository implements ContentRepository {
 
     public void addRawItem(RawItem raw) {
         rawItems.put(raw.id(), raw);
+    }
+
+    /** Registers a person so that person tags may name them; an unknown person is refused. */
+    public void addPerson(UUID person) {
+        knownPersons.add(person);
+    }
+
+    @Override
+    public Set<UUID> existingPersons(Connection connection, Collection<UUID> persons) {
+        return persons.stream().filter(knownPersons::contains).collect(java.util.stream.Collectors.toSet());
+    }
+
+    @Override
+    public void setRawMediaState(Connection connection, UUID rawItem, String state) {
+        RawItem raw = rawItems.get(rawItem);
+        rawItems.put(rawItem, new RawItem(raw.id(), raw.uploaderId(), raw.title(), raw.streamDate(), raw.durationSeconds(),
+                raw.createdAt(), raw.storageKey(), state));
     }
 
     /** The format of the transcript last stored for a raw item, or null when it has none. */

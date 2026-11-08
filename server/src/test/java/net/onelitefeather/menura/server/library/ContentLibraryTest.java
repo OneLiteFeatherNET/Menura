@@ -108,6 +108,20 @@ class ContentLibraryTest {
     }
 
     @Test
+    void unknownPersonTagIsRefusedNamingThePersonTagsField() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);
+        UUID unknown = UUID.fromString("9d0e1f2a-3b4c-4d5e-8f60-718293a4b5c6");
+
+        ProblemException refused = assertThrows(ProblemException.class, () -> f.library.setTags(LibraryFixture.editor(),
+                raw, Set.of(), Set.of(unknown), "req-tags"));
+
+        assertEquals(400, refused.status(), "a person that does not exist is a validation error, not a database error");
+        assertTrue(refused.detail().contains("personTags"), "the problem names the field: " + refused.detail());
+        assertTrue(f.content.tagsOf(null, List.of(raw)).get(raw).personTags().isEmpty(), "no tag is stored");
+    }
+
+    @Test
     void viewerCannotChangeTags() throws Exception {
         ContentFixture f = new ContentFixture();
         UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);

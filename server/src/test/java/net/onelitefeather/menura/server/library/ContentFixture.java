@@ -27,9 +27,15 @@ final class ContentFixture {
             base.auditLog);
 
     /** A raw item of the given duration, uploaded by the person, recorded on the given stream date. */
+    ContentFixture() {
+        content.addPerson(PERSON_A);
+        content.addPerson(PERSON_B);
+    }
+
     UUID rawItem(UUID uploader, String title, LocalDate streamDate, int durationSeconds) {
         UUID id = base.identifiers.next();
-        content.addRawItem(new RawItem(id, uploader, title, streamDate, durationSeconds, base.clock.instant()));
+        content.addRawItem(new RawItem(id, uploader, title, streamDate, durationSeconds, base.clock.instant(),
+                "objects/" + id, "available"));
         return id;
     }
 
