@@ -2,11 +2,11 @@
 
 ## Context
 
-Editors hold finished videos and images on their own machines. Distribution (`add-content-distribution`, phase 2) can only schedule assets that the hub stores, so this change puts finished assets into the private Menura bucket on the OLF Ceph object storage (principle 1), from the web app, without a desktop app (principle 2 is respected: no media work runs in the cluster). See proposal.md - Why for motivation.
+Editors hold finished videos and images on their own machines. Distribution (`add-content-distribution`, phase 1) can only schedule assets that the hub stores, so this change puts finished assets into the private Menura bucket on the OLF Ceph object storage (principle 1), from the web app, without a desktop app (principle 2 is respected: no media work runs in the cluster). See proposal.md - Why for motivation.
 
 Constraints from the project context: principle 1 (media in private Ceph buckets through the S3 API, presigned multipart uploads, the server never proxies bytes, metadata in PostgreSQL), principle 2 (the cluster runs no ffmpeg and no GPU work), principle 4 (nothing is published here), principle 6 (the browser holds only a session cookie, never a storage credential), principle 11 (secrets and links not logged, 404 for hidden objects, 429 with Retry-After), principle 15 (request bodies below 100 MB through the Cloudflare proxy, so parts are at most 95 MB).
 
-Phase note: `add-content-library` (phase 4) later extends the asset records with lineage edges to timelines, clips and recordings. This change defines the record and the upload path those edges attach to; it does not model lineage, so the later change adds fields and edges without changing the upload contract.
+Phase note: `add-content-library` (phase 1) later extends the asset records with lineage edges to timelines, clips and recordings. This change defines the record and the upload path those edges attach to; it does not model lineage, so the later change adds fields and edges without changing the upload contract.
 
 ## Goals / Non-Goals
 
@@ -17,7 +17,7 @@ Phase note: `add-content-library` (phase 4) later extends the asset records with
 
 **Non-Goals:**
 - No lineage (`add-content-library`), no transcoding, thumbnailing by ffmpeg or any probing of media on the server (principle 2).
-- No recording upload and no session model for recordings (`add-recording-ingest`).
+- No automatic ingest of OBS recordings and no session model for OBS sessions (`add-recording-ingest`, where that change is available).
 - No public links; no CDN delivery of assets (the Cloudflare terms check in principle 15 applies before any large video is served through the proxy).
 
 ## Decisions
@@ -25,6 +25,9 @@ Phase note: `add-content-library` (phase 4) later extends the asset records with
 **Presigned multipart upload from the browser.** The server creates the multipart upload in the bucket, issues one presigned URL per part with a short lifetime, and the browser sends each part straight to the storage endpoint. Parts are at most 95 MB, which keeps every request below the Cloudflare body limit of 100 MB; the storage endpoint is reached on its own public host (`s3.onelitefeather.net`, principle 14), so the request never crosses the API host.
 - Rejected: a single PUT of the whole file. A 10 GB upload would fail on the first lost connection and would be sent through the request-body limit.
 - Rejected: a server endpoint that receives parts and forwards them. It is forbidden by principle 1 and makes the server the bottleneck for all video traffic.
+
+**Raw material on the same path.** Stream recordings the editor uploads from the web app use the same session, part, resume and checksum rules as finished assets. The only differences are the kind (raw material, carrying the stream title and date) and the size limit, which is configurable and defaults to 50 GB. The verified upload is registered by `add-content-library` as a raw pool item owned by the uploader.
+- Rejected: a second upload path for recordings. It would duplicate the resume, checksum and part-size rules, and the two copies would drift apart.
 
 **Resume by confirmed parts, not by byte offsets.** The session records which parts the storage has confirmed (its part list). After an interruption the browser asks for the session and uploads only missing parts. A reload leads to the same session, because the session is found by its identifier, which the browser keeps in local storage as a convenience only.
 - Rejected: restarting after an interruption. For multi-gigabyte files it wastes the bandwidth the editor already spent.

@@ -25,6 +25,33 @@ Lets editors put finished videos and images into the hub's private object storag
 - **WHEN** its endpoints are listed
 - **THEN** no endpoint accepts media bytes as its request body
 
+### Requirement: Presigned multipart upload of raw material
+
+(Must) The system SHALL let an editor upload a raw stream recording from the web application through the same presigned multipart upload, with parts of at most 95 MB, and SHALL record each verified upload as raw material with the stream title and date given by the editor.
+
+#### Scenario: Raw recording upload targets issued
+- **GIVEN** an editor who starts the upload of a 40 GB stream recording with its stream title and date
+- **WHEN** the editor's client requests the upload
+- **THEN** the system creates an upload session in state uploading, returns presigned URLs for each part, none larger than 95 MB, and records the upload as raw material with that title and date
+
+### Requirement: Raw material size limit
+
+(Must) The system SHALL refuse a raw recording larger than the configured raw material size limit, which defaults to 50 GB.
+
+#### Scenario: Raw recording above the size limit refused
+- **GIVEN** a raw recording of 60 GB and the configured raw material size limit of 50 GB
+- **WHEN** the editor's client requests the upload
+- **THEN** the system refuses the request with a Problem Details response that names the limit and creates no session
+
+### Requirement: Automatic ingest stays with add-recording-ingest
+
+(Must) Where add-recording-ingest is available, recordings made by the OBS plugin SHALL be uploaded and recorded by that change, not by this one.
+
+#### Scenario: OBS recording handled by its own change
+- **GIVEN** a recording made by the OBS plugin on a streaming PC
+- **WHEN** the recording is uploaded
+- **THEN** the upload is performed and recorded by `add-recording-ingest`, and this change creates no session for it
+
 ### Requirement: Resumable upload
 
 (Must) When an upload is interrupted, the system SHALL report the parts already confirmed so that the upload continues from the first part that is not confirmed.

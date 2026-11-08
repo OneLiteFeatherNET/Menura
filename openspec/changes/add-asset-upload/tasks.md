@@ -13,6 +13,8 @@
 - [ ] 2.1 Write failing unit tests with a fake object storage that a session creates one multipart upload and presigned part URLs, that no part is larger than 95 MB (a 12 GB file yields parts of at most 95 MB), and that the session moves to uploading; verify they fail.
 - [ ] 2.2 Implement multipart creation and presigned part URL issuance against the S3 API; verify the 2.1 tests pass.
 - [ ] 2.3 Write a failing test that no route of the server accepts a request body with media bytes, by checking the route table against an allowlist; verify it fails if such a route exists, then implement the allowlist check and verify it passes.
+- [ ] 2.4 Write failing unit tests that a raw recording session is recorded as raw material with its stream title and date and uses parts of at most 95 MB, that a recording above the configured raw material limit (default 50 GB, set by environment variable) is refused with a Problem Details response and creates no session; verify they fail.
+- [ ] 2.5 Implement the raw material kind, the configurable size limit and its environment variable; verify the 2.4 tests pass.
 
 ## 3. Resume and completion
 
