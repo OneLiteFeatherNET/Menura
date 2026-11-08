@@ -132,16 +132,18 @@ class PrototypePoolControllerTest {
     @Test
     void anEditorCreatesAnUploadAndSeesItAsOwnedByThemselves() {
         String caller = "pool-create-editor";
-        AssetDetail created = client.toBlocking().retrieve(signedIn(HttpRequest.POST("/api/prototype/assets",
+        Asset created = client.toBlocking().retrieve(signedIn(HttpRequest.POST("/api/prototype/assets",
                 Map.of("kind", "raw", "title", "Upload per HTTP", "tags", List.of("ebpf"), "people", List.of(),
-                        "durationSeconds", 600)), "EDITOR", caller), AssetDetail.class);
+                        "durationSeconds", 600)), "EDITOR", caller), Asset.class);
+        AssetDetail detail = client.toBlocking().retrieve(signedIn(HttpRequest.GET("/api/prototype/assets/" + created.id()),
+                "EDITOR", caller), AssetDetail.class);
 
         List<Asset> mine = client.toBlocking().retrieve(signedIn(HttpRequest.GET("/api/prototype/assets?ownerId=me"),
                 "EDITOR", caller), Argument.listOf(Asset.class));
 
         assertTrue(mine.stream().anyMatch(asset -> asset.id().equals(created.id())), "the upload is owned by the caller");
         assertEquals(Asset.Transcript.pending, created.transcript());
-        assertTrue(created.transcriptSegments().isEmpty(), "a new upload has no transcript yet");
+        assertTrue(detail.transcriptSegments().isEmpty(), "a new upload has no transcript yet");
     }
 
     @Test
