@@ -26,6 +26,10 @@ tags:
     description: Channels of platform accounts, their connection through the platform's own consent, and their state. No response carries a token.
   - name: Platforms
     description: Platforms of this build, their capabilities and the audit status of their apps.
+  - name: Brand
+    description: >-
+      The central brand kit: versioned colours, typography, marks, texts and layout templates. Every signed-in role
+      reads it; the editor role publishes versions and sets the pins of consumers.
 paths:
   /health:
     get:
@@ -824,6 +828,300 @@ paths:
           $ref: "#/components/responses/Problem"
         "502":
           $ref: "#/components/responses/Problem"
+  /brand-kit:
+    get:
+      tags:
+        - Brand
+      operationId: getCurrentBrandKit
+      summary: The newest version of the brand kit.
+      description: |
+        Any signed-in role. The first touch of an empty installation seeds version 1 from the stream overlay theme and
+        the feather mark. Responses are never cached.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The newest version, with its whole kit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKitVersion"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /brand-kit/versions:
+    post:
+      tags:
+        - Brand
+      operationId: publishBrandKitVersion
+      summary: Publishes a draft of the brand kit as the next immutable version.
+      description: |
+        Editor only. The draft is checked before anything is stored: every colour token has a light and a dark value,
+        every text role reaches WCAG AA contrast (4.5:1) in both roles, every typography role has a font file, every
+        mark variant has a safe area, every format has one template, every template refers to tokens only and keeps
+        badge, title, captions and logo out of the top 14 % and bottom 35 % of the frame, and the short 9:16 follows
+        its own slot, timing and join-domain rules. A refusal (422) names every violation and stores nothing. The tonal
+        ramps are derived from their seeds at publication; tones sent in the draft are ignored.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandKit"
+      responses:
+        "201":
+          description: The published version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKitVersion"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /brand-kit/versions/{version}:
+    get:
+      tags:
+        - Brand
+      operationId: getBrandKitVersion
+      summary: One published version, unchanged since its publication.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/BrandKitVersionPath"
+      responses:
+        "200":
+          description: The version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKitVersion"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /brand-kit/render-bundle:
+    get:
+      tags:
+        - Brand
+      operationId: getBrandKitRenderBundle
+      summary: The JSON render bundle of a version, for external renderers.
+      description: |
+        The version named by version, else the version the consumer has pinned, else the newest one. The bundle holds
+        every colour token with its light and dark values, every typography role with its font file reference, every
+        mark with its safe area per variant, the per-language texts and hashtags, and the layout templates.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/BrandKitVersionQuery"
+        - $ref: "#/components/parameters/ConsumerQuery"
+      responses:
+        "200":
+          description: The render bundle of the resolved version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandKitVersion"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /brand-kit/css:
+    get:
+      tags:
+        - Brand
+      operationId: getBrandKitCss
+      summary: The colour tokens as CSS custom properties, light and dark.
+      description: Each token is exported as --brand-<name> with its light value, and its dark value under the dark scheme.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/BrandKitVersionQuery"
+        - $ref: "#/components/parameters/ConsumerQuery"
+      responses:
+        "200":
+          description: A style sheet of custom properties.
+          content:
+            text/css:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /brand-kit/templates/{format}:
+    get:
+      tags:
+        - Brand
+      operationId: getBrandKitTemplate
+      summary: The layout template of one format, with its declared parameters.
+      description: |
+        Formats: short-9x16 (1080 by 1920), long-16x9-intro, long-16x9-outro, thumbnail, social-post-image, end-card and
+        overlay-theme. Each template declares its parameters (title, subtitle, image, and join_domain for the short's
+        call to action); a renderer rejects an undeclared or missing parameter.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: format
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - short-9x16
+              - long-16x9-intro
+              - long-16x9-outro
+              - thumbnail
+              - social-post-image
+              - end-card
+              - overlay-theme
+        - $ref: "#/components/parameters/BrandKitVersionQuery"
+        - $ref: "#/components/parameters/ConsumerQuery"
+      responses:
+        "200":
+          description: The template.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /brand-kit/texts/{language}:
+    get:
+      tags:
+        - Brand
+      operationId: getBrandKitText
+      summary: The end-card text and hashtags of one language.
+      description: A language without an entry answers 404. No other language is substituted.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: language
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/BrandKitVersionQuery"
+        - $ref: "#/components/parameters/ConsumerQuery"
+      responses:
+        "200":
+          description: The text entry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LanguageText"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /brand-kit/pins/{consumer}:
+    parameters:
+      - $ref: "#/components/parameters/ConsumerPath"
+    get:
+      tags:
+        - Brand
+      operationId: getBrandKitPin
+      summary: The version a consumer has pinned.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The pin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KitPin"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      tags:
+        - Brand
+      operationId: setBrandKitPin
+      summary: Pins a consumer to an existing version until the pin is changed.
+      description: Editor only. A consumer with a pin keeps that version when newer versions are published.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KitPinRequest"
+      responses:
+        "200":
+          description: The pin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KitPin"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags:
+        - Brand
+      operationId: removeBrandKitPin
+      summary: Removes a pin, so that the consumer follows the newest version again.
+      description: Editor only.
+      security:
+        - sessionCookie: []
+      responses:
+        "204":
+          description: The pin is removed.
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /brand-kit/events:
+    get:
+      tags:
+        - Brand
+      operationId: streamBrandKitEvents
+      summary: Server-Sent Events of brand kit publications.
+      description: |
+        Any signed-in role. Each published version sends one event named brand-kit.published whose data is
+        {"version": N} and whose id is N; clients then read the version they need. Only publications made while the
+        client is connected are sent, so a client that reconnects reads GET /brand-kit to resynchronise. A heartbeat
+        event named heartbeat is sent at least every 25 seconds, so that the stream is not closed as idle.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: An event stream of brand kit notifications.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -849,6 +1147,38 @@ components:
       required: false
       schema:
         type: string
+    BrandKitVersionPath:
+      name: version
+      in: path
+      required: true
+      description: The number of a published brand kit version, starting at 1.
+      schema:
+        type: integer
+        minimum: 1
+    BrandKitVersionQuery:
+      name: version
+      in: query
+      required: false
+      description: A brand kit version number. Takes precedence over consumer.
+      schema:
+        type: integer
+        minimum: 1
+    ConsumerPath:
+      name: consumer
+      in: path
+      required: true
+      description: The name of a consumer, such as overlay-scene or obs-plugin. Lower case letters, digits and hyphens.
+      schema:
+        $ref: "#/components/schemas/ConsumerName"
+    ConsumerQuery:
+      name: consumer
+      in: query
+      required: false
+      description: |
+        A consumer whose pinned version is read. A consumer without a pin reads the newest version. Ignored when version
+        is given.
+      schema:
+        $ref: "#/components/schemas/ConsumerName"
   responses:
     Problem:
       description: An error, described by RFC 9457 Problem Details.
@@ -1476,3 +1806,352 @@ components:
           type: string
           maxLength: 200
           description: Where the decision came from, for example the audit letter or the console review.
+    ConsumerName:
+      type: string
+      pattern: "^[a-z][a-z0-9-]{0,63}$"
+      description: The name of a consumer of the brand kit.
+    BrandKitVersion:
+      type: object
+      description: One published version of the brand kit. The kit of a version never changes after its publication.
+      required:
+        - version
+        - publishedBy
+        - createdAt
+        - kit
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        publishedBy:
+          $ref: "#/components/schemas/Identifier"
+        createdAt:
+          type: string
+          format: date-time
+        kit:
+          $ref: "#/components/schemas/BrandKit"
+    BrandKit:
+      type: object
+      description: >-
+        The whole kit of one version. Colours are named tokens with a light and a dark value; the tonal ramps are derived
+        from their seeds at publication; text roles name a colour token and the background token it is shown on; templates
+        refer to tokens only, never to raw colours.
+      required:
+        - colours
+        - ramps
+        - textRoles
+        - typography
+        - marks
+        - voice
+        - texts
+        - templates
+      properties:
+        colours:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColourToken"
+        ramps:
+          type: array
+          items:
+            $ref: "#/components/schemas/TonalRamp"
+        textRoles:
+          type: array
+          items:
+            $ref: "#/components/schemas/TextRole"
+        typography:
+          type: array
+          items:
+            $ref: "#/components/schemas/TypographyRole"
+        marks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mark"
+        voice:
+          type: string
+          description: The voice and tone rules as text.
+        texts:
+          type: array
+          description: Hashtags and end-card text per language. A language without an entry has no text.
+          items:
+            $ref: "#/components/schemas/LanguageText"
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/Template"
+    ColourToken:
+      type: object
+      description: A named colour with its value for the light role and its value for the dark role.
+      required:
+        - name
+        - light
+        - dark
+      properties:
+        name:
+          type: string
+          pattern: "^[a-z][a-z0-9-]*$"
+        light:
+          $ref: "#/components/schemas/HexColour"
+        dark:
+          $ref: "#/components/schemas/HexColour"
+    HexColour:
+      type: string
+      pattern: "^#[0-9A-Fa-f]{6}$"
+      description: A colour in the form #rrggbb.
+    TonalRamp:
+      type: object
+      description: A seed colour and its tones. The tones are computed by the server at publication.
+      required:
+        - name
+        - seed
+        - tones
+      properties:
+        name:
+          type: string
+        seed:
+          $ref: "#/components/schemas/HexColour"
+        tones:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tone"
+    Tone:
+      type: object
+      required:
+        - tone
+        - hex
+      properties:
+        tone:
+          type: integer
+          minimum: 0
+          maximum: 100
+        hex:
+          $ref: "#/components/schemas/HexColour"
+    TextRole:
+      type: object
+      description: A text colour token shown on a background token. Both roles must reach WCAG AA contrast.
+      required:
+        - name
+        - colour
+        - background
+      properties:
+        name:
+          type: string
+        colour:
+          type: string
+          description: The name of a colour token.
+        background:
+          type: string
+          description: The name of a colour token.
+    TypographyRole:
+      type: object
+      description: >-
+        One role, such as headline, body or caption, with its font and its set of sizes. The font is a verified asset of
+        the library, referenced by its id; the file is never sent with the kit. A role without a font asset is refused.
+      required:
+        - role
+        - fontAsset
+        - sizesPx
+      properties:
+        role:
+          type: string
+        fontAsset:
+          $ref: "#/components/schemas/Identifier"
+        sizesPx:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            minimum: 1
+    Mark:
+      type: object
+      description: A logo or mark with named variants.
+      required:
+        - name
+        - variants
+      properties:
+        name:
+          type: string
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarkVariant"
+    MarkVariant:
+      type: object
+      description: >-
+        One variant of a mark: the verified library asset that holds its file, referenced by id, and the safe area no
+        other element may enter.
+      required:
+        - name
+        - asset
+        - safeArea
+      properties:
+        name:
+          type: string
+        asset:
+          $ref: "#/components/schemas/Identifier"
+        safeArea:
+          $ref: "#/components/schemas/SafeArea"
+    SafeArea:
+      type: object
+      description: The margin of a safe area, in percent of the frame, per side.
+      required:
+        - top
+        - right
+        - bottom
+        - left
+      properties:
+        top:
+          type: number
+          minimum: 0
+          maximum: 100
+        right:
+          type: number
+          minimum: 0
+          maximum: 100
+        bottom:
+          type: number
+          minimum: 0
+          maximum: 100
+        left:
+          type: number
+          minimum: 0
+          maximum: 100
+    LanguageText:
+      type: object
+      description: The end-card text and hashtags of one language.
+      required:
+        - language
+        - endCard
+        - hashtags
+      properties:
+        language:
+          type: string
+        endCard:
+          type: string
+        hashtags:
+          type: array
+          items:
+            type: string
+    Template:
+      type: object
+      description: >-
+        A layout template of one format. It is declarative: elements, token references, timing, safe-zone placement and
+        declared parameters. The short 9:16 (1080 by 1920) declares the slots badge (whole duration), title (0 to 3 s),
+        captions, session-tiles and cta (last 2 s, with the text parameter join_domain), and no end card. Boxes are in
+        percent of the frame from the top left corner. Badge, title, captions and logo lie between 14 % and 65 % of the
+        frame height.
+      required:
+        - format
+        - name
+        - width
+        - height
+        - slots
+        - parameters
+      properties:
+        format:
+          type: string
+        name:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/Slot"
+        parameters:
+          type: array
+          items:
+            $ref: "#/components/schemas/Parameter"
+    Slot:
+      type: object
+      description: One element of a template. A colour and a background are token names, never raw values.
+      required:
+        - name
+        - kind
+        - x
+        - y
+        - width
+        - height
+        - timing
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+        colour:
+          type: string
+          description: The name of a colour token.
+        background:
+          type: string
+          description: The name of a colour token.
+        parameter:
+          type: string
+          description: The declared parameter that fills this slot.
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+        timing:
+          $ref: "#/components/schemas/Timing"
+    Timing:
+      type: object
+      description: >-
+        When a slot is shown, in seconds. With fromEnd the values count back from the end of the output. An until of
+        null lasts to the end.
+      required:
+        - from
+        - fromEnd
+      properties:
+        from:
+          type: number
+          minimum: 0
+        until:
+          type: [number, "null"]
+          minimum: 0
+        fromEnd:
+          type: boolean
+    Parameter:
+      type: object
+      description: A parameter a person fills in. Undeclared parameters are refused.
+      required:
+        - name
+        - type
+        - required
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - text
+            - image
+        required:
+          type: boolean
+    KitPin:
+      type: object
+      description: The version a consumer has pinned.
+      required:
+        - consumer
+        - version
+        - updatedAt
+      properties:
+        consumer:
+          $ref: "#/components/schemas/ConsumerName"
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type: string
+          format: date-time
+    KitPinRequest:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 1

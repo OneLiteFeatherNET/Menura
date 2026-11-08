@@ -9,6 +9,8 @@ dependencies {
     implementation("io.micronaut:micronaut-runtime")
     implementation("io.micronaut:micronaut-http-server-netty")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
+    // Reactive streams of the brand kit's Server-Sent Events (add-brand-kit): the sink and the heartbeat.
+    implementation("io.projectreactor:reactor-core")
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
     implementation("com.nimbusds:nimbus-jose-jwt")
     // S3 client and presigner of the OLF Ceph object storage (add-asset-upload).
