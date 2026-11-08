@@ -113,6 +113,15 @@ public final class InMemoryChannelStore implements ChannelStore {
         audits.put(status.platform(), status);
     }
 
+    /** Forgets every row. A test that shares a store clears it first, so no test depends on another. */
+    public void clear() {
+        channels.clear();
+        grants.clear();
+        flows.clear();
+        quotas.clear();
+        audits.clear();
+    }
+
     /** The grant as stored, for asserting that a disconnect or a refusal left it alone or removed it. */
     public Optional<ChannelGrant> storedGrant(UUID channelId) {
         return Optional.ofNullable(grants.get(channelId));

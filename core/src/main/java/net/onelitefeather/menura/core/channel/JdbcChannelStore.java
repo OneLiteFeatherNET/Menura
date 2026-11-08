@@ -46,12 +46,16 @@ public final class JdbcChannelStore implements ChannelStore {
 
     @Override
     public List<Channel> listChannels(Connection connection, UUID afterId, int limit) throws SQLException {
-        String sql = "select " + CHANNEL_COLUMNS + " from menura.channel where (cast(? as uuid) is null or id > cast(? as uuid)) "
-                + "order by id limit ?";
+        String sql = afterId == null
+                ? "select " + CHANNEL_COLUMNS + " from menura.channel order by id limit ?"
+                : "select " + CHANNEL_COLUMNS + " from menura.channel where id > ? order by id limit ?";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setObject(1, afterId);
-            statement.setObject(2, afterId);
-            statement.setInt(3, limit);
+            if (afterId == null) {
+                statement.setInt(1, limit);
+            } else {
+                statement.setObject(1, afterId);
+                statement.setInt(2, limit);
+            }
             return channels(statement);
         }
     }

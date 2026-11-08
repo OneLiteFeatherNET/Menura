@@ -21,6 +21,10 @@ public final class RecordingAudit implements ChannelAudit {
         entries.add(new Entry(actor, action, target));
     }
 
+    public void clear() {
+        entries.clear();
+    }
+
     public List<Entry> entries() {
         return List.copyOf(entries);
     }

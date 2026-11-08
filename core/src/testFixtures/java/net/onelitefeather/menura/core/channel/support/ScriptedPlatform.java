@@ -47,6 +47,12 @@ public final class ScriptedPlatform implements HttpTransport {
         return (Reply) scripted;
     }
 
+    /** Forgets the scripted routes and the recorded requests. */
+    public void clear() {
+        routes.clear();
+        sent.clear();
+    }
+
     public List<Sent> sent() {
         return List.copyOf(sent);
     }

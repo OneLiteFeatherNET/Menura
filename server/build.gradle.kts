@@ -19,6 +19,8 @@ dependencies {
     implementation("ch.qos.logback:logback-classic")
     runtimeOnly("org.yaml:snakeyaml")
 
+    // In-memory channel store, scripted platform endpoint and clock of the core, for the channel HTTP tests.
+    testImplementation(testFixtures(project(":core")))
     testImplementation("io.micronaut.test:micronaut-test-junit5")
     testImplementation("io.micronaut:micronaut-http-client")
     testImplementation(libs.swagger.parser)
