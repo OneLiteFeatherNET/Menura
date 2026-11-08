@@ -30,6 +30,8 @@ tags:
     description: >-
       The central brand kit: versioned colours, typography, marks, texts and layout templates. Every signed-in role
       reads it; the editor role publishes versions and sets the pins of consumers.
+  - name: Content
+    description: The shared pool of raw recordings and clips, person and free tags, transcript search, timelines and lineage.
 paths:
   /health:
     get:
@@ -1157,6 +1159,416 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+  /library/items:
+    get:
+      tags:
+        - Content
+      operationId: listPoolItems
+      summary: One page of the shared pool, newest first.
+      description: |
+        The pool holds raw stream recordings (kind raw, stage raw), clips (kind clip, stage cut or rendered, status active
+        or suggested) and registered finished assets (kind clip, stage rendered, assetId set). Every person with a Menura
+        role sees every item. Filters combine with AND: mine selects the caller's own items, uploader a named member,
+        person an item tagged with that person, tag a free tag, stage one stage, and usage applies to every item
+        (used when a timeline uses the item or one of its clips, never_used otherwise). Each item names its uploaderId, personTags
+        and freeTags.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Mine"
+        - $ref: "#/components/parameters/Uploader"
+        - $ref: "#/components/parameters/Person"
+        - $ref: "#/components/parameters/Tag"
+        - $ref: "#/components/parameters/Stage"
+        - $ref: "#/components/parameters/Usage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: One page of pool items.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PoolPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /library/items/{id}/tags:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    put:
+      tags:
+        - Content
+      operationId: setItemTags
+      summary: Replace the free and person tags of a raw item or clip.
+      description: |
+        Only the editor role may change tags. Free tags match ^[a-z0-9-]{2,30}$, at most 20 per item. A person tag that
+        names no existing person is refused with 400, and the problem names the field personTags.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TagsRequest"
+      responses:
+        "200":
+          description: The tags as stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemTags"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /library/clips:
+    post:
+      tags:
+        - Content
+      operationId: createClip
+      summary: Create a clip inside a raw item.
+      description: |
+        A clip is a time range of one raw item with a title and free tags. Its stage is cut and its uploader is the
+        caller. A range that ends after the recording is refused. Status suggested marks a highlight candidate; it is
+        listed as suggested. Only the editor role may create clips.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClipRequest"
+      responses:
+        "201":
+          description: The clip as stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clip"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /library/clips/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Content
+      operationId: getClip
+      summary: One clip.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The clip.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clip"
+        "404":
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags:
+        - Content
+      operationId: renameClip
+      summary: Change the title of a clip; the uploader stays the same.
+      description: Only the editor role may change a clip, whoever uploaded it.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClipTitle"
+      responses:
+        "200":
+          description: The clip as stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clip"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags:
+        - Content
+      operationId: deleteClip
+      summary: Delete a clip on an explicit request.
+      description: |
+        Only the editor role may delete, and every deletion writes one audit entry. A clip that a timeline uses is kept
+        so that lineage stays readable; the request is refused with 409.
+      security:
+        - sessionCookie: []
+      responses:
+        "204":
+          description: The clip is deleted.
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /library/search:
+    get:
+      tags:
+        - Content
+      operationId: searchTranscripts
+      summary: Full-text search over transcript segments.
+      description: |
+        Returns each segment whose text contains every word of q, with its raw item and the second the speech starts at
+        (startMillis), so that a client can open the recording at that moment. The filters are those of the pool listing
+        and combine with AND; a stage filter keeps only hits from raw items with a clip at that stage. Results are
+        ordered by stream date, newest first. Semantic (meaning-based) search is not part of this release.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: The words to find. Every word must occur in the segment.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - $ref: "#/components/parameters/Mine"
+        - $ref: "#/components/parameters/Uploader"
+        - $ref: "#/components/parameters/Person"
+        - $ref: "#/components/parameters/Tag"
+        - $ref: "#/components/parameters/Stage"
+        - $ref: "#/components/parameters/Usage"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: The hits, possibly none.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchHit"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /library/raw-items/{id}/transcript:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    put:
+      tags:
+        - Content
+      operationId: uploadTranscript
+      summary: Attach or replace the transcript of a raw item.
+      description: |
+        The body is a WebVTT (text/vtt) or SRT (application/x-subrip) file of at most the configured transcript size
+        (10 MB by default). It is parsed into timed segments; a malformed cue is refused with a problem that names its
+        line. Replacing a transcript replaces all its segments and writes one audit entry. Menura never transcribes:
+        the transcript comes from the editing PC.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          text/vtt:
+            schema:
+              type: string
+          application/x-subrip:
+            schema:
+              type: string
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: The transcript as stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transcript"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+  /library/raw-items/{id}/media:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    delete:
+      tags:
+        - Content
+      operationId: removeRawMedia
+      summary: Remove the recording of a raw item; its row, transcript, clips and lineage stay.
+      description: |
+        Only the editor role may remove media. The recording is removed from the object storage and the raw item records
+        the media state removed; the raw item still lists in the pool and its lineage still names it. A second removal
+        is refused with 409. The removal writes one audit entry. Retention moves old recordings to cold storage on its
+        own schedule; see the retention CronJob in the Helm chart.
+      security:
+        - sessionCookie: []
+      responses:
+        "204":
+          description: The media is removed.
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /library/raw-items/{id}/lineage:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Content
+      operationId: getRawItemLineage
+      summary: The finished assets, timelines and clips made from a raw item.
+      description: Exactly the registered finished assets whose timeline uses a clip of this raw item.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The lineage of the raw item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RawLineage"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /library/timelines:
+    post:
+      tags:
+        - Content
+      operationId: storeTimeline
+      summary: Store a timeline as data.
+      description: |
+        A timeline holds the ordered clips it plays (sourceClipIds), overlays, captions, a layout template reference and
+        chapter marks. Chapters must start at 00:00, be in ascending order and be at least ten seconds apart. Only the
+        editor role may store timelines; the stored document is returned unchanged.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimelineRequest"
+      responses:
+        "201":
+          description: The timeline as stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeline"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+  /library/timelines/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Content
+      operationId: getTimeline
+      summary: One timeline as stored.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The timeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeline"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /library/finished-assets/{id}/registration:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The identifier of a verified finished video or image.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    post:
+      tags:
+        - Content
+      operationId: registerFinishedAsset
+      summary: Register a finished asset in the pool, made from a timeline.
+      description: |
+        Records the lineage (asset to timeline, timeline to clips) and moves the clips of the timeline to stage rendered.
+        An asset without a verified upload, or a timeline that does not exist, is rejected with 404 and is not listed.
+        A raw recording is refused with 400, and an asset that is registered already with 409.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Registration"
+      responses:
+        "201":
+          description: The registered asset.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisteredAsset"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -1214,6 +1626,72 @@ components:
         is given.
       schema:
         $ref: "#/components/schemas/ConsumerName"
+    Mine:
+      name: mine
+      in: query
+      description: Only the items the caller uploaded.
+      required: false
+      schema:
+        type: boolean
+    Uploader:
+      name: uploader
+      in: query
+      description: Only the items of this member (a person identifier).
+      required: false
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    Person:
+      name: person
+      in: query
+      description: Only the items that carry this person tag (a person identifier).
+      required: false
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    Tag:
+      name: tag
+      in: query
+      description: Only the items that carry this free tag.
+      required: false
+      schema:
+        type: string
+        pattern: "^[a-z0-9-]{2,30}$"
+    Stage:
+      name: stage
+      in: query
+      description: Only the items at this stage.
+      required: false
+      schema:
+        type: string
+        enum:
+          - raw
+          - cut
+          - rendered
+    Usage:
+      name: usage
+      in: query
+      description: used when a timeline uses the item or one of its clips, never_used otherwise. Finished assets are never used in phase 1.
+      required: false
+      schema:
+        type: string
+        enum:
+          - used
+          - never_used
+    From:
+      name: from
+      in: query
+      description: Only the items created on or after this UTC date.
+      required: false
+      schema:
+        type: string
+        format: date
+    To:
+      name: to
+      in: query
+      description: Only the items created on or before this UTC date.
+      required: false
+      schema:
+        type: string
+        format: date
   responses:
     Problem:
       description: An error, described by RFC 9457 Problem Details.
@@ -2272,3 +2750,409 @@ components:
             - "null"
           format: date-time
           description: When the removal was seen. Null while the post is live.
+    PoolItem:
+      type: object
+      description: One item of the shared pool. kind raw is a stream recording; kind clip is a clip or a registered finished asset.
+      required:
+        - id
+        - kind
+        - stage
+        - status
+        - uploaderId
+        - personTags
+        - freeTags
+        - createdAt
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        kind:
+          type: string
+          enum:
+            - raw
+            - clip
+        stage:
+          type: string
+          enum:
+            - raw
+            - cut
+            - rendered
+        status:
+          type: string
+          enum:
+            - active
+            - suggested
+        uploaderId:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type:
+            - string
+            - "null"
+          description: The stream title of a raw item, or the title of a clip or registered asset.
+        rawItemId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: The raw item a clip is cut from; null for raw items and registered assets.
+        assetId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: The finished asset of a registered item; null otherwise.
+        startSeconds:
+          type:
+            - integer
+            - "null"
+        endSeconds:
+          type:
+            - integer
+            - "null"
+        usage:
+          type:
+            - string
+            - "null"
+          enum:
+            - used
+            - never_used
+            - null
+          description: Set for every item. used when a timeline uses the item or one of its clips; finished assets are never used.
+        personTags:
+          type: array
+          description: The hub people who appear in the item.
+          items:
+            $ref: "#/components/schemas/Identifier"
+        freeTags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+    PoolPage:
+      description: One cursor page of pool items; the envelope is CursorPage.
+      allOf:
+        - $ref: "#/components/schemas/CursorPage"
+        - type: object
+          required:
+            - items
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/PoolItem"
+    TagsRequest:
+      type: object
+      description: The complete tag sets of an item; they replace the current ones.
+      properties:
+        freeTags:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            pattern: "^[a-z0-9-]{2,30}$"
+        personTags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Identifier"
+    ItemTags:
+      type: object
+      required:
+        - itemId
+        - freeTags
+        - personTags
+      properties:
+        itemId:
+          $ref: "#/components/schemas/Identifier"
+        freeTags:
+          type: array
+          items:
+            type: string
+        personTags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Identifier"
+    ClipRequest:
+      type: object
+      required:
+        - rawItemId
+        - startSeconds
+        - endSeconds
+        - title
+      properties:
+        rawItemId:
+          $ref: "#/components/schemas/Identifier"
+        startSeconds:
+          type: integer
+          minimum: 0
+        endSeconds:
+          type: integer
+          minimum: 1
+          description: Must be after startSeconds and within the recording's duration.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        freeTags:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            pattern: "^[a-z0-9-]{2,30}$"
+        status:
+          type: string
+          enum:
+            - active
+            - suggested
+          default: active
+    ClipTitle:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+    Clip:
+      type: object
+      description: A clip. Its uploader is set at creation and never changes; stage is cut until a finished asset is registered from it.
+      required:
+        - id
+        - rawItemId
+        - uploaderId
+        - title
+        - startSeconds
+        - endSeconds
+        - status
+        - stage
+        - freeTags
+        - createdAt
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        rawItemId:
+          $ref: "#/components/schemas/Identifier"
+        uploaderId:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type: string
+        startSeconds:
+          type: integer
+        endSeconds:
+          type: integer
+        status:
+          type: string
+          enum:
+            - active
+            - suggested
+        stage:
+          type: string
+          enum:
+            - cut
+            - rendered
+        freeTags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+    SearchHit:
+      type: object
+      description: A transcript segment that matched, with the raw item and the position of its speech in that recording.
+      required:
+        - rawItemId
+        - title
+        - uploaderId
+        - startMillis
+        - endMillis
+        - text
+      properties:
+        rawItemId:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type:
+            - string
+            - "null"
+        streamDate:
+          type:
+            - string
+            - "null"
+          format: date
+        uploaderId:
+          $ref: "#/components/schemas/Identifier"
+        startMillis:
+          type: integer
+          format: int64
+          description: The milliseconds into the recording at which the speech starts; open the raw item here.
+        endMillis:
+          type: integer
+          format: int64
+        speaker:
+          type:
+            - string
+            - "null"
+          description: Set only for segments of a JSON transcript that names a speaker.
+        text:
+          type: string
+    Transcript:
+      type: object
+      required:
+        - rawItemId
+        - format
+        - segmentCount
+        - replaced
+        - uploadedAt
+      properties:
+        rawItemId:
+          $ref: "#/components/schemas/Identifier"
+        format:
+          type: string
+          enum:
+            - webvtt
+            - srt
+        segmentCount:
+          type: integer
+        replaced:
+          type: boolean
+          description: True when an earlier transcript of the raw item was replaced.
+        uploadedAt:
+          type: string
+          format: date-time
+    Chapter:
+      type: object
+      required:
+        - seconds
+        - title
+      properties:
+        seconds:
+          type: integer
+          minimum: 0
+          description: Where the chapter starts; the first chapter is at 0.
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+    TimelineDocument:
+      type: object
+      description: The timeline as data. Source ranges are clips of the pool, in play order.
+      required:
+        - sourceClipIds
+      properties:
+        layoutTemplate:
+          type:
+            - string
+            - "null"
+          description: Reference to a layout template of the brand kit.
+        sourceClipIds:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Identifier"
+        overlays:
+          type: array
+          items:
+            type: object
+        captions:
+          type: array
+          items:
+            type: object
+        chapters:
+          type: array
+          description: Chapter marks, ascending, the first at 0, at least ten seconds apart.
+          items:
+            $ref: "#/components/schemas/Chapter"
+    TimelineRequest:
+      type: object
+      required:
+        - title
+        - document
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        document:
+          $ref: "#/components/schemas/TimelineDocument"
+    Timeline:
+      type: object
+      required:
+        - id
+        - title
+        - uploaderId
+        - document
+        - createdAt
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type: string
+        uploaderId:
+          $ref: "#/components/schemas/Identifier"
+        document:
+          $ref: "#/components/schemas/TimelineDocument"
+        createdAt:
+          type: string
+          format: date-time
+    Registration:
+      type: object
+      required:
+        - timelineId
+        - title
+      properties:
+        timelineId:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+    RegisteredAsset:
+      type: object
+      required:
+        - assetId
+        - title
+        - uploaderId
+        - timelineId
+        - registeredAt
+      properties:
+        assetId:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type: string
+        uploaderId:
+          $ref: "#/components/schemas/Identifier"
+        timelineId:
+          $ref: "#/components/schemas/Identifier"
+        registeredAt:
+          type: string
+          format: date-time
+    RawLineage:
+      type: object
+      description: The finished assets made from a raw item. Each names its timeline and the clips of this raw item it uses.
+      required:
+        - rawItemId
+        - assets
+      properties:
+        rawItemId:
+          $ref: "#/components/schemas/Identifier"
+        assets:
+          type: array
+          items:
+            type: object
+            required:
+              - assetId
+              - title
+              - timelineId
+              - clipIds
+            properties:
+              assetId:
+                $ref: "#/components/schemas/Identifier"
+              title:
+                type: string
+              timelineId:
+                $ref: "#/components/schemas/Identifier"
+              clipIds:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Identifier"
