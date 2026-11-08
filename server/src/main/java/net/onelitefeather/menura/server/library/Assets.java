@@ -62,12 +62,13 @@ public class Assets {
             after = parseInstant(position[0]);
             afterId = parseUuid(position[1]);
         }
-        boolean admin = AssetAccess.isAdmin(viewer);
+        if (!AssetAccess.mayRead(viewer)) {
+            return new AssetPageView(List.of(), null);
+        }
         Instant seek = after;
         UUID seekId = afterId;
         int fetch = request.limit() + 1;
-        List<AssetRecord> rows = transactions.inTransaction(connection ->
-                assets.page(connection, seek, seekId, fetch, viewer.personId(), admin));
+        List<AssetRecord> rows = transactions.inTransaction(connection -> assets.page(connection, seek, seekId, fetch));
         boolean more = rows.size() > request.limit();
         List<AssetRecord> items = more ? rows.subList(0, request.limit()) : rows;
         String next = null;

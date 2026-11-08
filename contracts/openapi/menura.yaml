@@ -421,7 +421,8 @@ paths:
       operationId: listAssets
       summary: The assets the caller may see, newest first.
       description: |
-        Any signed-in person. Raw material is listed only to its uploader and to admins. Listing carries metadata only;
+        Any signed-in person who holds a Menura role. The library is one shared pool: finished assets and raw material
+        alike are listed to every reader, and only verified uploads are listed. Listing carries metadata only;
         links are requested per asset.
       security:
         - sessionCookie: []

@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -56,6 +57,9 @@ class AssetUploadRoundTripIntegrationTest {
     private static final CurrentPerson EDITOR = new CurrentPerson(
             UUID.fromString("0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"), "subject", Set.of(Role.EDITOR), Channel.WEB);
     private static final String BUCKET = "menura-it";
+    private static final UUID OTHER_EDITOR_ID = UUID.fromString("5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b");
+    private static final UUID VIEWER_ID = UUID.fromString("6f7a8b9c-0d1e-4f2a-9b3c-4d5e6f7a8b9c");
+    private static final long MIB = 1024L * 1024;
 
     @Container
     PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:17.11"))
@@ -110,6 +114,54 @@ class AssetUploadRoundTripIntegrationTest {
         assertEquals("failed", f.uploads.read(EDITOR, started.id()).state(), "the session is marked failed");
         assertTrue(f.storage.head(UploadSession.keyFor(started.id())).isEmpty(), "the bytes of the wrong file are removed");
         assertEquals(0, f.library.list(EDITOR, PageRequest.of(null, null)).items().size(), "nothing is listed");
+    }
+
+    /**
+     * The SQL listing shows the verified assets of the shared pool to every reader, raw material of other uploaders
+     * included, and never a pending or a failed upload.
+     */
+    @Test
+    void listingShowsVerifiedFinishedAndRawAssetsButNeverPendingOrFailedUploads() throws Exception {
+        Fixture f = new Fixture();
+        CurrentPerson otherEditor = new CurrentPerson(OTHER_EDITOR_ID, "other", Set.of(Role.EDITOR), Channel.WEB);
+        CurrentPerson viewer = new CurrentPerson(VIEWER_ID, "viewer", Set.of(Role.VIEWER), Channel.WEB);
+
+        List<byte[]> finishedParts = parts((int) MIB, 11);
+        UUID finished = complete(f, EDITOR, video(MIB, LibraryFixture.compositeOf(finishedParts)), finishedParts);
+
+        List<byte[]> rawParts = parts((int) MIB, 12);
+        AssetDeclaration raw = AssetDeclaration.declare("raw_material", "mkv", 7200, 1920, 1080, MIB,
+                LibraryFixture.compositeOf(rawParts), "Coop night", "2026-11-01");
+        UUID rawAsset = complete(f, EDITOR, raw, rawParts);
+
+        List<byte[]> pendingParts = parts((int) MIB, 13);
+        UploadSessionView pending = f.uploads.start(otherEditor,
+                video(MIB, LibraryFixture.compositeOf(pendingParts)), "req-pending");
+        put(pending.parts().get(0), pendingParts.get(0));
+
+        List<byte[]> declaredParts = parts((int) MIB, 14);
+        List<byte[]> sentParts = parts((int) MIB, 15);
+        UploadSessionView failing = f.uploads.start(otherEditor,
+                video(MIB, LibraryFixture.compositeOf(declaredParts)), "req-failing");
+        put(failing.parts().get(0), sentParts.get(0));
+        assertThrows(ProblemException.class, () -> f.uploads.complete(otherEditor, failing.id(), "req-failing-complete"));
+
+        List<UUID> listed = f.library.list(viewer, PageRequest.of(null, null)).items().stream()
+                .map(AssetView::id).toList();
+
+        assertEquals(List.of(rawAsset, finished), listed,
+                "the viewer sees both verified assets, newest first, and nothing else");
+        assertFalse(listed.contains(pending.id()), "a pending upload is not listed");
+        assertFalse(listed.contains(failing.id()), "a failed upload is not listed");
+        assertEquals(rawAsset, f.library.get(viewer, rawAsset).id(), "the raw item of another uploader is readable");
+    }
+
+    private UUID complete(Fixture f, CurrentPerson who, AssetDeclaration declaration, List<byte[]> bytes) throws Exception {
+        UploadSessionView started = f.uploads.start(who, declaration, "req-start");
+        for (PartUrl part : started.parts()) {
+            put(part, bytes.get(part.partNumber() - 1));
+        }
+        return f.uploads.complete(who, started.id(), "req-complete").assetId();
     }
 
     /** One set of services over the real database and storage, for one test. */

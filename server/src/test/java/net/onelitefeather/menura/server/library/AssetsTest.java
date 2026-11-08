@@ -3,11 +3,13 @@ package net.onelitefeather.menura.server.library;
 import net.onelitefeather.menura.core.paging.PageRequest;
 import net.onelitefeather.menura.core.problem.ProblemException;
 import net.onelitefeather.menura.server.audit.AuditEntry;
+import net.onelitefeather.menura.server.auth.CurrentPerson;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static net.onelitefeather.menura.server.library.LibraryFixture.EDITOR;
@@ -28,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AssetsTest {
 
     private static final Duration LINK_LIFETIME = Duration.ofMinutes(5);
+    private static final UUID ROLELESS = UUID.fromString("4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6a7b");
 
     /** A finished image of the editor, listed. The seed makes each one's bytes, and so its checksum, distinct. */
     private static UUID finished(LibraryFixture f, long seed) throws SQLException {
@@ -41,19 +44,34 @@ class AssetsTest {
     }
 
     @Test
-    void listContainsOnlyTheAssetsTheViewerMaySee() throws SQLException {
+    void listShowsRawMaterialOfOtherUploadersToEveryReaderOfTheSharedPool() throws SQLException {
         LibraryFixture f = new LibraryFixture();
         UUID shared = finished(f, 1);
-        UUID ownRaw = raw(f);
+        UUID raw = raw(f);
 
         AssetPageView forViewer = f.library.list(viewer(), PageRequest.of(null, null));
         AssetPageView forOther = f.library.list(otherEditor(), PageRequest.of(null, null));
         AssetPageView forOwner = f.library.list(editor(), PageRequest.of(null, null));
 
-        assertEquals(List.of(shared), ids(forViewer), "a viewer sees the finished asset and no raw material");
-        assertEquals(List.of(shared), ids(forOther), "another editor does not see raw material of someone else");
-        assertEquals(2, forOwner.items().size(), "the uploader sees their own raw material");
-        assertTrue(ids(forOwner).contains(ownRaw));
+        assertEquals(List.of(raw, shared), ids(forViewer), "a viewer sees the shared pool, raw material included");
+        assertEquals(List.of(raw, shared), ids(forOther), "another editor sees raw material of someone else");
+        assertEquals(List.of(raw, shared), ids(forOwner), "the uploader sees the same pool");
+    }
+
+    @Test
+    void personWithoutAnyRoleSeesNoAssetAndGetsNotFound() throws SQLException {
+        LibraryFixture f = new LibraryFixture();
+        UUID asset = finished(f, 1);
+        CurrentPerson roleless = LibraryFixture.person(ROLELESS, Set.of());
+
+        assertTrue(ids(f.library.list(roleless, PageRequest.of(null, null))).isEmpty(),
+                "a signed-in person without a role reads nothing");
+        assertEquals(404, assertThrows(ProblemException.class, () -> f.library.get(roleless, asset)).status());
+        assertEquals(404, assertThrows(ProblemException.class,
+                () -> f.library.link(roleless, asset, false)).status());
+        assertEquals(404, assertThrows(ProblemException.class,
+                () -> f.library.delete(roleless, asset, "req-d")).status());
+        assertEquals(1, f.assets.rows().size(), "the caller who may not read deletes nothing");
     }
 
     @Test
@@ -72,19 +90,6 @@ class AssetsTest {
         assertNotNull(page1.nextCursor(), "a full page carries a cursor for the next one");
         assertEquals(List.of(first), ids(page2), "the next page continues after the cursor");
         assertNull(page2.nextCursor(), "the last page has no cursor");
-    }
-
-    @Test
-    void hiddenRawMaterialAnswersNotFoundForGetPreviewAndDeletionAlike() throws SQLException {
-        LibraryFixture f = new LibraryFixture();
-        UUID hidden = raw(f);
-
-        assertEquals(404, assertThrows(ProblemException.class, () -> f.library.get(otherEditor(), hidden)).status());
-        assertEquals(404, assertThrows(ProblemException.class,
-                () -> f.library.link(otherEditor(), hidden, false)).status());
-        assertEquals(404, assertThrows(ProblemException.class,
-                () -> f.library.delete(otherEditor(), hidden, "req-d")).status());
-        assertEquals(1, f.assets.rows().size(), "a hidden asset is not deleted by the caller who may not see it");
     }
 
     @Test

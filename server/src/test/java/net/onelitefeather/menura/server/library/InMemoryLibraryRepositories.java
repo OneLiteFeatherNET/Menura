@@ -87,14 +87,13 @@ public final class InMemoryLibraryRepositories {
         }
 
         @Override
-        public List<AssetRecord> page(Connection connection, Instant afterCreatedAt, UUID afterId, int limit,
-                                      UUID viewerId, boolean seesAllRaw) {
+        public List<AssetRecord> page(Connection connection, Instant afterCreatedAt, UUID afterId, int limit) {
             List<AssetRecord> visible = new ArrayList<>();
             for (AssetRecord asset : rows.values()) {
                 boolean after = afterCreatedAt == null
                         || asset.createdAt().isBefore(afterCreatedAt)
                         || (asset.createdAt().equals(afterCreatedAt) && asset.id().compareTo(afterId) < 0);
-                if (after && AssetAccess.mayList(asset, viewerId, seesAllRaw)) {
+                if (after) {
                     visible.add(asset);
                 }
             }

@@ -1,29 +1,23 @@
 package net.onelitefeather.menura.server.library;
 
-import net.onelitefeather.menura.core.asset.AssetKind;
-import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.server.auth.CurrentPerson;
 import net.onelitefeather.menura.server.web.ObjectAccess;
 
 import java.util.UUID;
 
 /**
- * Who may see which asset. Finished videos and images are shared with every signed-in person. Raw material is a
- * stream recording a person still works on, so it is visible to its uploader and to the admin role only. Hidden
- * assets answer 404, never 403 (principle 11).
+ * Who may see which asset. The library is one shared pool: every verified asset, finished or raw material, is visible
+ * to every signed-in person who holds a Menura role, so a person without any role reads nothing. Writes and deletes
+ * keep their own role rules (the editor role). Hidden assets answer 404, never 403 (principle 11).
  */
 public final class AssetAccess {
 
     private AssetAccess() {
     }
 
-    /** The rule, shared with the SQL of {@link AssetRepository#page}: raw material is visible to its uploader or an admin. */
-    public static boolean mayList(AssetRecord asset, UUID viewerId, boolean admin) {
-        return asset.kind() != AssetKind.RAW_MATERIAL || asset.uploaderId().equals(viewerId) || admin;
-    }
-
-    public static boolean isAdmin(CurrentPerson viewer) {
-        return viewer.roles().contains(Role.ADMIN);
+    /** Whether the viewer may read the shared pool: any Menura role is enough. */
+    public static boolean mayRead(CurrentPerson viewer) {
+        return !viewer.roles().isEmpty();
     }
 
     /** The visibility rule of one asset for the guard. */
@@ -31,7 +25,7 @@ public final class AssetAccess {
         return new ObjectAccess<>() {
             @Override
             public boolean isVisible(AssetRecord asset) {
-                return mayList(asset, viewer.personId(), isAdmin(viewer));
+                return AssetAccess.mayRead(viewer);
             }
 
             @Override

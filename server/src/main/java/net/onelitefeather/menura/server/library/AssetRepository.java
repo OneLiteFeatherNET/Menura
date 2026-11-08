@@ -16,11 +16,11 @@ public interface AssetRepository {
     Optional<AssetRecord> findDuplicate(Connection connection, UUID uploaderId, String checksum) throws SQLException;
 
     /**
-     * One page of the assets the viewer may see, newest first, after the position of {@code after} (null for the
-     * first page). The rule is {@link AssetAccess#mayList}; the SQL implementation applies the same rule in its query.
+     * One page of the shared pool, newest first, after the position of {@code afterCreatedAt} and {@code afterId} (both
+     * null for the first page). The table holds only verified assets, so every row is listed; who may read the pool is
+     * decided by {@link AssetAccess#mayRead} before this is called.
      */
-    List<AssetRecord> page(Connection connection, Instant afterCreatedAt, UUID afterId, int limit, UUID viewerId,
-                           boolean seesAllRaw) throws SQLException;
+    List<AssetRecord> page(Connection connection, Instant afterCreatedAt, UUID afterId, int limit) throws SQLException;
 
     void insert(Connection connection, AssetRecord asset) throws SQLException;
 

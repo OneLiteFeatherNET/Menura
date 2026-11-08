@@ -27,10 +27,12 @@ public class JdbcAssetRepository implements AssetRepository {
     private static final String FIND = "select " + COLUMNS + " from menura.asset where id = ?";
     private static final String FIND_DUPLICATE = "select " + COLUMNS + " from menura.asset "
             + "where uploader_id = ? and checksum = ? order by created_at limit 1";
-    /** The visibility rule of {@link AssetAccess#mayList}, in SQL: raw material only for its uploader or an admin. */
+    /**
+     * The listing of the shared pool: every row of the asset table (only verified uploads are rows), after the keyset
+     * position, newest first. Pending and failed uploads live in upload_session and never match.
+     */
     private static final String PAGE = "select " + COLUMNS + " from menura.asset "
-            + "where (kind <> 'raw_material' or uploader_id = ? or ?) "
-            + "and (?::timestamptz is null or (created_at, id) < (?::timestamptz, ?::uuid)) "
+            + "where (?::timestamptz is null or (created_at, id) < (?::timestamptz, ?::uuid)) "
             + "order by created_at desc, id desc limit ?";
     private static final String INSERT = "insert into menura.asset (" + COLUMNS
             + ") values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -54,16 +56,13 @@ public class JdbcAssetRepository implements AssetRepository {
     }
 
     @Override
-    public List<AssetRecord> page(Connection connection, Instant afterCreatedAt, UUID afterId, int limit, UUID viewerId,
-                                  boolean seesAllRaw) throws SQLException {
+    public List<AssetRecord> page(Connection connection, Instant afterCreatedAt, UUID afterId, int limit) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(PAGE)) {
-            statement.setObject(1, viewerId);
-            statement.setBoolean(2, seesAllRaw);
             Timestamp after = afterCreatedAt == null ? null : Timestamp.from(afterCreatedAt);
-            statement.setTimestamp(3, after);
-            statement.setTimestamp(4, after);
-            statement.setObject(5, afterId);
-            statement.setInt(6, limit);
+            statement.setTimestamp(1, after);
+            statement.setTimestamp(2, after);
+            statement.setObject(3, afterId);
+            statement.setInt(4, limit);
             List<AssetRecord> rows = new ArrayList<>();
             try (ResultSet row = statement.executeQuery()) {
                 while (row.next()) {
