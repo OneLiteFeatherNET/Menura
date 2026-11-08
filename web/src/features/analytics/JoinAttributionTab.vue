@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// Rendered by the Analytics layout, which passes the channel selection only the newer tabs use.
+defineOptions({ inheritAttrs: false });
 import { computed, onMounted } from 'vue';
 import { api } from '../../api/client';
 import type { JoinSource } from '../../api/types';
