@@ -116,3 +116,25 @@ and roll again. A lost key means every channel must be reconnected; the reconnec
 **Check the connection.** `kubectl get cronjob menura-channel-health` shows the schedule, and a finished run prints
 `channel-health checked=… refreshed=… needs_reconnection=… unavailable=…`. Channels that need reconnection show their
 reason in the channel list.
+
+## External posts (operator steps)
+
+The `external-post-sync` CronJob imports the existing posts and videos of every connected channel and re-syncs them
+(change `add-external-post-import`). It runs at `jobs.externalPostSync.schedule` (every six hours by default) and skips a
+channel whose last complete sync is newer than `jobs.externalPostSync.interval`. It reads the same `channels.existingSecret`
+as the channel health job and needs no further key.
+
+**What "removed" means.** A post is marked removed when a complete listing from the platform no longer contains it. The
+time of the removal is the time the sync saw it. A removed post keeps its record and its metric history and is never
+deleted; if the platform lists it again, it becomes live again.
+
+**An incomplete listing marks nothing.** A listing that fails part-way, is rate limited or reaches its limit of 5000
+items adds the items it lists but marks no post removed. The channel overview shows the failure of the last sync.
+
+**Platform support.** A platform adapter that does not list published items reports the channel as failed with the reason
+"not listed in this build". The YouTube listing comes with `add-youtube-insights`; until then the YouTube channels show
+that reason.
+
+**Check the import.** `kubectl get cronjob menura-external-post-sync` shows the schedule, and a finished run prints
+`external-post-sync checked=… synced=… skipped=… incomplete=… failed=… waiting=…`. Channels that need reconnection are
+counted as `waiting` and are not read.

@@ -277,19 +277,30 @@ if grep -qE 'MENURA_(TOKEN_ENCRYPTION_KEY|YOUTUBE_CLIENT_SECRET)' "$rendered"; t
 fi
 
 # The channel health job runs as a CronJob (jobs run channel-health) and is on by default.
-channel_health_command="$(yq -N 'select(.kind == "CronJob") | .spec.jobTemplate.spec.template.spec.containers[0].command | join(" ")' "$rendered")"
+channel_health_command="$(yq -N 'select(.kind == "CronJob" and (.metadata.name | test("-channel-health$"))) | .spec.jobTemplate.spec.template.spec.containers[0].command | join(" ")' "$rendered")"
 if [[ "$channel_health_command" != "jobs run channel-health" ]]; then
   report "the channel health CronJob must run 'jobs run channel-health' (found '$channel_health_command')"
 fi
 
-# With channels.existingSecret set, the server, the jobs and the channel health CronJob read that Secret through envFrom.
+# The external post sync runs as a CronJob (jobs run external-post-sync) and is on by default (change
+# add-external-post-import). It reads its interval from the values, so a run skips channels synced within it.
+external_sync_command="$(yq -N 'select(.kind == "CronJob" and (.metadata.name | test("-external-post-sync$"))) | .spec.jobTemplate.spec.template.spec.containers[0].command | join(" ")' "$rendered")"
+if [[ "$external_sync_command" != "jobs run external-post-sync" ]]; then
+  report "the external post sync CronJob must run 'jobs run external-post-sync' (found '$external_sync_command')"
+fi
+external_sync_interval="$(yq -N 'select(.kind == "CronJob" and (.metadata.name | test("-external-post-sync$"))) | .spec.jobTemplate.spec.template.spec.containers[0].env[] | select(.name == "MENURA_EXTERNAL_POST_SYNC_INTERVAL") | .value' "$rendered")"
+if [[ "$external_sync_interval" != "$(yq -r '.jobs.externalPostSync.interval' "$chart/values.yaml")" ]]; then
+  report "the external post sync must get MENURA_EXTERNAL_POST_SYNC_INTERVAL from jobs.externalPostSync.interval"
+fi
+
+# With channels.existingSecret set, the server, the jobs and the two job CronJobs read that Secret through envFrom.
 helm template "$release" "$chart" --set channels.existingSecret=menura-channels >"$rendered_channels"
 secret_pods="$({
   yq -N 'select(.kind == "Deployment") | select(.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-channels") | .metadata.name' "$rendered_channels"
   yq -N 'select(.kind == "CronJob") | select(.spec.jobTemplate.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-channels") | .metadata.name' "$rendered_channels"
 } | grep -c . || true)"
-if [[ "$secret_pods" -ne 3 ]]; then
-  report "expected server, jobs and channel health pods to read the channel Secret, found $secret_pods"
+if [[ "$secret_pods" -ne 4 ]]; then
+  report "expected server, jobs, channel health and external post sync pods to read the channel Secret, found $secret_pods"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

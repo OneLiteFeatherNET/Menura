@@ -15,7 +15,9 @@ public final class JobsMain {
     public static void main(String[] args) {
         MenuraSettings settings = MenuraSettings.from(System.getenv());
         JobDispatcher dispatcher = new JobDispatcher(List.of(new PingJob(), new MigrateJob(settings),
-                new ChannelHealthJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC())));
+                new ChannelHealthJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC()),
+                new ExternalPostSyncJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC(),
+                        ExternalPostSyncJob.intervalFrom(System.getenv()))));
         System.exit(dispatcher.dispatch(args, System.out, System.err));
     }
 }
