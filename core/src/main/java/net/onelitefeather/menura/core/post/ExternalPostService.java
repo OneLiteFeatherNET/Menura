@@ -55,6 +55,7 @@ public final class ExternalPostService {
     private final ConnectionService connections;
     private final PlatformRegistry platforms;
     private final int listingLimit;
+    private final ExternalPostListener listener;
 
     public ExternalPostService(Transactions transactions, Clock clock, IdentifierGenerator identifiers,
                                ChannelStore channels, ExternalPostStore posts, ConnectionService connections,
@@ -65,6 +66,14 @@ public final class ExternalPostService {
     public ExternalPostService(Transactions transactions, Clock clock, IdentifierGenerator identifiers,
                                ChannelStore channels, ExternalPostStore posts, ConnectionService connections,
                                PlatformRegistry platforms, int listingLimit) {
+        this(transactions, clock, identifiers, channels, posts, connections, platforms, listingLimit,
+                ExternalPostListener.NONE);
+    }
+
+    /** The service with a listener that reacts to every post an import inserts, in the import's transaction. */
+    public ExternalPostService(Transactions transactions, Clock clock, IdentifierGenerator identifiers,
+                               ChannelStore channels, ExternalPostStore posts, ConnectionService connections,
+                               PlatformRegistry platforms, int listingLimit, ExternalPostListener listener) {
         if (listingLimit < 1) {
             throw new IllegalArgumentException("the listing limit must be at least 1");
         }
@@ -76,6 +85,7 @@ public final class ExternalPostService {
         this.connections = Objects.requireNonNull(connections, "connections");
         this.platforms = Objects.requireNonNull(platforms, "platforms");
         this.listingLimit = listingLimit;
+        this.listener = Objects.requireNonNull(listener, "listener");
     }
 
     /** Re-syncs one channel now, whatever the time of its last sync. */
@@ -167,6 +177,7 @@ public final class ExternalPostService {
             Plan plan = plan(channelId, platform, stored, listing, now);
             for (ExternalPost post : plan.inserts()) {
                 posts.insert(c, post);
+                listener.imported(c, post, plan.insertedItems().get(post.id()));
             }
             for (ExternalPost post : plan.updates()) {
                 posts.update(c, post);
@@ -203,6 +214,7 @@ public final class ExternalPostService {
         }
         Set<String> listed = new HashSet<>();
         List<ExternalPost> inserts = new ArrayList<>();
+        Map<UUID, PublishedItem> insertedItems = new HashMap<>();
         List<ExternalPost> updates = new ArrayList<>();
         int listedChanges = 0;
         for (PublishedItem item : listing.items()) {
@@ -215,7 +227,9 @@ public final class ExternalPostService {
             ExternalPost existing = byItem.get(item.platformItemId());
             try {
                 if (existing == null) {
-                    inserts.add(ExternalPost.create(identifiers.next(), channelId, platform, item, now));
+                    ExternalPost created = ExternalPost.create(identifiers.next(), channelId, platform, item, now);
+                    inserts.add(created);
+                    insertedItems.put(created.id(), item);
                 } else {
                     ExternalPost next = existing.listed(item, now);
                     if (next != existing) {
@@ -237,10 +251,11 @@ public final class ExternalPostService {
                 }
             }
         }
-        return new Plan(inserts, updates, listedChanges, removed);
+        return new Plan(inserts, insertedItems, updates, listedChanges, removed);
     }
 
-    private record Plan(List<ExternalPost> inserts, List<ExternalPost> updates, int listedChanges, int removed) {
+    private record Plan(List<ExternalPost> inserts, Map<UUID, PublishedItem> insertedItems, List<ExternalPost> updates,
+                        int listedChanges, int removed) {
     }
 
     private static String reasonOf(PlatformException failure) {

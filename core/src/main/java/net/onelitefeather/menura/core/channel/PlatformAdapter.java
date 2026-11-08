@@ -65,6 +65,15 @@ public interface PlatformAdapter {
     List<PublishedItem> listPublished(String accessToken, int limit);
 
     /**
+     * The platform item identifiers that a playlist of the channel contains. Read-only: phase 1 never writes playlists.
+     * An adapter whose build cannot read playlist membership throws {@link Unsupported}; callers show the playlist as
+     * not checked.
+     */
+    default Set<String> playlistItemIds(String accessToken, String playlistId) {
+        throw new Unsupported("reading playlist membership");
+    }
+
+    /**
      * Reads the requested metrics of one item. A metric the platform does not expose is left out of the map; callers
      * record it as unavailable, never as zero.
      */
@@ -112,8 +121,17 @@ public interface PlatformAdapter {
 
     enum PublicationStatus { PENDING, PROCESSING, PUBLISHED, FAILED, REMOVED }
 
-    /** One item the platform lists for a channel. */
-    record PublishedItem(String platformItemId, String url, String title, Instant publishedAt, String format) {
+    /**
+     * One item the platform lists for a channel. The description is the text the platform shows under the item; it is
+     * empty when the platform does not report one. Series assignment reads the hashtags in it.
+     */
+    record PublishedItem(String platformItemId, String url, String title, Instant publishedAt, String format,
+                         String description) {
+
+        /** An item without a description, as adapters that do not report one list it. */
+        public PublishedItem(String platformItemId, String url, String title, Instant publishedAt, String format) {
+            this(platformItemId, url, title, publishedAt, format, "");
+        }
     }
 
     /** Thrown by operations an adapter build does not yet implement. The server answers 501. */

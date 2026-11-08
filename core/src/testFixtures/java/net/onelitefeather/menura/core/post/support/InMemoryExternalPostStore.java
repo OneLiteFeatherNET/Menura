@@ -30,6 +30,11 @@ public final class InMemoryExternalPostStore implements ExternalPostStore {
     }
 
     @Override
+    public Optional<ExternalPost> find(Connection connection, UUID id) {
+        return Optional.ofNullable(posts.get(id));
+    }
+
+    @Override
     public List<ExternalPost> page(Connection connection, UUID channelId, Instant afterPublishedAt, UUID afterId,
                                    int limit) {
         return posts.values().stream()
