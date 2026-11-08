@@ -34,22 +34,12 @@ spec:
           env:
             {{- include "menura.databaseEnv" . | nindent 12 }}
             {{- include "menura.libraryEnv" . | nindent 12 }}
+            {{- include "menura.channelEnv" . | nindent 12 }}
             {{- range $name, $value := .Values.server.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
             {{- end }}
-          # The database Secret and, on the server only, the object storage Secret (S3 credentials).
-          {{- if or .Values.database.existingSecret .Values.storage.existingSecret }}
-          envFrom:
-            {{- with .Values.database.existingSecret }}
-            - secretRef:
-                name: {{ . }}
-            {{- end }}
-            {{- with .Values.storage.existingSecret }}
-            - secretRef:
-                name: {{ . }}
-            {{- end }}
-          {{- end }}
+          {{- include "menura.serverSecretEnvFrom" . | nindent 10 }}
           {{- include "menura.containerSecurity" . | nindent 10 }}
           # Liveness only checks that the process accepts connections. /health reports
           # the database, so a database outage must not restart the server pods.

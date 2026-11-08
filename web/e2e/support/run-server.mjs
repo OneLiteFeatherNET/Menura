@@ -1,6 +1,7 @@
 // Starts the Menura server in environment e2e against a PostgreSQL 17 container of Testcontainers, and stops both
 // when Playwright stops this process. The server runs the local profile too, so Flyway creates the schema.
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
@@ -25,6 +26,8 @@ const server = spawn(launcher, {
     MENURA_DB_URL: database,
     MENURA_DB_USER: container.getUsername(),
     MENURA_DB_PASSWORD: container.getPassword(),
+    // The server refuses to start without a token key (channel connections); a fresh key per run, never stored.
+    MENURA_TOKEN_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     MENURA_WEB_ORIGIN: 'http://localhost:4173',
     MENURA_AUTH_WEB_APP_URL: 'http://localhost:4173/',
   },

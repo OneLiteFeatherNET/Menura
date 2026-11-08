@@ -2,14 +2,21 @@ package net.onelitefeather.menura.server.config;
 
 import io.micronaut.context.annotation.Factory;
 import jakarta.inject.Singleton;
+import net.onelitefeather.menura.core.db.DataSourceTransactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
 import net.onelitefeather.menura.core.secret.SecretGenerator;
 
+import javax.sql.DataSource;
 import java.security.SecureRandom;
 
 /** Provides the core utilities to the server's beans. The clock is provided by {@code ClockConfiguration}. */
 @Factory
 public class CoreBeans {
+
+    @Singleton
+    DataSourceTransactions dataSourceTransactions(DataSource dataSource) {
+        return new DataSourceTransactions(dataSource);
+    }
 
     @Singleton
     SecureRandom secureRandom() {

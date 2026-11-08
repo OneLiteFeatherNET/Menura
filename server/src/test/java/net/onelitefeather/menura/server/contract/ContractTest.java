@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,6 +88,35 @@ class ContractTest {
         assertEquals(List.of(), securityOf(api, "/auth/logout", PathItem::getPost));
         assertEquals(List.of(), securityOf(api, "/calendar/feed/{token}", PathItem::getGet),
                 "the feed authenticates with its own token in the path");
+    }
+
+    @Test
+    void channelOperationsNeedASessionAndTheCallbackToo() {
+        OpenAPI api = contract();
+
+        assertEquals(List.of("sessionCookie"), securityOf(api, "/channels", PathItem::getGet));
+        assertEquals(List.of("sessionCookie"), securityOf(api, "/channels/connections", PathItem::getPost),
+                "starting a connection needs a session");
+        assertEquals(List.of("sessionCookie"), securityOf(api, "/channels/{id}", PathItem::getDelete),
+                "disconnecting needs a session");
+        assertEquals(List.of("sessionCookie"), securityOf(api, "/channel-connections/callback", PathItem::getGet),
+                "the callback is tied to the person who started the consent");
+        assertEquals(List.of("sessionCookie"), securityOf(api, "/platforms", PathItem::getGet));
+    }
+
+    @Test
+    void channelRepresentationDeclaresNoTokenProperty() {
+        OpenAPI api = contract();
+
+        for (String schema : List.of("Channel", "AuditView", "QuotaView", "Platform", "Authorization")) {
+            io.swagger.v3.oas.models.media.Schema<?> declared = api.getComponents().getSchemas().get(schema);
+            assertNotNull(declared, schema + " must be declared");
+            assertNotNull(declared.getProperties(), schema + " must list its properties");
+            for (Object property : declared.getProperties().keySet()) {
+                assertFalse(property.toString().toLowerCase(java.util.Locale.ROOT).contains("token"),
+                        schema + " must not declare a token property, but declares " + property);
+            }
+        }
     }
 
     /** The names of the security requirements of one operation; empty when it declares none. */

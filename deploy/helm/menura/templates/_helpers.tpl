@@ -101,6 +101,52 @@ envFrom:
 {{- end }}
 
 {{/*
+The env of the channel connections: the YouTube redirect URI and the refresh margin. The client id and secret and the
+token keys are read from channels.existingSecret (menura.secretEnvFrom), never written here.
+*/}}
+{{- define "menura.channelEnv" -}}
+- name: MENURA_YOUTUBE_REDIRECT_URI
+  value: {{ .Values.channels.youtube.redirectUri | quote }}
+- name: MENURA_CHANNEL_REFRESH_MARGIN
+  value: {{ .Values.channels.refreshMargin | quote }}
+{{- end }}
+
+{{/*
+Every Secret a server or jobs pod reads through envFrom: the database credentials and the channel secrets. The channel
+Secret is listed only when it is set; without it the server does not start (the token key is required).
+*/}}
+{{- define "menura.secretEnvFrom" -}}
+{{- $secrets := list -}}
+{{- with .Values.database.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
+{{- with .Values.channels.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
+{{- include "menura.envFromSecrets" $secrets -}}
+{{- end }}
+
+{{/*
+The server's envFrom: the shared Secrets plus, on the server only, the object storage Secret (S3 credentials).
+*/}}
+{{- define "menura.serverSecretEnvFrom" -}}
+{{- $secrets := list -}}
+{{- with .Values.database.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
+{{- with .Values.channels.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
+{{- with .Values.storage.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
+{{- include "menura.envFromSecrets" $secrets -}}
+{{- end }}
+
+{{/*
+Renders envFrom for a list of Secret names; renders nothing for an empty list.
+*/}}
+{{- define "menura.envFromSecrets" -}}
+{{- if . }}
+envFrom:
+  {{- range . }}
+  - secretRef:
+      name: {{ . }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
 Pod-level hardening shared by every pod: no Kubernetes API token and no root.
 */}}
 {{- define "menura.podSecurity" -}}

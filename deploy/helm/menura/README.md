@@ -82,3 +82,37 @@ cluster sets 1 and 2, the public hosts do not meet principle 11.
 - The bucket's CORS rule must allow the web app origin (`https://menura.onelitefeather.net`) for `PUT` and `GET` only,
   with the `x-amz-checksum-sha256` header allowed. No other origin, wildcard or credentialed CORS is allowed (principle 14).
 - `library.partSizeBytes` must not exceed 99614720 (95 MiB, principle 15); `check-helm.sh` enforces it.
+
+## Channel connections (operator steps)
+
+Channels are connected through each platform's own consent (change `add-channel-connections`). The chart holds no
+secret: the server and the `channel-health` CronJob read them from `channels.existingSecret`, a Secret created outside
+the chart with these keys:
+
+| Key                                | Required | Purpose                                                              |
+|------------------------------------|----------|----------------------------------------------------------------------|
+| `MENURA_TOKEN_ENCRYPTION_KEY`      | yes      | AES-256 key, base64 of 32 bytes. The server does not start without it. |
+| `MENURA_YOUTUBE_CLIENT_ID`         | for YouTube | OAuth client id of the YouTube app.                              |
+| `MENURA_YOUTUBE_CLIENT_SECRET`     | for YouTube | OAuth client secret of the YouTube app.                          |
+| `MENURA_TOKEN_ENCRYPTION_KEY_PREVIOUS` | rotation only | The old key, read for decryption only, while a key rotation runs. |
+
+**Create the platform app (YouTube).** In Google Cloud, create an OAuth client of type *Web application*. Register the
+redirect URI `https://api-menura.onelitefeather.net/channel-connections/callback` (it must equal
+`channels.youtube.redirectUri`). Enable the YouTube Data API v3 for the project. Put the client id and secret into the
+Secret above. Until a compliance audit of the project passes, Google limits its quota; record that status (next step).
+
+**Record the audit status.** Each platform app has an audit status that an administrator records, with its source,
+through `PUT /platforms/{platform}/audit-status` (body `{"status": "unaudited", "source": "<where the decision came
+from>"}`; `status` is `unknown`, `unaudited` or `audited`). The web app and the publication dry run show it. An app that
+is `unknown` or `unaudited` cannot use public visibility, so record `audited` only after the audit letter. Every
+decision is dated and audited.
+
+**Rotate the encryption key.** 1. Generate a new key with `openssl rand -base64 32`. 2. Set the old key as
+`MENURA_TOKEN_ENCRYPTION_KEY_PREVIOUS` and the new one as `MENURA_TOKEN_ENCRYPTION_KEY` in the Secret, and roll the
+server and the jobs. 3. The next `channel-health` run (every 15 minutes by default) rewrites every grant with the new
+key; grants are readable with either key meanwhile. 4. After one successful run, remove `MENURA_TOKEN_ENCRYPTION_KEY_PREVIOUS`
+and roll again. A lost key means every channel must be reconnected; the reconnect flow keeps channel history.
+
+**Check the connection.** `kubectl get cronjob menura-channel-health` shows the schedule, and a finished run prints
+`channel-health checked=… refreshed=… needs_reconnection=… unavailable=…`. Channels that need reconnection show their
+reason in the channel list.

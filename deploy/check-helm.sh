@@ -37,7 +37,8 @@ rendered="$(mktemp)"
 rendered_disabled="$(mktemp)"
 rendered_pull="$(mktemp)"
 rendered_storage="$(mktemp)"
-trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull" "$rendered_storage"' EXIT
+rendered_channels="$(mktemp)"
+trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull" "$rendered_storage" "$rendered_channels"' EXIT
 helm template "$release" "$chart" >"$rendered"
 
 # Hosts across all HTTPRoutes, one per line, sorted.
@@ -194,7 +195,9 @@ if grep -qiE 'access-control-allow|allowOrigins|allowCredentials' "$rendered"; t
   report "the chart must not configure CORS at the gateway"
 fi
 
-if grep -qE '(^|[^A-Za-z0-9_.*/-])\*([^A-Za-z0-9_.*/-]|$)' "$rendered"; then
+# Scoped to the edge resources: the channel health CronJob needs a cron schedule, which contains `*`.
+if yq -N 'select(.kind == "HTTPRoute" or .apiVersion == "gateway.envoyproxy.io/v1alpha1")' "$rendered" \
+  | grep -qE '(^|[^A-Za-z0-9_.*/-])\*([^A-Za-z0-9_.*/-]|$)'; then
   report "no edge policy may use a wildcard"
 fi
 
@@ -265,6 +268,28 @@ if grep -q 'MENURA_S3_SECRET_ACCESS_KEY' <(yq -N 'select(.kind == "Deployment" o
 fi
 if grep -q 'menura-storage' <(yq -N 'select(.kind == "Deployment" or .kind == "Job") | select(.metadata.labels."app.kubernetes.io/component" != "server")' "$rendered_storage"); then
   report "the jobs and migrate pods must not reference the storage Secret"
+fi
+
+# Channel connections (change add-channel-connections): the token key and the YouTube client secret reach the pods only
+# through the channel Secret (envFrom), never as a literal value in the chart.
+if grep -qE 'MENURA_(TOKEN_ENCRYPTION_KEY|YOUTUBE_CLIENT_SECRET)' "$rendered"; then
+  report "the token key and the YouTube client secret must come from a Secret, not from a value in the chart"
+fi
+
+# The channel health job runs as a CronJob (jobs run channel-health) and is on by default.
+channel_health_command="$(yq -N 'select(.kind == "CronJob") | .spec.jobTemplate.spec.template.spec.containers[0].command | join(" ")' "$rendered")"
+if [[ "$channel_health_command" != "jobs run channel-health" ]]; then
+  report "the channel health CronJob must run 'jobs run channel-health' (found '$channel_health_command')"
+fi
+
+# With channels.existingSecret set, the server, the jobs and the channel health CronJob read that Secret through envFrom.
+helm template "$release" "$chart" --set channels.existingSecret=menura-channels >"$rendered_channels"
+secret_pods="$({
+  yq -N 'select(.kind == "Deployment") | select(.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-channels") | .metadata.name' "$rendered_channels"
+  yq -N 'select(.kind == "CronJob") | select(.spec.jobTemplate.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-channels") | .metadata.name' "$rendered_channels"
+} | grep -c . || true)"
+if [[ "$secret_pods" -ne 3 ]]; then
+  report "expected server, jobs and channel health pods to read the channel Secret, found $secret_pods"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

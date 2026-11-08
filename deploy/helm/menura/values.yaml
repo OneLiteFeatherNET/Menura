@@ -95,6 +95,23 @@ jobs:
     requests:
       cpu: 100m
       memory: 256Mi
+  # The channel health job (CronJob): refreshes connected channels' tokens before they expire and marks rejected
+  # grants as needing reconnection. Needs channels.existingSecret; without it every run fails at once.
+  channelHealth:
+    enabled: true
+    schedule: "*/15 * * * *"
+
+# Channel connections (change add-channel-connections). The server and the channel health job read these from an
+# existing Secret created outside this chart, with the keys MENURA_TOKEN_ENCRYPTION_KEY (required; the server does not
+# start without it), MENURA_YOUTUBE_CLIENT_ID and MENURA_YOUTUBE_CLIENT_SECRET, and optionally
+# MENURA_TOKEN_ENCRYPTION_KEY_PREVIOUS during a key rotation. The chart holds no secret value. See README.md.
+channels:
+  existingSecret: ""
+  youtube:
+    # The redirect URI registered in the YouTube app (Google Cloud). It is the public callback of the API host.
+    redirectUri: https://api-menura.onelitefeather.net/channel-connections/callback
+  # A grant whose access token expires within this margin is refreshed (ISO-8601 duration).
+  refreshMargin: PT10M
 
 # Gateway API routes attach to the shared Envoy Gateway listener (the `eg`
 # Gateway in namespace `envoy` of the cluster repository).

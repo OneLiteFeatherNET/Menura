@@ -1,0 +1,12 @@
+# Test environment only (activated by @MicronautTest). The token key is 32 zero bytes: a placeholder, never a real key.
+micronaut:
+  http:
+    client:
+      # The callback redirect is asserted as the response, so the client must not follow it.
+      follow-redirects: false
+menura:
+  channels:
+    token-encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    youtube:
+      client-id: test-client-id
+      client-secret: test-client-secret

@@ -22,6 +22,10 @@ tags:
     description: Calendar feed tokens for read-only calendar subscriptions.
   - name: Library
     description: Finished assets and raw material, uploaded by presigned multipart upload straight to the object storage.
+  - name: Channels
+    description: Channels of platform accounts, their connection through the platform's own consent, and their state. No response carries a token.
+  - name: Platforms
+    description: Platforms of this build, their capabilities and the audit status of their apps.
 paths:
   /health:
     get:
@@ -549,6 +553,277 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+  /platforms:
+    get:
+      tags:
+        - Platforms
+      operationId: listPlatforms
+      summary: The platforms of this build with their capabilities, features and audit status.
+      description: |
+        Read by every signed-in person. The restrictions of an app that is not audited are listed with its status, so
+        publishers see them before they schedule.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The platforms of this build.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Platform"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /platforms/{platform}/audit-status:
+    put:
+      tags:
+        - Platforms
+      operationId: recordPlatformAuditStatus
+      summary: Record the audit status of a platform app (administrators only).
+      description: |
+        Records the status with the date of the decision and its source, and writes an audit entry. An app whose status
+        is unknown or unaudited cannot use public visibility.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          description: The platform identifier, for example youtube.
+          schema:
+            type: string
+            maxLength: 40
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditStatusRequest"
+      responses:
+        "200":
+          description: The recorded audit status with its text and restrictions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditView"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+  /channels:
+    get:
+      tags:
+        - Channels
+      operationId: listChannels
+      summary: List the channels, with their connection state and quota.
+      description: |
+        Cursor-paged in id order. Read by every signed-in person. The representation carries no token.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: One page of channels.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /channels/connections:
+    post:
+      tags:
+        - Channels
+      operationId: startChannelConnection
+      summary: Start the connection of a new channel through the platform's consent.
+      description: |
+        Returns the platform's own consent URL. The browser is sent there; the platform returns it to the callback, and
+        the server connects the channel only after the platform grants it. No credential is ever entered in Menura.
+        Only a publisher or an administrator may start a connection.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectRequest"
+      responses:
+        "202":
+          description: The consent URL. It carries the state of this flow only and is never cached.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Authorization"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /channels/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The channel identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Channels
+      operationId: getChannel
+      summary: One channel with its connection state, scopes, quota and audit status.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Channel"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags:
+        - Channels
+      operationId: disconnectChannel
+      summary: Disconnect a channel; the platform grant is revoked where possible and the stored tokens are deleted.
+      description: |
+        The answer says what the platform did with the grant. When it reports failed, the platform grant may still
+        exist and should be revoked in the platform's own settings. The stored tokens are deleted in every case.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The disconnect is complete.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Disconnection"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /channels/{id}/consent:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The channel identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    post:
+      tags:
+        - Channels
+      operationId: startChannelConsent
+      summary: Reconnect a channel that needs reconnection, or enable further features on it, through consent.
+      description: |
+        The channel keeps its identity, posts and history. A consent for a different platform account is refused and the
+        publisher is asked to connect a new channel. Only a publisher or an administrator may start it.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentRequest"
+      responses:
+        "202":
+          description: The consent URL. It carries the state of this flow only and is never cached.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Authorization"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /channel-connections/callback:
+    get:
+      tags:
+        - Channels
+      operationId: completeChannelConnection
+      summary: Callback of the platform consent; sends the browser back to the channel page.
+      description: |
+        Called by the browser after the platform's consent. The state must belong to a live consent started by the same
+        person. The answer is a redirect to the web app's channel page with the outcome; no token is ever placed in it.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: state
+          in: query
+          required: false
+          description: The state of the consent, as the platform returned it.
+          schema:
+            type: string
+            maxLength: 512
+        - name: code
+          in: query
+          required: false
+          description: The authorization code of the platform, exchanged once.
+          schema:
+            type: string
+            maxLength: 2048
+        - name: error
+          in: query
+          required: false
+          description: The reason the platform reports when the consent was refused or cancelled.
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        "302":
+          description: Redirect to the channel page with connection=<outcome>, the channel and a reason when there is one.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content: {}
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "502":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -924,3 +1199,280 @@ components:
         expiresAt:
           type: string
           format: date-time
+    ChannelPage:
+      type: object
+      description: One page of channels. nextCursor is null on the last page.
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Channel"
+        nextCursor:
+          type:
+            - string
+            - "null"
+    Channel:
+      type: object
+      description: >-
+        A channel of a platform account. It has no field for a token, a secret or a token fragment; its scopes and
+        expiry are separate fields.
+      required:
+        - id
+        - platform
+        - displayName
+        - platformAccountId
+        - state
+        - features
+        - grantedScopes
+        - missingScopes
+        - createdAt
+        - updatedAt
+        - quota
+        - audit
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        platform:
+          type: string
+          description: The platform identifier, for example youtube.
+        displayName:
+          type: string
+        platformAccountId:
+          type: string
+          description: The identifier of the channel at the platform.
+        state:
+          type: string
+          enum:
+            - connected
+            - needs_reconnection
+            - disconnected
+        stateReason:
+          type:
+            - string
+            - "null"
+          description: Why the channel needs reconnection, in readable words.
+        features:
+          type: array
+          description: The features the channel is enabled for.
+          items:
+            type: string
+        grantedScopes:
+          type: array
+          description: The scopes the platform granted.
+          items:
+            type: string
+        missingScopes:
+          type: array
+          description: Scopes an enabled feature needs that were not granted. Flagged, not refused.
+          items:
+            type: string
+        grantRevocation:
+          type:
+            - string
+            - "null"
+          enum:
+            - revoked
+            - not_supported
+            - failed
+            - null
+          description: What the platform did with the grant at disconnect. failed means the grant may still exist.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        quota:
+          $ref: "#/components/schemas/QuotaView"
+        audit:
+          $ref: "#/components/schemas/AuditView"
+    QuotaView:
+      type: object
+      description: Quota and rate-limit state of a channel, as reported or measured. Null values were never reported.
+      required:
+        - warning
+      properties:
+        used:
+          type:
+            - integer
+            - "null"
+        limit:
+          type:
+            - integer
+            - "null"
+        resetAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        warning:
+          type: boolean
+          description: True when the used share is above the configured warning level.
+        delay:
+          oneOf:
+            - $ref: "#/components/schemas/DelayView"
+            - type: "null"
+    DelayView:
+      type: object
+      description: A platform rate limit that delays publications until nextAttemptAt.
+      required:
+        - reason
+        - nextAttemptAt
+      properties:
+        reason:
+          type: string
+        nextAttemptAt:
+          type: string
+          format: date-time
+    AuditView:
+      type: object
+      description: The audit status of a platform app, its readable text and the restrictions it implies.
+      required:
+        - status
+        - displayText
+        - restrictions
+      properties:
+        status:
+          type: string
+          enum:
+            - unknown
+            - unaudited
+            - audited
+        displayText:
+          type: string
+          example: "unaudited: uploads private only"
+        restrictions:
+          type: array
+          items:
+            type: string
+          example:
+            - public visibility not available
+        decidedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        source:
+          type:
+            - string
+            - "null"
+    Platform:
+      type: object
+      description: A platform of this build with what it supports and the features a channel can enable.
+      required:
+        - platform
+        - displayName
+        - capabilities
+        - features
+        - audit
+      properties:
+        platform:
+          type: string
+        displayName:
+          type: string
+        capabilities:
+          $ref: "#/components/schemas/Capabilities"
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/Feature"
+        audit:
+          $ref: "#/components/schemas/AuditView"
+    Capabilities:
+      type: object
+      description: What the platform offers and what this build supports.
+      required:
+        - publishing
+        - nativeScheduling
+        - listing
+        - metrics
+        - revocation
+      properties:
+        publishing:
+          type: boolean
+        nativeScheduling:
+          type: boolean
+        listing:
+          type: boolean
+        metrics:
+          type: boolean
+        revocation:
+          type: boolean
+    Feature:
+      type: object
+      required:
+        - name
+        - scopes
+      properties:
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+    Authorization:
+      type: object
+      description: The platform's consent URL. It carries the state of this flow only.
+      required:
+        - authorizationUrl
+      properties:
+        authorizationUrl:
+          type: string
+          format: uri
+    ConnectRequest:
+      type: object
+      description: A new connection. Features are optional and must be declared by the platform.
+      required:
+        - platform
+      properties:
+        platform:
+          type: string
+          maxLength: 40
+          pattern: "^[a-z][a-z0-9_-]{0,39}$"
+        features:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            pattern: "^[a-z][a-z0-9_]{0,39}$"
+    ConsentRequest:
+      type: object
+      description: Features to enable on a reconnection. Omitting them keeps the channel's features.
+      properties:
+        features:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            pattern: "^[a-z][a-z0-9_]{0,39}$"
+    Disconnection:
+      type: object
+      description: The outcome of a disconnect at the platform.
+      required:
+        - revocation
+      properties:
+        revocation:
+          type: string
+          enum:
+            - revoked
+            - not_supported
+            - failed
+    AuditStatusRequest:
+      type: object
+      description: The audit status of a platform app and its source.
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - unknown
+            - unaudited
+            - audited
+        source:
+          type: string
+          maxLength: 200
+          description: Where the decision came from, for example the audit letter or the console review.
