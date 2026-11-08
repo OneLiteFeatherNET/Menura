@@ -16,6 +16,7 @@ public class ClockConfiguration {
 
     @Singleton
     @Requires(missingBeans = Clock.class)
+    @Requires(notEnv = "e2e") // environment e2e injects a fixed clock instead (E2eClockConfiguration)
     Clock clock() {
         return Clock.systemUTC();
     }

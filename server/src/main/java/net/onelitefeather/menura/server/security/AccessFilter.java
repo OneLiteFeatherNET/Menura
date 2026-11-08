@@ -29,10 +29,11 @@ public class AccessFilter implements HttpServerFilter {
 
     /**
      * The only anonymous routes: liveness and readiness, the OpenAPI document, and the web sign-in endpoints, which
-     * exist to create or end a session and so cannot require one.
+     * exist to create or end a session and so cannot require one. The test-only sign-in path exists only in
+     * environment e2e (E2eSignInController); in every other environment it has no route and answers 404.
      */
     static final Set<String> ANONYMOUS_PATHS = Set.of("/health", "/openapi/menura.yaml", "/auth/login",
-            "/auth/callback", "/auth/logout");
+            "/auth/callback", "/auth/logout", "/auth/e2e/sign-in");
 
     private final CurrentPerson currentPerson;
 
