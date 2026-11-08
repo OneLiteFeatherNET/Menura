@@ -1,6 +1,7 @@
 package net.onelitefeather.menura.server.series;
 
 import io.micronaut.serde.annotation.Serdeable;
+import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.series.ContentSeries;
 import net.onelitefeather.menura.core.series.SeriesAssignment;
 import net.onelitefeather.menura.core.series.SeriesDraft;
@@ -13,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** The representations of content series over REST: the requests an editor sends and the views every role reads. */
@@ -25,7 +27,8 @@ public final class SeriesViews {
     @Serdeable
     public record SeriesRequest(String name, Map<String, String> badgeText, String colourToken, String badgeToken,
                                 String openingFormula, String layoutTemplate, String hashtag, String audience,
-                                Integer weekday, Integer postingSlot, Boolean active, List<PlaylistRequest> playlists) {
+                                Integer weekday, Integer postingSlot, Boolean active, List<PlaylistRequest> playlists,
+                                List<String> visibleTo) {
     }
 
     /** The playlist of a series on one channel. */
@@ -41,7 +44,8 @@ public final class SeriesViews {
     @Serdeable
     public record SeriesView(UUID id, String name, Map<String, String> badgeText, String colourToken, String badgeToken,
                              String openingFormula, String layoutTemplate, String hashtag, String audience, int weekday,
-                             int postingSlot, boolean active, List<PlaylistView> playlists, Instant createdAt,
+                             int postingSlot, boolean active, List<PlaylistView> playlists, List<String> visibleTo,
+                             Instant createdAt,
                              Instant updatedAt) {
     }
 
@@ -97,7 +101,8 @@ public final class SeriesViews {
         }
         return new SeriesDraft(request.name(), request.badgeText(), request.colourToken(), request.badgeToken(),
                 request.openingFormula(), request.layoutTemplate(), request.hashtag(), request.audience(),
-                request.weekday(), request.postingSlot(), request.active() == null || request.active(), playlists);
+                request.weekday(), request.postingSlot(), request.active() == null || request.active(), playlists,
+                request.visibleTo());
     }
 
     public static SeriesView of(ContentSeries series) {
@@ -106,7 +111,8 @@ public final class SeriesViews {
                 .toList();
         return new SeriesView(series.id(), series.name(), series.badgeText(), series.colourToken(), series.badgeToken(),
                 series.openingFormula(), series.layoutTemplate(), series.hashtag(), series.audience().value(),
-                series.weekday(), series.postingSlot(), series.active(), playlists, series.createdAt(), series.updatedAt());
+                series.weekday(), series.postingSlot(), series.active(), playlists, roleNames(series.visibleTo()),
+                series.createdAt(), series.updatedAt());
     }
 
     public static AssignmentView of(SeriesAssignment assignment) {
@@ -132,6 +138,11 @@ public final class SeriesViews {
     static EpisodeView episode(SeriesReports.Episode episode, SeriesAssignment assignment) {
         return new EpisodeView(episode.number(), episode.post().id(), episode.post().title(), episode.post().format(),
                 episode.post().publishedAt(), assignment == null ? null : lower(assignment.playlistState()));
+    }
+
+    /** The role names of a visibility, lower case and sorted, as the API names roles. */
+    static List<String> roleNames(Set<Role> roles) {
+        return roles.stream().map(role -> lower(role)).sorted().toList();
     }
 
     static String lower(Enum<?> value) {

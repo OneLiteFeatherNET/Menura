@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.series;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -14,13 +15,24 @@ import java.util.UUID;
  * @param weekday      the preferred weekday, 1 (Monday) to 7 (Sunday)
  * @param postingSlot  the preferred posting hour: 12, 18 or 21
  * @param playlists    the playlist per channel, if any
+ * @param visibleTo    the role names that may see the series; null means every role
  */
 public record SeriesDraft(String name, Map<String, String> badgeText, String colourToken, String badgeToken,
                           String openingFormula, String layoutTemplate, String hashtag, String audience,
-                          Integer weekday, Integer postingSlot, boolean active, Map<UUID, SeriesPlaylist> playlists) {
+                          Integer weekday, Integer postingSlot, boolean active, Map<UUID, SeriesPlaylist> playlists,
+                          List<String> visibleTo) {
 
     public SeriesDraft {
         badgeText = badgeText == null ? null : Map.copyOf(badgeText);
         playlists = playlists == null ? Map.of() : Map.copyOf(playlists);
+        visibleTo = visibleTo == null ? null : List.copyOf(visibleTo);
+    }
+
+    /** A draft that leaves the visibility to the default: every role. */
+    public SeriesDraft(String name, Map<String, String> badgeText, String colourToken, String badgeToken,
+                       String openingFormula, String layoutTemplate, String hashtag, String audience, Integer weekday,
+                       Integer postingSlot, boolean active, Map<UUID, SeriesPlaylist> playlists) {
+        this(name, badgeText, colourToken, badgeToken, openingFormula, layoutTemplate, hashtag, audience, weekday,
+                postingSlot, active, playlists, null);
     }
 }

@@ -1,12 +1,17 @@
 package net.onelitefeather.menura.core.series;
 
+import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.problem.ProblemException;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -18,7 +23,7 @@ import java.util.regex.Pattern;
 public record ContentSeries(UUID id, String name, Map<String, String> badgeText, String colourToken, String badgeToken,
                             String openingFormula, String layoutTemplate, String hashtag, Audience audience,
                             int weekday, int postingSlot, boolean active, Map<UUID, SeriesPlaylist> playlists,
-                            Instant createdAt, Instant updatedAt) {
+                            Set<Role> visibleTo, Instant createdAt, Instant updatedAt) {
 
     private static final Pattern TOKEN = Pattern.compile("[a-z][a-z0-9-]{0,63}");
     private static final Pattern LANGUAGE = Pattern.compile("[a-z]{2}(-[A-Z]{2})?");
@@ -37,6 +42,15 @@ public record ContentSeries(UUID id, String name, Map<String, String> badgeText,
         Objects.requireNonNull(updatedAt, "updatedAt");
         badgeText = Map.copyOf(Objects.requireNonNull(badgeText, "badgeText"));
         playlists = Map.copyOf(Objects.requireNonNull(playlists, "playlists"));
+        visibleTo = Set.copyOf(Objects.requireNonNull(visibleTo, "visibleTo"));
+        if (visibleTo.isEmpty()) {
+            throw new IllegalArgumentException("a series is visible to at least one role");
+        }
+    }
+
+    /** Whether a caller holding these roles may see the series. */
+    public boolean isVisibleTo(Set<Role> roles) {
+        return roles.stream().anyMatch(visibleTo::contains);
     }
 
     /**
@@ -66,7 +80,24 @@ public record ContentSeries(UUID id, String name, Map<String, String> badgeText,
         Map<UUID, SeriesPlaylist> playlists = new LinkedHashMap<>();
         draft.playlists().forEach((channel, playlist) -> playlists.put(channel, playlist(playlist)));
         return new ContentSeries(id, name, badges, colour, badge, formula, template, hashtag, audience, weekday, slot,
-                draft.active(), playlists, createdAt, updatedAt);
+                draft.active(), playlists, visibility(draft.visibleTo()), createdAt, updatedAt);
+    }
+
+    /** The roles of a draft's visibility; null means every role, an empty list or an unknown name is refused. */
+    private static Set<Role> visibility(List<String> names) {
+        if (names == null) {
+            return EnumSet.allOf(Role.class);
+        }
+        if (names.isEmpty()) {
+            throw invalid("The series needs at least one role that may see it.");
+        }
+        Set<Role> roles = EnumSet.noneOf(Role.class);
+        for (String name : names) {
+            Role role = Role.parse(name).orElseThrow(() -> invalid("The role '" + name + "' is unknown. Allowed roles: "
+                    + Arrays.stream(Role.values()).map(r -> r.name().toLowerCase(Locale.ROOT)).toList() + "."));
+            roles.add(role);
+        }
+        return roles;
     }
 
     private static Map<String, String> badges(Map<String, String> raw) {

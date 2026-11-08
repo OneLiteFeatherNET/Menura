@@ -1,6 +1,7 @@
 package net.onelitefeather.menura.core.series;
 
 import net.onelitefeather.menura.core.post.ExternalPostFormat;
+import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.channel.Channel;
 import net.onelitefeather.menura.core.channel.ConnectionState;
 import net.onelitefeather.menura.core.channel.JdbcChannelStore;
@@ -42,6 +43,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -77,6 +79,23 @@ class JdbcSeriesStoreIntegrationTest {
         assertEquals(stored.badgeText(), read.badgeText(), "the badge texts round-trip per language");
         assertEquals("PL-1", read.playlists().get(channel).playlistId(), "the playlist of the channel round-trips");
         assertEquals("#kube", read.hashtag(), "the hashtag round-trips");
+    }
+
+    @Test
+    void aSeriesRoundTripsItsVisibleRolesAndAHiddenSeriesAnswersNotFound() throws Exception {
+        World world = new World();
+        SeriesDraft base = SeriesFixture.draft("Redaktion", "#redaktion");
+        SeriesDraft limited = new SeriesDraft(base.name(), base.badgeText(), base.colourToken(), base.badgeToken(),
+                base.openingFormula(), base.layoutTemplate(), base.hashtag(), base.audience(), base.weekday(),
+                base.postingSlot(), base.active(), base.playlists(), List.of("editor", "operator"));
+        UUID id = world.transactions.inTransaction(c -> world.service.create(c, limited).id());
+
+        ContentSeries read = world.transactions.inTransaction(c -> world.series.find(c, id).orElseThrow());
+
+        assertEquals(Set.of(Role.EDITOR, Role.OPERATOR), read.visibleTo(), "the visible roles round-trip");
+        ProblemException hidden = assertThrows(ProblemException.class, () -> world.transactions.inTransaction(
+                c -> world.service.find(c, id, Set.of(Role.VIEWER))));
+        assertEquals(404, hidden.status(), "a viewer does not see the series and gets 404");
     }
 
     @Test

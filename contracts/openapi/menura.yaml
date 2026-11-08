@@ -3434,6 +3434,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SeriesPlaylist"
+        visibleTo:
+          type: array
+          description: The roles that may see the series. Omitted means every role. A series a caller may not see answers 404.
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - viewer
+              - editor
+              - publisher
+              - operator
+              - admin
     SeriesPlaylist:
       type: object
       required:
@@ -3499,6 +3511,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SeriesPlaylist"
+        visibleTo:
+          type: array
+          description: The roles that may see the series.
+          items:
+            type: string
         createdAt:
           type: string
           format: date-time

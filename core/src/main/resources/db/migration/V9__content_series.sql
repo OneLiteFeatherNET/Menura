@@ -16,6 +16,10 @@ CREATE TABLE menura.content_series (
     weekday         smallint    NOT NULL CHECK (weekday BETWEEN 1 AND 7),
     posting_slot    smallint    NOT NULL CHECK (posting_slot IN (12, 18, 21)),
     active          boolean     NOT NULL,
+    -- The roles that may see the series; every role by default. A series a caller may not see answers 404.
+    visible_to      text[]      NOT NULL DEFAULT ARRAY['viewer', 'editor', 'publisher', 'operator', 'admin']::text[]
+                                CHECK (cardinality(visible_to) >= 1
+                                       AND visible_to <@ ARRAY['viewer', 'editor', 'publisher', 'operator', 'admin']::text[]),
     created_at      timestamptz NOT NULL,
     updated_at      timestamptz NOT NULL
 );

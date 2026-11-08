@@ -95,6 +95,24 @@ class SeriesHttpTest {
     }
 
     @Test
+    void aViewerDoesNotSeeAnEditorOnlySeriesInTheListOrByItsIdentifier() throws Exception {
+        Map<String, Object> body = draft("Redaktion", "#redaktion", "primary", "on-primary");
+        body.put("visibleTo", List.of("editor"));
+        String id = (String) create(EDITOR, "EDITOR", body).body().get("id");
+
+        List<?> listed = (List<?>) get(VIEWER, "VIEWER", "/series");
+        assertTrue(listed.isEmpty(), "the viewer's list leaves the series out");
+
+        HttpClientResponseException hidden = assertThrows(HttpClientResponseException.class,
+                () -> get(VIEWER, "VIEWER", "/series/" + id));
+        assertEquals(404, hidden.getStatus().getCode(), "a series the viewer may not see answers 404, not 403");
+        assertEquals(200, client.toBlocking().exchange(HttpRequest.GET("/series/" + id)
+                .header(HeaderIdentityFilter.PERSON_HEADER, EDITOR)
+                .header(HeaderIdentityFilter.ROLES_HEADER, "EDITOR"), Object.class).getStatus().getCode(),
+                "the editor reads it");
+    }
+
+    @Test
     void theRenderBundleIsRefusedForAViewer() {
         seedChannel();
 

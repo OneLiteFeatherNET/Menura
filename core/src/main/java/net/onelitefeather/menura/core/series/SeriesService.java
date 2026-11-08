@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.series;
 
+import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.brand.BrandKit.ColourToken;
 import net.onelitefeather.menura.core.brand.Colour;
 import net.onelitefeather.menura.core.channel.Channel;
@@ -30,12 +31,14 @@ import java.time.ZoneId;
 import java.time.temporal.IsoFields;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -58,6 +61,9 @@ public final class SeriesService implements ExternalPostListener {
 
     /** Weeks run from Monday in the zone of the team, so a week is the one people in the stream chat talk about. */
     public static final ZoneId WEEK_ZONE = ZoneId.of("Europe/Berlin");
+
+    /** Every role: the visibility of the system's own reads and writes, such as the import and the playlist check. */
+    private static final Set<Role> EVERY_ROLE = Set.copyOf(EnumSet.allOf(Role.class));
 
     public static final int DEFAULT_WEEKS = 8;
     public static final int MAX_WEEKS = 52;
@@ -82,14 +88,31 @@ public final class SeriesService implements ExternalPostListener {
         this.joinDomain = Objects.requireNonNull(joinDomain, "joinDomain");
     }
 
-    /** Every series, active and inactive. */
+    /** Every series, active and inactive, for the system: no visibility applies. */
     public List<ContentSeries> list(Connection connection) throws SQLException {
         return series.list(connection);
     }
 
-    /** One series, or 404. */
+    /** The series a caller holding these roles may see, active and inactive. */
+    public List<ContentSeries> list(Connection connection, Set<Role> roles) throws SQLException {
+        return series.list(connection).stream().filter(s -> s.isVisibleTo(roles)).toList();
+    }
+
+    /** One series, or 404, for the system: no visibility applies. */
     public ContentSeries find(Connection connection, UUID id) throws SQLException {
         return series.find(connection, id).orElseThrow(SeriesService::seriesNotFound);
+    }
+
+    /**
+     * One series for a caller holding these roles. A series the caller may not see answers 404, the same as a missing one, so
+     * the answer reveals nothing about it.
+     */
+    public ContentSeries find(Connection connection, UUID id, Set<Role> roles) throws SQLException {
+        ContentSeries found = find(connection, id);
+        if (!found.isVisibleTo(roles)) {
+            throw seriesNotFound();
+        }
+        return found;
     }
 
     /** Stores a new series after its colours and template are checked against the brand kit. */
@@ -107,7 +130,12 @@ public final class SeriesService implements ExternalPostListener {
      * the contrast is refused and the stored series stays as it was.
      */
     public ContentSeries update(Connection connection, UUID id, SeriesDraft draft) throws SQLException {
-        ContentSeries existing = find(connection, id);
+        return update(connection, id, draft, EVERY_ROLE);
+    }
+
+    /** Replaces a series the caller may see; any other series answers 404 and nothing is written. */
+    public ContentSeries update(Connection connection, UUID id, SeriesDraft draft, Set<Role> roles) throws SQLException {
+        ContentSeries existing = find(connection, id, roles);
         ContentSeries checked = ContentSeries.of(id, draft, existing.createdAt(), clock.instant());
         requireBrandValues(checked);
         requireUniqueHashtag(connection, checked);
@@ -132,6 +160,12 @@ public final class SeriesService implements ExternalPostListener {
      */
     public SeriesAssignment assign(Connection connection, UUID postId, AssignmentCommand command, UUID actor)
             throws SQLException {
+        return assign(connection, postId, command, actor, EVERY_ROLE);
+    }
+
+    /** As {@link #assign(Connection, UUID, AssignmentCommand, UUID)}, but a series the caller may not see answers 404. */
+    public SeriesAssignment assign(Connection connection, UUID postId, AssignmentCommand command, UUID actor,
+                                   Set<Role> roles) throws SQLException {
         Objects.requireNonNull(command, "command");
         ExternalPost post = posts.find(connection, postId).orElseThrow(() -> new ProblemException(404, "Not Found",
                 "No external post with this id."));
@@ -140,7 +174,7 @@ public final class SeriesService implements ExternalPostListener {
             throw new ProblemException(400, "Invalid assignment",
                     "Name one series, or mark the post no series; not both and not neither.");
         }
-        ContentSeries target = hasSeries ? find(connection, command.seriesId()) : null;
+        ContentSeries target = hasSeries ? find(connection, command.seriesId(), roles) : null;
         Optional<SeriesAssignment> current = series.lockAssignment(connection, post.id());
         if (current.isPresent() && current.get().covered()) {
             if (sameDecision(current.get(), target)) {
@@ -198,6 +232,14 @@ public final class SeriesService implements ExternalPostListener {
      * channel. Only published shorts count; a post with a publish time after now is not published yet.
      */
     public Overview overview(Connection connection, Integer weeks) throws SQLException {
+        return overview(connection, weeks, EVERY_ROLE);
+    }
+
+    /**
+     * As {@link #overview(Connection, Integer)} for a caller with these roles: only the series the caller may see are listed.
+     * The audience warning still counts every active series, because it describes the installation, not the caller's view.
+     */
+    public Overview overview(Connection connection, Integer weeks, Set<Role> roles) throws SQLException {
         int count = weeks == null ? DEFAULT_WEEKS : weeks;
         if (count < 1 || count > MAX_WEEKS) {
             throw new ProblemException(400, "Invalid weeks", "The number of weeks must be from 1 to " + MAX_WEEKS + ".");
@@ -240,7 +282,8 @@ public final class SeriesService implements ExternalPostListener {
             }
             coverage.add(new ChannelCoverage(channel.id(), channel.displayName(), rows));
         }
-        return new Overview(all, warnings, coverage);
+        List<ContentSeries> visible = all.stream().filter(s -> s.isVisibleTo(roles)).toList();
+        return new Overview(visible, warnings, coverage);
     }
 
     /**

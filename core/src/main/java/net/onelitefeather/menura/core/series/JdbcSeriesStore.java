@@ -1,5 +1,7 @@
 package net.onelitefeather.menura.core.series;
 
+import net.onelitefeather.menura.core.auth.Role;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -7,19 +9,21 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /** PostgreSQL implementation of {@link SeriesStore} over the tables of migration V9. */
 public final class JdbcSeriesStore implements SeriesStore {
 
     private static final String SERIES_COLUMNS = "id, name, colour_token, badge_token, opening_formula, layout_template, "
-            + "hashtag, audience, weekday, posting_slot, active, created_at, updated_at";
+            + "hashtag, audience, weekday, posting_slot, active, visible_to, created_at, updated_at";
     private static final String ASSIGNMENT_COLUMNS = "post_id, series_id, no_series, flag, playlist_state, "
             + "playlist_checked_at, assigned_at, assigned_by";
 
@@ -37,8 +41,8 @@ public final class JdbcSeriesStore implements SeriesStore {
     @Override
     public void insert(Connection connection, ContentSeries series) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("insert into menura.content_series (" + SERIES_COLUMNS
-                + ") values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-            bindSeries(statement, series);
+                + ") values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+            bindSeries(connection, statement, series);
             statement.executeUpdate();
         }
         writeChildren(connection, series);
@@ -48,7 +52,7 @@ public final class JdbcSeriesStore implements SeriesStore {
     public void update(Connection connection, ContentSeries series) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("update menura.content_series set name = ?, "
                 + "colour_token = ?, badge_token = ?, opening_formula = ?, layout_template = ?, hashtag = ?, audience = ?, "
-                + "weekday = ?, posting_slot = ?, active = ?, updated_at = ? where id = ?")) {
+                + "weekday = ?, posting_slot = ?, active = ?, visible_to = ?, updated_at = ? where id = ?")) {
             statement.setString(1, series.name());
             statement.setString(2, series.colourToken());
             statement.setString(3, series.badgeToken());
@@ -59,8 +63,9 @@ public final class JdbcSeriesStore implements SeriesStore {
             statement.setInt(8, series.weekday());
             statement.setInt(9, series.postingSlot());
             statement.setBoolean(10, series.active());
-            statement.setTimestamp(11, Timestamp.from(series.updatedAt()));
-            statement.setObject(12, series.id());
+            statement.setArray(11, visibleArray(connection, series));
+            statement.setTimestamp(12, Timestamp.from(series.updatedAt()));
+            statement.setObject(13, series.id());
             if (statement.executeUpdate() != 1) {
                 throw new SQLException("the series to update does not exist");
             }
@@ -228,7 +233,7 @@ public final class JdbcSeriesStore implements SeriesStore {
         return series.stream().map(s -> new ContentSeries(s.id(), s.name(),
                 badges.getOrDefault(s.id(), Map.of()), s.colourToken(), s.badgeToken(), s.openingFormula(),
                 s.layoutTemplate(), s.hashtag(), s.audience(), s.weekday(), s.postingSlot(), s.active(),
-                playlists.getOrDefault(s.id(), Map.of()), s.createdAt(), s.updatedAt())).toList();
+                playlists.getOrDefault(s.id(), Map.of()), s.visibleTo(), s.createdAt(), s.updatedAt())).toList();
     }
 
     private static void writeChildren(Connection connection, ContentSeries series) throws SQLException {
@@ -255,7 +260,24 @@ public final class JdbcSeriesStore implements SeriesStore {
         }
     }
 
-    private static void bindSeries(PreparedStatement statement, ContentSeries series) throws SQLException {
+    /** The visible roles as a text array of their lower-case names, sorted so that equal sets are stored alike. */
+    private static java.sql.Array visibleArray(Connection connection, ContentSeries series) throws SQLException {
+        String[] names = series.visibleTo().stream().map(role -> role.name().toLowerCase(Locale.ROOT)).sorted()
+                .toArray(String[]::new);
+        return connection.createArrayOf("text", names);
+    }
+
+    private static Set<Role> visibleRoles(ResultSet row) throws SQLException {
+        java.sql.Array array = row.getArray("visible_to");
+        Set<Role> roles = EnumSet.noneOf(Role.class);
+        for (Object name : (Object[]) array.getArray()) {
+            roles.add(Role.valueOf(String.valueOf(name).toUpperCase(Locale.ROOT)));
+        }
+        return roles;
+    }
+
+    private static void bindSeries(Connection connection, PreparedStatement statement, ContentSeries series)
+            throws SQLException {
         statement.setObject(1, series.id());
         statement.setString(2, series.name());
         statement.setString(3, series.colourToken());
@@ -267,8 +289,9 @@ public final class JdbcSeriesStore implements SeriesStore {
         statement.setInt(9, series.weekday());
         statement.setInt(10, series.postingSlot());
         statement.setBoolean(11, series.active());
-        statement.setTimestamp(12, Timestamp.from(series.createdAt()));
-        statement.setTimestamp(13, Timestamp.from(series.updatedAt()));
+        statement.setArray(12, visibleArray(connection, series));
+        statement.setTimestamp(13, Timestamp.from(series.createdAt()));
+        statement.setTimestamp(14, Timestamp.from(series.updatedAt()));
     }
 
     private static ContentSeries seriesOf(ResultSet row) throws SQLException {
@@ -276,7 +299,7 @@ public final class JdbcSeriesStore implements SeriesStore {
                 row.getString("colour_token"), row.getString("badge_token"), row.getString("opening_formula"),
                 row.getString("layout_template"), row.getString("hashtag"),
                 Audience.parse(row.getString("audience")).orElseThrow(), row.getInt("weekday"),
-                row.getInt("posting_slot"), row.getBoolean("active"), Map.of(),
+                row.getInt("posting_slot"), row.getBoolean("active"), Map.of(), visibleRoles(row),
                 row.getTimestamp("created_at").toInstant(), row.getTimestamp("updated_at").toInstant());
     }
 

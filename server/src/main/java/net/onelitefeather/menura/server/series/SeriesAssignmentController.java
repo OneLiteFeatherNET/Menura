@@ -47,7 +47,8 @@ public class SeriesAssignmentController {
         CurrentPerson person = SeriesController.person(request);
         SeriesAssignment assignment = auditLog.write(SeriesController.caller(person), "series.assign", "external_post",
                 RequestIds.from(request, identifiers), connection -> series.assign(connection, id,
-                        new AssignmentCommand(body.seriesId(), body.noSeries(), body.replace()), person.personId()));
+                        new AssignmentCommand(body.seriesId(), body.noSeries(), body.replace()), person.personId(),
+                        person.roles()));
         return SeriesViews.of(assignment);
     }
 }

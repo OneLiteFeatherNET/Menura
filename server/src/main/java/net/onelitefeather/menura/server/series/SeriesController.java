@@ -34,6 +34,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -56,29 +57,33 @@ public class SeriesController {
         this.identifiers = identifiers;
     }
 
+    /** The series the caller may see. */
     @Get
     @RequiresRole
     @ExecuteOn(TaskExecutors.BLOCKING)
-    List<SeriesView> list() throws SQLException {
-        return transactions.inTransaction(c -> series.list(c).stream().map(SeriesViews::of).toList());
+    List<SeriesView> list(HttpRequest<?> request) throws SQLException {
+        Set<Role> roles = person(request).roles();
+        return transactions.inTransaction(c -> series.list(c, roles).stream().map(SeriesViews::of).toList());
     }
 
-    /** The series with their warnings and the weekly coverage of every channel. */
+    /** The series the caller may see, with their warnings and the weekly coverage of every channel. */
     @Get("/overview")
     @RequiresRole
     @ExecuteOn(TaskExecutors.BLOCKING)
-    OverviewView overview(@QueryValue Optional<Integer> weeks) throws SQLException {
-        SeriesReports.Overview overview = transactions.inTransaction(c -> series.overview(c, weeks.orElse(null)));
+    OverviewView overview(@QueryValue Optional<Integer> weeks, HttpRequest<?> request) throws SQLException {
+        Set<Role> roles = person(request).roles();
+        SeriesReports.Overview overview = transactions.inTransaction(c -> series.overview(c, weeks.orElse(null), roles));
         return SeriesViews.of(overview);
     }
 
-    /** One series with its episodes in number order. */
+    /** One series with its episodes in number order; a series the caller may not see answers 404. */
     @Get("/{id}")
     @RequiresRole
     @ExecuteOn(TaskExecutors.BLOCKING)
-    SeriesDetailView detail(@PathVariable UUID id) throws SQLException {
+    SeriesDetailView detail(@PathVariable UUID id, HttpRequest<?> request) throws SQLException {
+        Set<Role> roles = person(request).roles();
         return transactions.inTransaction(c -> {
-            ContentSeries found = series.find(c, id);
+            ContentSeries found = series.find(c, id, roles);
             List<SeriesViews.EpisodeView> episodes = new ArrayList<>();
             for (SeriesReports.Episode episode : series.episodes(c, id)) {
                 SeriesAssignment assignment = series.assignmentOf(c, episode.post().id()).orElse(null);
@@ -104,7 +109,8 @@ public class SeriesController {
     SeriesView update(@PathVariable UUID id, @Body SeriesRequest body, HttpRequest<?> request) throws SQLException {
         CurrentPerson person = person(request);
         ContentSeries updated = auditLog.write(caller(person), "series.update", "content_series",
-                RequestIds.from(request, identifiers), connection -> series.update(connection, id, SeriesViews.draft(require(body))));
+                RequestIds.from(request, identifiers),
+                connection -> series.update(connection, id, SeriesViews.draft(require(body)), person.roles()));
         return SeriesViews.of(updated);
     }
 
