@@ -1,0 +1,85 @@
+package net.onelitefeather.menura.server.library;
+
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRouteInfo;
+import jakarta.inject.Inject;
+import org.junit.jupiter.api.Test;
+
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+/**
+ * Checks the route table of the server against an allowlist (principle 1: the server never receives media bytes). A new
+ * route must be added to the allowlist on purpose, and no route may take a binary or multipart body.
+ */
+@MicronautTest
+class RouteTableTest {
+
+    /** Every route of the server, as "METHOD template". Adding a route changes this list on purpose. */
+    static final Set<String> ALLOWED = Set.of(
+            "GET /health",
+            "GET /auth/login",
+            "GET /auth/callback",
+            "GET /auth/session",
+            "POST /auth/logout",
+            "POST /calendar-feed-token",
+            "DELETE /calendar-feed-token",
+            "GET /calendar/feed/{token}",
+            "GET /openapi/menura.yaml",
+            "POST /asset-upload-sessions",
+            "GET /asset-upload-sessions/{id}",
+            "POST /asset-upload-sessions/{id}/duplicate-confirmation",
+            "POST /asset-upload-sessions/{id}/complete",
+            "DELETE /asset-upload-sessions/{id}",
+            "GET /assets",
+            "GET /assets/{id}",
+            "GET /assets/{id}/preview-link",
+            "GET /assets/{id}/download-link",
+            "DELETE /assets/{id}");
+
+    private static final Set<Class<?>> BINARY_BODIES = Set.of(byte[].class, InputStream.class, ByteBuffer.class,
+            StreamingFileUpload.class, CompletedFileUpload.class);
+
+    @Inject
+    Router router;
+
+    @Test
+    void noRouteTakesMediaBytesAsItsBody() {
+        List<String> binary = routes().stream()
+                .filter(route -> route.getRequestBodyType().map(Argument::getType).map(BINARY_BODIES::contains).orElse(false))
+                .map(route -> route.getHttpMethodName() + " " + route.getUriMatchTemplate())
+                .toList();
+
+        assertEquals(List.of(), binary, "no route may accept a binary or multipart body");
+    }
+
+    @Test
+    void routeTableMatchesTheAllowlist() {
+        Set<String> actual = routes().stream()
+                .map(route -> route.getHttpMethodName() + " " + route.getUriMatchTemplate())
+                .collect(Collectors.toSet());
+
+        assertFalse(actual.isEmpty(), "the server must expose its routes");
+        assertEquals(ALLOWED, actual, "the route table differs from the allowlist");
+    }
+
+    /**
+     * The production routes: HEAD routes are implied by GET, and the /test-* controllers exist only in the test sources.
+     */
+    private List<UriRouteInfo<?, ?>> routes() {
+        return router.uriRoutes()
+                .filter(route -> !route.getHttpMethodName().equals("HEAD"))
+                .filter(route -> !route.getUriMatchTemplate().toString().startsWith("/test-"))
+                .toList();
+    }
+}
