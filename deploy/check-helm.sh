@@ -300,8 +300,29 @@ secret_pods="$({
   yq -N 'select(.kind == "Deployment") | select(.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-channels") | .metadata.name' "$rendered_channels"
   yq -N 'select(.kind == "CronJob") | select(.spec.jobTemplate.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-channels") | .metadata.name' "$rendered_channels"
 } | grep -c . || true)"
-if [[ "$secret_pods" -ne 4 ]]; then
-  report "expected server, jobs, channel health and external post sync pods to read the channel Secret, found $secret_pods"
+if [[ "$secret_pods" -ne 5 ]]; then
+  report "expected server, jobs, channel health, external post sync and metric collection pods to read the channel Secret, found $secret_pods"
+fi
+
+# The analytics time zone (change add-content-analytics) reaches the server and the metric collection from the values.
+analytics_zone="$(yq -r '.analytics.timeZone' "$chart/values.yaml")"
+server_zone="$(yq -N 'select(.kind == "Deployment") | select(.metadata.labels."app.kubernetes.io/component" == "server") | .spec.template.spec.containers[0].env[] | select(.name == "MENURA_ANALYTICS_TIME_ZONE") | .value' "$rendered")"
+metric_zone="$(yq -N 'select(.kind == "CronJob") | select(.metadata.name | test("-metric-collection$")) | .spec.jobTemplate.spec.template.spec.containers[0].env[] | select(.name == "MENURA_ANALYTICS_TIME_ZONE") | .value' "$rendered")"
+if [[ "$server_zone" != "$analytics_zone" ]]; then
+  report "the server must get MENURA_ANALYTICS_TIME_ZONE=$analytics_zone from analytics.timeZone (found '$server_zone')"
+fi
+if [[ "$metric_zone" != "$analytics_zone" ]]; then
+  report "the metric collection must get MENURA_ANALYTICS_TIME_ZONE=$analytics_zone from analytics.timeZone (found '$metric_zone')"
+fi
+
+# The metric collection runs as a CronJob (jobs run metric-collection, change add-content-analytics) and is on by default.
+metric_command="$(yq -N 'select(.kind == "CronJob" and (.metadata.name | test("-metric-collection$"))) | .spec.jobTemplate.spec.template.spec.containers[0].command | join(" ")' "$rendered")"
+if [[ "$metric_command" != "jobs run metric-collection" ]]; then
+  report "the metric collection CronJob must run 'jobs run metric-collection' (found '$metric_command')"
+fi
+metric_schedule="$(yq -N 'select(.kind == "CronJob" and (.metadata.name | test("-metric-collection$"))) | .spec.schedule' "$rendered")"
+if [[ "$metric_schedule" != "$(yq -r '.jobs.metricCollection.schedule' "$chart/values.yaml")" ]]; then
+  report "the metric collection CronJob must take its schedule from jobs.metricCollection.schedule"
 fi
 
 # The retention CronJob (change add-content-library) is off by default: the default render has no retention CronJob.

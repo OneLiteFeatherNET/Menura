@@ -487,7 +487,7 @@ public final class ConnectionService {
         if (adapter.capabilities().metrics()) {
             String token = freshGrant(channelId).accessToken();
             try {
-                values = adapter.readMetrics(token, platformItemId, metrics);
+                values = adapter.readMetrics(token, List.of(platformItemId), metrics).getOrDefault(platformItemId, Map.of());
             } catch (PlatformException failure) {
                 throw platformFailure(failure);
             } catch (PlatformAdapter.Unsupported unsupported) {
