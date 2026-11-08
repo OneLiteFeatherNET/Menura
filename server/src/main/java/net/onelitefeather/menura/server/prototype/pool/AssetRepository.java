@@ -26,6 +26,10 @@ public class AssetRepository {
     private final Map<String, Asset> assets = new LinkedHashMap<>();
     private final Map<String, List<TranscriptSegment>> transcripts = new HashMap<>();
     private final Map<String, Person> people = new LinkedHashMap<>();
+    /** The person each signed-in subject is mapped to. Guarded by the same lock as the other maps. */
+    private final Map<String, String> personBySubject = new HashMap<>();
+    /** The number of the next simulated upload; the ids of new assets continue after the seed. */
+    private int nextAssetNumber = 1000;
 
     public AssetRepository() {
         for (Person person : PoolSeed.people()) {
@@ -99,6 +103,46 @@ public class AssetRepository {
             return Optional.ofNullable(people.get(id));
         } finally {
             lock.readLock().unlock();
+        }
+    }
+
+    /** The person a signed-in subject is mapped to, or empty when the subject has not written anything yet. */
+    public Optional<String> personIdOf(String subject) {
+        lock.readLock().lock();
+        try {
+            return Optional.ofNullable(personBySubject.get(subject));
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Returns the person of a subject, creating it with {@code name} and {@code newPersonId} on the first write of
+     * that subject. An existing mapping is never changed.
+     */
+    public Person ensurePersonOf(String subject, String newPersonId, String name) {
+        lock.writeLock().lock();
+        try {
+            String existing = personBySubject.get(subject);
+            if (existing != null) {
+                return people.get(existing);
+            }
+            Person created = new Person(newPersonId, name);
+            people.put(created.id(), created);
+            personBySubject.put(subject, created.id());
+            return created;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /** A new asset id, unique within this repository. */
+    public String nextAssetId() {
+        lock.writeLock().lock();
+        try {
+            return "a-" + nextAssetNumber++;
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 }
