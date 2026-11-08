@@ -78,6 +78,12 @@ public final class JdbcSeriesStore implements SeriesStore {
 
     @Override
     public Optional<SeriesAssignment> lockAssignment(Connection connection, UUID postId) throws SQLException {
+        // The post row is locked first, so two decisions on a post that has none yet also run one after the other.
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select id from menura.external_post where id = ? for update")) {
+            statement.setObject(1, postId);
+            statement.executeQuery().close();
+        }
         return assignment(connection, "select " + ASSIGNMENT_COLUMNS + " from menura.content_series_assignment "
                 + "where post_id = ? for update", postId);
     }
