@@ -70,6 +70,28 @@ application.yml); the user and password come from the existing Secret.
   value: {{ .Values.database.url | quote }}
 {{- end }}
 
+{{/*
+Library environment of the server only: the object storage endpoint, bucket and region, the part size and the
+limits and lifetimes of uploads and signed links. The credentials are not here; they come from storage.existingSecret.
+*/}}
+{{- define "menura.libraryEnv" -}}
+- name: MENURA_S3_ENDPOINT
+  value: {{ .Values.storage.endpoint | quote }}
+- name: MENURA_S3_REGION
+  value: {{ .Values.storage.region | quote }}
+- name: MENURA_S3_BUCKET
+  value: {{ .Values.storage.bucket | quote }}
+# Byte counts are rendered as int64: a YAML number is a float, which quote would print in exponent form.
+- name: MENURA_LIBRARY_PART_SIZE_BYTES
+  value: {{ int64 .Values.library.partSizeBytes | quote }}
+- name: MENURA_LIBRARY_RAW_MATERIAL_MAX_BYTES
+  value: {{ int64 .Values.library.rawMaterialMaxBytes | quote }}
+- name: MENURA_LIBRARY_UPLOAD_URL_LIFETIME
+  value: {{ .Values.library.uploadUrlLifetime | quote }}
+- name: MENURA_LIBRARY_LINK_LIFETIME
+  value: {{ .Values.library.linkLifetime | quote }}
+{{- end }}
+
 {{- define "menura.databaseEnvFrom" -}}
 {{- with .Values.database.existingSecret }}
 envFrom:

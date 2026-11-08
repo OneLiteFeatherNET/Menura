@@ -36,6 +36,21 @@ datasources:
 # registration: a web application whose redirect URI is MENURA_ENTRA_REDIRECT_URI, delegated openid and profile
 # permissions, and the groups claim in the ID token. Role group ids are comma-separated lists of object ids.
 menura:
+  # Finished assets and raw material (see net.onelitefeather.menura.server.library). The bucket is private; the
+  # endpoint is the public S3 host, because the browser sends parts straight to it (principle 14). Credentials come from
+  # an existing Secret (deploy/helm/menura); empty key values use the default AWS credential chain.
+  storage:
+    endpoint: ${MENURA_S3_ENDPOINT:`http://localhost:3900`}
+    region: ${MENURA_S3_REGION:`garage`}
+    bucket: ${MENURA_S3_BUCKET:`menura-dev`}
+    access-key-id: ${MENURA_S3_ACCESS_KEY_ID:}
+    secret-access-key: ${MENURA_S3_SECRET_ACCESS_KEY:}
+  library:
+    # Parts are at most 95 MB (principle 15); the default is that maximum.
+    part-size-bytes: ${MENURA_LIBRARY_PART_SIZE_BYTES:`99614720`}
+    raw-material-max-bytes: ${MENURA_LIBRARY_RAW_MATERIAL_MAX_BYTES:`53687091200`}
+    upload-url-lifetime: ${MENURA_LIBRARY_UPLOAD_URL_LIFETIME:`PT15M`}
+    link-lifetime: ${MENURA_LIBRARY_LINK_LIFETIME:`PT5M`}
   # Person budget of the server (see PersonRateLimiter). Anonymous requests are limited per IP at the gateway.
   ratelimit:
     person:
