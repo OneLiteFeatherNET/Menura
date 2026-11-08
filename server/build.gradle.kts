@@ -11,6 +11,9 @@ dependencies {
     implementation("io.micronaut.serde:micronaut-serde-jackson")
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
     implementation("com.nimbusds:nimbus-jose-jwt")
+    // S3 client and presigner of the OLF Ceph object storage (add-asset-upload).
+    implementation(platform(libs.awssdk.bom))
+    implementation(libs.awssdk.s3)
     runtimeOnly(libs.postgresql)
     // Compile-time too: the log redaction converter extends the logback pattern API.
     implementation("ch.qos.logback:logback-classic")
@@ -22,6 +25,7 @@ dependencies {
     // Integration tests (@Tag("integration")) run the sign-in store against PostgreSQL 17 in a container.
     testImplementation(platform(libs.testcontainers.bom))
     testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.testcontainers.minio)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.postgresql)
 }

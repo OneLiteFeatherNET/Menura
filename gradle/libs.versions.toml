@@ -6,6 +6,8 @@ postgresql = "42.7.14"
 junit = "6.0.3"
 testcontainers = "2.0.5"
 swagger-parser = "2.1.48"
+# AWS SDK v2 for the S3 API of the OLF Ceph object storage (presigned multipart uploads, change add-asset-upload).
+awssdk = "2.57.3"
 
 [libraries]
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
@@ -18,6 +20,9 @@ testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
 swagger-parser = { module = "io.swagger.parser.v3:swagger-parser", version.ref = "swagger-parser" }
+awssdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "awssdk" }
+awssdk-s3 = { module = "software.amazon.awssdk:s3" }
+testcontainers-minio = { module = "org.testcontainers:testcontainers-minio", version.ref = "testcontainers" }
 
 [plugins]
 micronaut-application = { id = "io.micronaut.application", version.ref = "micronaut" }
