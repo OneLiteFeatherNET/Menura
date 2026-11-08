@@ -69,5 +69,6 @@ export async function fetchPool(filters: PoolFilters, cursor: string | null = nu
   if (!response.ok) {
     throw new Error(`Der Content-Pool konnte nicht geladen werden (HTTP ${response.status}).`);
   }
-  return (await response.json()) as PoolPage;
+  const body = (await response.json()) as Partial<PoolPage>;
+  return { items: Array.isArray(body.items) ? body.items : [], nextCursor: body.nextCursor ?? null };
 }

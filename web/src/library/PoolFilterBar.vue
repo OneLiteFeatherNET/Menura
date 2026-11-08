@@ -62,7 +62,7 @@ const isChosen = () =>
       label="Tag"
       type="search"
       :model-value="filters.tag"
-      maxlength="30"
+      :maxlength="30"
       placeholder="z. B. speedrun"
       @update:model-value="(value: string) => update({ tag: value })"
     />
