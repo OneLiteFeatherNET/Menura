@@ -1,6 +1,6 @@
 # Tasks
 
-Requirements marked "Where ... is available" in the spec are built by the change that provides the component: recording, stream, contributor and tag links in `add-content-library` (phase 4), overlay state in `add-overlay-system` (phase 6), source post and revision comparisons in `add-content-distribution` (phase 2), MCP reads in `add-hub-mcp-server` (phase 3). The series and layout template dimensions read the catalogue of `add-content-series` and the brand kit of `add-brand-kit`, both phase 1 dependencies; the internal source tests use a test double, as the join-attribution source is built in `add-join-attribution`.
+Requirements marked "Where ... is available" in the spec are built by the change that provides the component: recording, stream, contributor and tag links in `add-content-library` (phase 1), overlay state in `add-overlay-system` (phase 6), source post and revision comparisons in `add-content-distribution` (phase 1), MCP reads in `add-hub-mcp-server` (phase 3). The series and layout template dimensions read the catalogue of `add-content-series` and the brand kit of `add-brand-kit`, both phase 1 dependencies; the internal source tests use a test double, as the join-attribution source is built in `add-join-attribution`.
 
 ## 1. Metric model and collection
 

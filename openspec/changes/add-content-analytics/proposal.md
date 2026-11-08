@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(analytics)` (code PR). Phase: 1 (Recognition & Measurability). Depends on: `add-access-control`, `add-channel-connections`, `add-external-post-import`, `add-content-series`, `add-brand-kit`.
+Conventional Commits: `feat(analytics)` (code PR). Phase: 1 (Pool, Calendar & Analytics). Depends on: `add-access-control`, `add-channel-connections`, `add-external-post-import`, `add-content-series`, `add-brand-kit`.
 
 Strand: content.
 
@@ -17,7 +17,7 @@ Optimisation decisions (which hook, length, layout, posting hour or channel work
 - Internal metric sources, such as join attribution from `add-join-attribution`, may write metric points for a channel, a post or a series under their own registered metric names. They are stored, rolled up and read like platform metrics, marked with their source, and estimates are flagged.
 - A series comparison per series and week shows engaged views, average view percentage (or unavailable) and the metrics of registered internal sources, read from rollups.
 - Analytics are readable through REST for the web dashboard. Where the hub MCP server is available, the same reads are offered through MCP so Claude can base optimisation proposals on them.
-- Comparisons of metrics before and after an accepted revision, and of recycled posts with their originals, are specified and built in `add-content-distribution` (phase 2).
+- Comparisons of metrics before and after an accepted revision, and of recycled posts with their originals, are specified and built in `add-content-distribution` (phase 1).
 - Could: export to a Prometheus-compatible endpoint for the existing OLF Grafana.
 
 ## Capabilities
@@ -32,7 +32,7 @@ Optimisation decisions (which hook, length, layout, posting hour or channel work
 
 - PostgreSQL (CloudNativePG, PostgreSQL 17, standard image): new partitioned metric tables and rollup tables; partitions are created ahead of each month.
 - Jobs component: the collection job and the rollup job run as Kubernetes CronJobs from the same codebase as the server.
-- Platform integrations: each provides its native metrics through the metrics operation of the adapter port. The insights changes implement it: `add-youtube-insights` and `add-twitch-insights` in phase 1, `add-tiktok-insights` and `add-instagram-insights` in phase 2; no third-party analytics service is used.
+- Platform integrations: each provides its native metrics through the metrics operation of the adapter port. The insights changes implement it: `add-youtube-insights` in phase 1, `add-twitch-insights`, `add-tiktok-insights` and `add-instagram-insights` in phase 2; no third-party analytics service is used.
 - Web: a dashboard that reads rollups, with the series comparison.
 - MCP: read-only analytics tools are added by `add-hub-mcp-server` when that change exists. Its tasks are not part of this change.
 - Storage growth: two years of raw points per external post and channel; partition and rollup sizing is in design.md.
