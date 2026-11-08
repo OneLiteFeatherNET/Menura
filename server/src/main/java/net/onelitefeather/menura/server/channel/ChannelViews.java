@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.server.channel;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.micronaut.serde.annotation.Serdeable;
 import net.onelitefeather.menura.core.channel.ChannelSnapshot;
 import net.onelitefeather.menura.core.channel.PlatformCapabilities;
@@ -21,11 +22,13 @@ public final class ChannelViews {
 
     /** One page of channels; {@code nextCursor} is null on the last page. */
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record ChannelPage(List<ChannelView> items, String nextCursor) {
     }
 
     /** A channel with its connection state, scopes, quota and the audit status of its platform app. */
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record ChannelView(UUID id, String platform, String displayName, String platformAccountId, String state,
                               String stateReason, List<String> features, List<String> grantedScopes,
                               List<String> missingScopes, String grantRevocation, Instant createdAt, Instant updatedAt,
@@ -33,30 +36,36 @@ public final class ChannelViews {
     }
 
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record QuotaView(Long used, Long limit, Instant resetAt, boolean warning, DelayView delay) {
     }
 
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record DelayView(String reason, Instant nextAttemptAt) {
     }
 
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record AuditView(String status, String displayText, List<String> restrictions, Instant decidedAt,
                             String source) {
     }
 
     /** A platform with what it supports and the features a channel can enable. */
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record PlatformView(String platform, String displayName, CapabilitiesView capabilities,
                                List<FeatureView> features, AuditView audit) {
     }
 
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record CapabilitiesView(boolean publishing, boolean nativeScheduling, boolean listing, boolean metrics,
                                    boolean revocation) {
     }
 
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record FeatureView(String name, List<String> scopes) {
     }
 
