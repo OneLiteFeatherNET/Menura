@@ -36,7 +36,8 @@ helm lint "$chart"
 rendered="$(mktemp)"
 rendered_disabled="$(mktemp)"
 rendered_pull="$(mktemp)"
-trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull"' EXIT
+rendered_storage="$(mktemp)"
+trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull" "$rendered_storage"' EXIT
 helm template "$release" "$chart" >"$rendered"
 
 # Hosts across all HTTPRoutes, one per line, sorted.
@@ -198,8 +199,9 @@ if grep -qE '(^|[^A-Za-z0-9_.*/-])\*([^A-Za-z0-9_.*/-]|$)' "$rendered"; then
 fi
 
 # Nothing outside the three public hosts may appear as a host in the rendered chart.
+# The one other host is the storage endpoint, s3.onelitefeather.net (principle 14: clients receive only presigned URLs for it).
 other_hosts="$(grep -oE '[a-z0-9-]+\.onelitefeather\.net' "$rendered" | sort -u \
-  | grep -vxE 'menura\.onelitefeather\.net|api-menura\.onelitefeather\.net|mcp-menura\.onelitefeather\.net' || true)"
+  | grep -vxE 'menura\.onelitefeather\.net|api-menura\.onelitefeather\.net|mcp-menura\.onelitefeather\.net|s3\.onelitefeather\.net' || true)"
 if [[ -n "$other_hosts" ]]; then
   report "unexpected host(s) in the rendered chart: $other_hosts"
 fi
@@ -235,6 +237,34 @@ if [[ "$pod_count" -ne 4 ]]; then
 fi
 if [[ "$pull_count" -ne "$pod_count" ]]; then
   report "every pod spec must carry imagePullSecrets harbor-pull ($pull_count of $pod_count do)"
+fi
+
+# Object storage of the library (add-asset-upload): with storage.existingSecret set, only the server pods get the S3
+# credentials, the bucket and endpoint come from values, and the part size never exceeds 95 MB (principle 15).
+helm template "$release" "$chart" --set storage.existingSecret=menura-storage >"$rendered_storage"
+server_env() {
+  yq -N "select(.kind == \"Deployment\") | select(.metadata.labels.\"app.kubernetes.io/component\" == \"server\") | .spec.template.spec.containers[0].env[] | select(.name == \"$1\") | .value" "$rendered_storage"
+}
+expected_bucket="$(yq -r '.storage.bucket' "$chart/values.yaml")"
+expected_endpoint="$(yq -r '.storage.endpoint' "$chart/values.yaml")"
+if [[ "$(server_env MENURA_S3_BUCKET)" != "$expected_bucket" ]]; then
+  report "the server must get MENURA_S3_BUCKET=$expected_bucket"
+fi
+if [[ "$(server_env MENURA_S3_ENDPOINT)" != "$expected_endpoint" ]]; then
+  report "the server must get MENURA_S3_ENDPOINT=$expected_endpoint"
+fi
+part_size="$(server_env MENURA_LIBRARY_PART_SIZE_BYTES)"
+if [[ -z "$part_size" || "$part_size" -gt 99614720 ]]; then
+  report "MENURA_LIBRARY_PART_SIZE_BYTES must be set and at most 99614720 (95 MiB, principle 15), found '$part_size'"
+fi
+if ! yq -N 'select(.kind == "Deployment") | select(.metadata.labels."app.kubernetes.io/component" == "server") | .spec.template.spec.containers[0].envFrom[]?.secretRef.name' "$rendered_storage" | grep -qx 'menura-storage'; then
+  report "the server pods must read the S3 credentials from the existing Secret menura-storage"
+fi
+if grep -q 'MENURA_S3_SECRET_ACCESS_KEY' <(yq -N 'select(.kind == "Deployment" or .kind == "Job") | select(.metadata.labels."app.kubernetes.io/component" != "server")' "$rendered_storage"); then
+  report "only the server may receive the S3 credentials; jobs and the migrate hook must not"
+fi
+if grep -q 'menura-storage' <(yq -N 'select(.kind == "Deployment" or .kind == "Job") | select(.metadata.labels."app.kubernetes.io/component" != "server")' "$rendered_storage"); then
+  report "the jobs and migrate pods must not reference the storage Secret"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

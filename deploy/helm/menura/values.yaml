@@ -30,6 +30,25 @@ database:
   # Empty means the pods get no credentials and the database cannot be reached.
   existingSecret: ""
 
+# Object storage of the library (finished assets and raw material): the OLF Ceph RGW through its S3 API, on the public
+# host (principle 14). The bucket is private and the browser sends parts straight to the endpoint, so its CORS rule
+# allows the web app origin only. Credentials are not values: they come from an existing Secret with the keys
+# MENURA_S3_ACCESS_KEY_ID and MENURA_S3_SECRET_ACCESS_KEY, injected into the server pods only.
+storage:
+  endpoint: https://s3.onelitefeather.net
+  region: default
+  bucket: menura
+  existingSecret: ""
+
+# Library limits and lifetimes, each an environment variable of the server (see application.yml). The part size may
+# not exceed 95 MB (principle 15): the Cloudflare request-body limit is 100 MB. The raw material limit defaults to 50 GiB.
+# Presigned part URLs and signed links are short-lived by design.
+library:
+  partSizeBytes: 99614720
+  rawMaterialMaxBytes: 53687091200
+  uploadUrlLifetime: PT15M
+  linkLifetime: PT5M
+
 # The server: REST API, backend-for-frontend, OAuth authorization server,
 # SSE feeds and the MCP endpoint. It never transcodes or renders video.
 server:

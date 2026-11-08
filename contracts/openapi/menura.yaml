@@ -20,6 +20,8 @@ tags:
     description: Web sign-in through Menura's authorization server (backend-for-frontend session).
   - name: Calendar
     description: Calendar feed tokens for read-only calendar subscriptions.
+  - name: Library
+    description: Finished assets and raw material, uploaded by presigned multipart upload straight to the object storage.
 paths:
   /health:
     get:
@@ -241,6 +243,311 @@ paths:
                 type: string
         "401":
           $ref: "#/components/responses/Problem"
+  /asset-upload-sessions:
+    post:
+      tags:
+        - Library
+      operationId: startAssetUpload
+      summary: Starts an upload of a finished asset or raw material.
+      description: |
+        Editor only. The declaration is checked first; a checksum already recorded for the same uploader flags the
+        upload instead (state flagged, no part URLs) until it is confirmed. Otherwise a multipart upload is created in
+        the private bucket and presigned part URLs are issued, none for a part above 95 MB. The media bytes go from the
+        browser straight to the storage; the server never receives them.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetUploadRequest"
+      responses:
+        "201":
+          description: The session was created. Its state is uploading, or flagged when the checksum is a duplicate.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSessionView"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "413":
+          description: The file is above the raw material limit, or needs more parts than the storage allows.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /asset-upload-sessions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Library
+      operationId: getAssetUpload
+      summary: The upload session with its confirmed parts and the URLs of the parts still to send.
+      description: |
+        Editor only, and only for the uploader; any other caller answers 404. The confirmed parts are read from the
+        storage. The upload continues with nextPart. A reload returns the same session.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The session.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSessionView"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags:
+        - Library
+      operationId: cancelAssetUpload
+      summary: Cancels a flagged or running upload and aborts its storage upload.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The session is cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSessionView"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /asset-upload-sessions/{id}/duplicate-confirmation:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    post:
+      tags:
+        - Library
+      operationId: confirmDuplicateAssetUpload
+      summary: Confirms that a flagged duplicate is intended and starts its upload.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The upload continues; its part URLs are in the response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSessionView"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /asset-upload-sessions/{id}/complete:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    post:
+      tags:
+        - Library
+      operationId: completeAssetUpload
+      summary: Completes an upload and verifies the stored checksum.
+      description: |
+        Every part must be in the storage. The stored object's size and checksum are compared with the declaration: a
+        match lists the asset as available; a mismatch fails the session, removes the object and answers 422.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The asset is available; assetId names it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSessionView"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          description: The stored file does not match the declared size and checksum; nothing is listed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /assets:
+    get:
+      tags:
+        - Library
+      operationId: listAssets
+      summary: The assets the caller may see, newest first.
+      description: |
+        Any signed-in person. Raw material is listed only to its uploader and to admins. Listing carries metadata only;
+        links are requested per asset.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: One page of visible assets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /assets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Library
+      operationId: getAsset
+      summary: One asset.
+      description: A hidden asset answers 404, the same as an unknown one.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The asset.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetView"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags:
+        - Library
+      operationId: deleteAsset
+      summary: Deletes an asset that no post references.
+      description: |
+        Editor only, and an explicit request: nothing is deleted otherwise. Refused with 409 while a post references the
+        asset, naming the post. Each deletion writes one audit entry.
+      security:
+        - sessionCookie: []
+      responses:
+        "204":
+          description: The asset is deleted.
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /assets/{id}/preview-link:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Library
+      operationId: getAssetPreviewLink
+      summary: A short-lived signed link to preview the asset inline.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The signed link. It expires at expiresAt and is never cached.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedLink"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /assets/{id}/download-link:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Library
+      operationId: getAssetDownloadLink
+      summary: A short-lived signed link to download the asset as an attachment.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The signed link. It expires at expiresAt and is never cached.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedLink"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -368,3 +675,251 @@ components:
               - PUBLISHER
               - OPERATOR
               - ADMIN
+    AssetUploadRequest:
+      type: object
+      description: What an editor declares to start an upload. Every field is checked; a missing one is named in the problem.
+      required:
+        - kind
+        - format
+        - sizeBytes
+        - checksum
+        - width
+        - height
+      properties:
+        kind:
+          type: string
+          enum:
+            - video
+            - image
+            - raw_material
+        format:
+          type: string
+          description: The container or image format, in lower case (mp4, mov, webm, mkv, png, jpg, jpeg, webp or gif).
+          maxLength: 16
+        durationSeconds:
+          type: integer
+          minimum: 1
+          description: Required for video and raw_material; not allowed for image. Declared by the client, never probed.
+        width:
+          type: integer
+          minimum: 1
+          maximum: 16384
+        height:
+          type: integer
+          minimum: 1
+          maximum: 16384
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 1
+        checksum:
+          type: string
+          description: The SHA-256 of the part digests, base64, then a dash and the part count, as in "base64=-3". The server compares it with the storage's own value on completion.
+          pattern: "^[A-Za-z0-9+/]{43}=-[1-9][0-9]{0,4}$"
+        streamTitle:
+          type: string
+          maxLength: 200
+          description: Required for raw_material. No control or format characters.
+        streamDate:
+          type: string
+          format: date
+          description: Required for raw_material; the day of the stream.
+    PartUrl:
+      type: object
+      description: A presigned PUT URL for one part. The browser sends the part with its x-amz-checksum-sha256 header.
+      required:
+        - partNumber
+        - sizeBytes
+        - url
+        - expiresAt
+      properties:
+        partNumber:
+          type: integer
+          minimum: 1
+        sizeBytes:
+          type: integer
+          format: int64
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+    UploadSessionView:
+      type: object
+      description: An upload session. Nullable members are always present, as null when they do not apply.
+      required:
+        - id
+        - state
+        - kind
+        - format
+        - width
+        - height
+        - sizeBytes
+        - checksum
+        - partSizeBytes
+        - partCount
+        - confirmedParts
+        - parts
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        state:
+          type: string
+          enum:
+            - flagged
+            - uploading
+            - available
+            - failed
+            - cancelled
+        kind:
+          type: string
+          enum:
+            - video
+            - image
+            - raw_material
+        format:
+          type: string
+        durationSeconds:
+          type:
+            - integer
+            - "null"
+        width:
+          type: integer
+        height:
+          type: integer
+        sizeBytes:
+          type: integer
+          format: int64
+        checksum:
+          type: string
+        partSizeBytes:
+          type: integer
+          format: int64
+        partCount:
+          type: integer
+        streamTitle:
+          type:
+            - string
+            - "null"
+        streamDate:
+          type:
+            - string
+            - "null"
+          format: date
+        duplicateOf:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: The asset the checksum already belongs to, when the upload is flagged.
+        assetId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        failureReason:
+          type:
+            - string
+            - "null"
+          description: Why the session failed, for example checksum_mismatch.
+        confirmedParts:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          description: The part numbers the storage has confirmed, ascending.
+        nextPart:
+          type:
+            - integer
+            - "null"
+          description: The first part not yet confirmed; null when every part is confirmed.
+        parts:
+          type: array
+          description: Presigned URLs for the parts not yet confirmed, ascending.
+          items:
+            $ref: "#/components/schemas/PartUrl"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AssetView:
+      type: object
+      description: A verified asset as listed. Metadata only; links are requested separately.
+      required:
+        - id
+        - kind
+        - format
+        - width
+        - height
+        - sizeBytes
+        - checksum
+        - uploaderId
+        - createdAt
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        kind:
+          type: string
+          enum:
+            - video
+            - image
+            - raw_material
+        format:
+          type: string
+        durationSeconds:
+          type:
+            - integer
+            - "null"
+        width:
+          type: integer
+        height:
+          type: integer
+        sizeBytes:
+          type: integer
+          format: int64
+        checksum:
+          type: string
+        uploaderId:
+          $ref: "#/components/schemas/Identifier"
+        streamTitle:
+          type:
+            - string
+            - "null"
+        streamDate:
+          type:
+            - string
+            - "null"
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+    AssetPage:
+      description: One cursor page of assets; the envelope is CursorPage.
+      allOf:
+        - $ref: "#/components/schemas/CursorPage"
+        - type: object
+          required:
+            - items
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/AssetView"
+    SignedLink:
+      type: object
+      description: A signed link to one object. The storage refuses it after expiresAt.
+      required:
+        - url
+        - expiresAt
+      properties:
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
