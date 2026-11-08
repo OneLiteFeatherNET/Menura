@@ -1122,6 +1122,41 @@ paths:
                 type: string
         "401":
           $ref: "#/components/responses/Problem"
+  /channels/{id}/external-posts:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The channel identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Channels
+      operationId: listChannelExternalPosts
+      summary: The posts of a channel, imported or published by Menura, with their status and the time of the last sync.
+      description: |
+        Cursor-paged, newest first. Read by every signed-in person, as the channel is. A removed post carries no link
+        (url is null) and status removed; its record and history are kept. A channel that needs reconnection keeps its
+        posts and shows channelState needs_reconnection, and no sync reads it until it is connected again.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: One page of the channel's posts with the time of its last complete sync.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExternalPostPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -2155,3 +2190,85 @@ components:
         version:
           type: integer
           minimum: 1
+    ExternalPostPage:
+      type: object
+      description: One page of a channel's external posts, with the time of its last complete sync.
+      required:
+        - channelId
+        - channelState
+        - items
+        - nextCursor
+      properties:
+        channelId:
+          $ref: "#/components/schemas/Identifier"
+        channelState:
+          type: string
+          enum:
+            - connected
+            - needs_reconnection
+            - disconnected
+        lastSuccessfulSyncAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: When the channel was last re-synced completely. Null when it never was.
+        lastFailedSyncAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        syncFailureReason:
+          type:
+            - string
+            - "null"
+          description: The fixed text of the last failed sync, with no token and no response body.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExternalPost"
+        nextCursor:
+          type:
+            - string
+            - "null"
+    ExternalPost:
+      type: object
+      description: >-
+        A post or video of a channel. It holds metadata and the platform URL only; no media is stored by Menura.
+      required:
+        - id
+        - platform
+        - title
+        - format
+        - publishedAt
+        - url
+        - status
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        platform:
+          type: string
+        title:
+          type: string
+        format:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+          description: The publish time in UTC.
+        url:
+          type:
+            - string
+            - "null"
+          description: The platform link. Null when the post is removed.
+        status:
+          type: string
+          enum:
+            - live
+            - removed
+        removedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: When the removal was seen. Null while the post is live.

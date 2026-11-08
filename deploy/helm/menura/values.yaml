@@ -100,6 +100,13 @@ jobs:
   channelHealth:
     enabled: true
     schedule: "*/15 * * * *"
+  # The external post sync (CronJob, change add-external-post-import): imports the existing posts of connected channels
+  # and re-syncs them. A channel whose last complete sync is newer than interval (ISO-8601) is skipped. Needs
+  # channels.existingSecret, like channelHealth.
+  externalPostSync:
+    enabled: true
+    schedule: "17 */6 * * *"
+    interval: PT6H
 
 # Channel connections (change add-channel-connections). The server and the channel health job read these from an
 # existing Secret created outside this chart, with the keys MENURA_TOKEN_ENCRYPTION_KEY (required; the server does not
