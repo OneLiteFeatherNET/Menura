@@ -23,3 +23,11 @@ openspec
 desktop
 obs-plugin
 overlay
+
+# The Storybook workbench of the web package: its configuration and its static build never reach an image.
+web/.storybook
+web/storybook-static
+web/e2e
+web/test-results
+web/playwright-report
+web/dist-e2e

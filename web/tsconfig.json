@@ -19,5 +19,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "tests/**/*.ts", "scripts/**/*.ts", "*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.vue", "tests/**/*.ts", "scripts/**/*.ts", ".storybook/**/*.ts", "e2e/**/*.ts", "*.ts"]
 }

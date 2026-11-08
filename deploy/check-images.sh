@@ -63,7 +63,8 @@ ignore=".dockerignore"
 if [[ ! -f "$ignore" ]]; then
   report "$ignore does not exist"
 else
-  for pattern in ".git" "**/node_modules" "web/dist" "**/build"; do
+  # The Storybook workbench never reaches an image: its configuration and its static build are ignored.
+  for pattern in ".git" "**/node_modules" "web/dist" "**/build" "web/.storybook" "web/storybook-static"; do
     if ! grep -qxF "$pattern" "$ignore"; then
       report "$ignore does not exclude $pattern"
     fi

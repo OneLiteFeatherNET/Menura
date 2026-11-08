@@ -151,6 +151,33 @@ for command in ("pnpm lint", "pnpm typecheck", "pnpm test", "pnpm build"):
     if command not in web_text:
         fail(f"build.yml does not run '{command}'")
 
+# The workbench job: Storybook interaction tests and the Playwright suite in Chromium, the static workbench and the
+# Playwright traces uploaded as artifacts.
+workbench_jobs = [
+    job for job in (build.get("jobs") or {}).values()
+    if isinstance(job, dict) and "test-storybook" in step_text(job)
+]
+if not workbench_jobs:
+    fail("build.yml has no job that runs the Storybook tests (pnpm test-storybook)")
+for job in workbench_jobs:
+    text = step_text(job)
+    if "test-e2e" not in text:
+        fail("the workbench job does not run the end-to-end tests (pnpm test-e2e)")
+    if "build-storybook" not in text:
+        fail("the workbench job does not build the static workbench (pnpm build-storybook)")
+    if "playwright install" not in text and "playwright install" not in " ".join(
+            str(step.get("run", "")) for step in job.get("steps") or [] if isinstance(step, dict)):
+        fail("the workbench job does not install the Playwright browser")
+    uploads = [
+        str((step.get("with") or {}).get("path", ""))
+        for step in job.get("steps") or []
+        if isinstance(step, dict) and "upload-artifact" in str(step.get("uses", ""))
+    ]
+    if not any("storybook-static" in path for path in uploads):
+        fail("the workbench job does not upload the static workbench")
+    if not any("test-results" in path for path in uploads):
+        fail("the workbench job does not upload the Playwright traces")
+
 # chart.yml: the three deploy checks and the schema validation of the rendered chart.
 chart_text = "\n".join(
     step_text(job) for job in (workflows.get(".github/workflows/chart.yml", {}).get("jobs") or {}).values()
