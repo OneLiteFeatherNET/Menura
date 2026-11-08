@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(series)` (code PR). Phase: 1 (Recognition & Measurability). Depends on: `add-access-control`, `add-brand-kit`, `add-channel-connections`, `add-external-post-import`.
+Conventional Commits: `feat(series)` (code PR). Phase: 1 (Pool, Calendar & Analytics). Depends on: `add-access-control`, `add-brand-kit`, `add-channel-connections`, `add-external-post-import`.
 
 Strand: content.
 
@@ -33,6 +33,6 @@ Menura does not render or cut video in this change (principle 2). Until `add-loc
 - PostgreSQL (CloudNativePG, PostgreSQL 17, standard image): new tables for series, post assignments and per-series episode counters; no new database or extension.
 - Server: REST endpoints for editors (write) and viewers (read); the render bundle endpoint for the external renderer, which is a machine client with its own credential.
 - Web: series management and the coverage view.
-- Brand kit: a series colour references a colour token of `add-brand-kit`, which moves to phase 1 with this roadmap re-cut.
+- Brand kit: a series colour references a colour token of `add-brand-kit`, which is also in phase 1.
 - Jobs: no new scheduled job. Coverage is computed on read; the playlist check runs after collection of platform data.
 - Join attribution: `add-join-attribution` reads the series assignment of posts. No edge in the other direction: the join domain reaches the render bundle only where that change is available.

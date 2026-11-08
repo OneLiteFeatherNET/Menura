@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(attribution)` (code PR). Phase: 1 (Recognition & Measurability). Depends on: `add-access-control`, `add-channel-connections`, `add-external-post-import`, `add-content-analytics`, `add-content-series`.
+Conventional Commits: `feat(attribution)` (code PR). Phase: 2 (Platforms & Join Attribution). Depends on: `add-access-control`, `add-channel-connections`, `add-external-post-import`, `add-content-analytics`, `add-content-series`.
 
 Strand: content.
 
