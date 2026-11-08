@@ -33,6 +33,29 @@ Content analytics keeps the performance history of every external post, whether 
 - **WHEN** the collection fails
 - **THEN** the job records the failure for that channel and keeps the points collected before the failure
 
+### Requirement: Snapshots at fixed offsets
+(Must) The hub SHALL record the cumulative metrics of every external post at +1 hour, +2 hours, +4 hours, +8 hours, +24 hours, +48 hours and +7 days after its publication, and daily after that; SHALL take each snapshot in the first collection run at or after its offset and store it with its as-of time; and SHALL overwrite the snapshot of an offset when the platform later reports a revised value for it.
+
+#### Scenario: Snapshot taken at its offset
+- **GIVEN** an external post published at 10:00 and a collection run at 11:05, the first run at or after 11:00
+- **WHEN** that run collects the post
+- **THEN** the +1 hour snapshot holds the cumulative values with the as-of time 11:05
+
+#### Scenario: Late platform revision overwrites the snapshot
+- **GIVEN** a stored +24 hour snapshot with 100 views
+- **WHEN** a later collection receives 120 views for the same offset from the platform
+- **THEN** the snapshot holds 120 views with the new as-of time, and the raw points keep both collected values
+
+#### Scenario: Daily snapshots after seven days
+- **GIVEN** an external post published nine days earlier
+- **WHEN** the daily collection runs
+- **THEN** the snapshots of day eight and day nine are stored, each with its as-of time
+
+#### Scenario: Metric not provided in a snapshot
+- **GIVEN** a channel that does not provide watch time
+- **WHEN** the +24 hour snapshot of its post is taken
+- **THEN** the watch time of that snapshot is stored as absent and not as zero
+
 ### Requirement: Metric points in partitioned PostgreSQL tables
 (Must) The hub SHALL store every metric point in PostgreSQL with its external post, channel, metric name, value and collection time, in tables partitioned by month, and SHALL keep all raw points.
 
@@ -85,10 +108,10 @@ Content analytics keeps the performance history of every external post, whether 
 - **WHEN** a person requests the total views per channel and format for the last quarter
 - **THEN** the hub returns the result within one second from the rollups
 
-#### Scenario: Aggregate by posting hour
+#### Scenario: Posting-hour comparison
 - **GIVEN** two years of metric points and their rollups
-- **WHEN** a person requests the average views per posting hour for one channel
-- **THEN** the hub returns the result within one second from the rollups
+- **WHEN** a person requests the posting-hour comparison for one channel
+- **THEN** the hub returns the comparison at equal age defined in "Comparison at equal age" within one second from the rollups
 
 ### Requirement: Internal metric sources
 (Must) The hub SHALL accept metric points from registered internal sources for the installation as a whole, a channel, an external post or a series, each under its own registered metric names; SHALL store, roll up and read these points like platform metrics; SHALL mark every point with its source; and SHALL keep an estimate flag on points that a source reports as estimates and show it on every read.
@@ -117,6 +140,34 @@ Content analytics keeps the performance history of every external post, whether 
 - **GIVEN** a stored platform point of an external post
 - **WHEN** an internal source writes a point for the same post
 - **THEN** the platform point is unchanged and the internal point is stored with its own source
+
+### Requirement: Comparison at equal age
+(Must) The dashboard SHALL compare posts at equal age by publish hour and by weekday in the installation time zone (configured, default Europe/Berlin), using for each post its snapshot at a chosen offset (default +24 hours) and the median over the posts of each group; SHALL exclude every post younger than the chosen offset and report the count of posts used; and SHALL show a metric that a platform does not deliver as unavailable, never as zero.
+
+#### Scenario: Median per publish hour at +24 hours
+- **GIVEN** three posts published at 18:00 Europe/Berlin with +24 hour views of 100, 200 and 900
+- **WHEN** a person requests the equal-age comparison at +24 hours
+- **THEN** the 18:00 group shows a median of 200 views from three posts
+
+#### Scenario: Younger posts excluded
+- **GIVEN** a post published 10 hours ago and a chosen offset of +24 hours
+- **WHEN** the comparison is computed
+- **THEN** the post is excluded and not counted
+
+#### Scenario: Chosen offset used
+- **GIVEN** a request for the comparison at +48 hours
+- **WHEN** the comparison is computed
+- **THEN** only the +48 hour snapshots are used and posts younger than 48 hours are excluded
+
+#### Scenario: Weekday in the installation time zone
+- **GIVEN** a post published at 2026-11-08T23:30:00Z, which is Monday 00:30 in Europe/Berlin
+- **WHEN** the comparison is grouped by weekday
+- **THEN** the post is counted under Monday
+
+#### Scenario: Missing metric shown as unavailable
+- **GIVEN** a group whose posts all come from a channel that does not provide retention
+- **WHEN** the comparison is shown
+- **THEN** the retention median of that group is shown as unavailable and the count of posts with a retention value is zero
 
 ### Requirement: Series comparison
 (Must) The dashboard SHALL show, per series and per week, the engaged views, the average view percentage and the metrics of registered internal sources, read from rollups within the one-second budget of dashboard aggregates; a value the platform does not deliver SHALL be shown as unavailable and not as zero; and series SHALL be ranked by engaged views, not by views.

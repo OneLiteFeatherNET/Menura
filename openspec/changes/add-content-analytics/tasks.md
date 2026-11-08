@@ -42,13 +42,27 @@ Requirements marked "Where ... is available" in the spec are built by the change
 - [ ] 6.2 Implement the series-week rollup, the comparison endpoint and the dashboard comparison view; verify the tests from 6.1 pass
 - [ ] 6.3 Write a failing integration test (tagged `integration`) that the comparison of 52 weeks over 20 series and two years of generated points returns within one second from the rollup; verify it fails, then tune the rollup until it passes
 
-## 7. Integration checks
+## 7. Snapshots at fixed offsets
 
-- [ ] 7.1 Run the integration suite with the project's heavy-job lock (`flock ~/.cache/claude-heavy.lock`) and verify the partition, rollup, series comparison and two-year read tests pass
+- [ ] 7.1 Write failing tests with an injected clock and a fake channel client that the due offsets of a post are +1, +2, +4, +8, +24 and +48 hours and +7 days, then daily, that each snapshot is taken by the first run at or after its offset and stores its as-of time and age, and that a metric the channel does not provide is stored as absent; verify they fail
+- [ ] 7.2 Implement the snapshot table and the offset scheduling in the collection job; verify the tests from 7.1 pass
+- [ ] 7.3 Write failing tests that a revised value for an offset overwrites that snapshot while the raw points keep both collected values; verify they fail
+- [ ] 7.4 Implement the overwrite of a snapshot on revision; verify the tests from 7.3 pass
 
-## 8. Delivery
+## 8. Comparison at equal age
 
-- [ ] 8.1 Open the code pull request titled `feat(analytics): collect metrics of external posts`
+- [ ] 8.1 Write failing tests with an injected clock that the comparison uses the snapshot at the chosen offset (default +24 hours), groups posts by publish hour and weekday in the installation time zone (default Europe/Berlin), takes the median over the posts, excludes posts younger than the offset, reports the count of posts used, and shows a metric no post provides as unavailable; verify they fail
+- [ ] 8.2 Implement the per-offset group rollup and the equal-age comparison read, with the installation time zone read from configuration (default Europe/Berlin); verify the tests from 8.1 pass
+- [ ] 8.3 Write a failing integration test (tagged `integration`) that the equal-age comparison over two years of generated points returns within one second from the rollup; verify it fails, then tune the rollup until it passes
+- [ ] 8.4 Write failing mount tests that the dashboard posting-hour view renders the median and the count of posts for the chosen offset returned by the endpoint; verify they fail, then implement the view and verify they pass
+
+## 9. Integration checks
+
+- [ ] 9.1 Run the integration suite with the project's heavy-job lock (`flock ~/.cache/claude-heavy.lock`) and verify the partition, rollup, series comparison, equal-age comparison and two-year read tests pass
+
+## 10. Delivery
+
+- [ ] 10.1 Open the code pull request titled `feat(analytics): collect metrics of external posts`
 
 ## Workflow follow-up
 

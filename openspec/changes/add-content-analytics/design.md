@@ -4,7 +4,7 @@
 
 External posts and their channels live in PostgreSQL (see `add-external-post-import`); channels, platform connections and the metrics operation of the adapter port come from `add-channel-connections`. Metric points are a time series: many small rows per post, channel and metric, collected repeatedly for two years. Requirements are in `specs/content-analytics`; motivation is in proposal.md. Principle 1 keeps metadata and analytics metric points in the OLF CloudNativePG cluster (PostgreSQL 17, standard image, no extensions beyond it), with no further database. Principle 2 applies: the cluster runs no media work. The collection and rollup jobs run as Kubernetes CronJobs from the jobs component.
 
-The series catalogue (`add-content-series`) and the brand kit (`add-brand-kit`) are phase 1 dependencies of this change, so their dimensions are required here. Internal metric sources, such as join attribution (`add-join-attribution`), write into this change's tables. Recordings, the content library, content distribution, the overlay and the hub MCP server belong to later phases. Every requirement that needs one of them is written as a "Where ... is available" clause in the spec, and its tasks are not part of this change; the change that provides the component implements it.
+The series catalogue (`add-content-series`) and the brand kit (`add-brand-kit`) are phase 1 dependencies of this change, so their dimensions are required here. Internal metric sources, such as join attribution (`add-join-attribution`), write into this change's tables. The content library and content distribution are phase 1 as well; recordings, the overlay and the hub MCP server belong to later phases. Every requirement that needs one of these components is written as a "Where ... is available" clause in the spec, and its tasks are not part of this change; the change that provides the component implements it.
 
 ## Goals / Non-Goals
 
@@ -14,6 +14,7 @@ The series catalogue (`add-content-series`) and the brand kit (`add-brand-kit`) 
 - Partitions that keep each month's table small and let old months be maintained without touching recent ones.
 - A single read path for the dashboard (REST), and for MCP once `add-hub-mcp-server` exists.
 - Imported and published external posts analysed in the same way.
+- Posts compared at the same age (snapshots at fixed offsets), not at the same clock time.
 
 **Non-Goals:**
 - No write path from analytics into posts, schedules or approvals.
@@ -39,6 +40,14 @@ The series catalogue (`add-content-series`) and the brand kit (`add-brand-kit`) 
 
 **Unavailable is not zero.** A metric a channel does not provide is stored as absent; aggregates skip absent values and report the count of points used. Alternative: storing zero (rejected: it distorts averages and comparisons).
 
+**Snapshots as one row per post, metric and offset.** The collection job works out which offsets are due for each post (+1, +2, +4, +8, +24, +48 hours, +7 days, then daily) and writes each taken value to a snapshot table keyed by external post, metric and offset, with its as-of time and the age at which it was taken. A later revision overwrites that row; the raw points keep every collected value, as the spec states. The table is small (one row per post, metric and offset), so it is not partitioned by month. Collection runs are coarser than the first offsets only at the start; a snapshot taken late keeps its real as-of time and age, so it is late, not wrong.
+- Rejected: reading the value at an offset from raw points. Collection times are irregular, so an exact +1 hour value would often not exist.
+- Rejected: a separate snapshot job. The collection job already reads every post, and a second reader would double the platform calls.
+
+**Equal-age comparison by median over snapshot values.** The rollup job keeps, per offset, the snapshot value of each post grouped by publish hour and weekday in the installation time zone (configured, default Europe/Berlin). The comparison takes the median of one group at the chosen offset and reports the count of posts used. Posts younger than the offset are not in the rollup yet, so they are excluded by construction. Median rather than mean, because a single viral post would dominate a mean; the median cannot be summed in a rollup, which is why the per-post values are kept per group, and a group is small enough to read within the one-second budget (checked by the integration task).
+- Rejected: a mean. One outlier moves it by orders of magnitude.
+- Rejected: comparing raw totals of posts of different age, which is what the dashboard shows today and what makes new posts look weak.
+
 **Native platform metrics through the adapter port.** Each platform integration provides its metrics through the metrics operation of the adapter port (`add-channel-connections`). The collection job calls that operation for each external post and stores what it returns, with the availability each platform declares.
 - Rejected: a third-party analytics aggregator. Principle 13 forbids a service between Menura and a platform, and it would add a second source of truth for the same numbers.
 - Rejected: scraping public pages. It is not an official interface and breaks the minimal-scope rule of principle 13.
@@ -59,9 +68,11 @@ The series catalogue (`add-content-series`) and the brand kit (`add-brand-kit`) 
 - [Risk] A platform reports public posts only, so private posts have no metrics. → Mitigation: those metrics are stored as unavailable and the dashboard says why.
 - [Risk] Rollup job runs long on two years of partitions. → Mitigation: rollups are built per day and week, so a rebuild touches only the affected period.
 - [Risk] An estimate from an internal source is read as a measured value. → Mitigation: the estimate flag is kept in points and rollups and shown on every read, and the spec scenarios test it.
+- [Risk] A post's snapshot is taken late, so the comparison at an offset mixes ages → Mitigation: each snapshot stores its as-of age, and the comparison shows the count of posts used so a thin group is visible.
 - [Trade-off] Rollups lag raw points by the job interval. Accepted: analytics are for decisions made over days, not for live views.
 
 ## Open Questions
 
 - How long raw metric points are kept. This does not change the specs (raw points are kept, and no retention is specified), so it is deferred to the operator.
 - Whether the operator wants history rebuilt after a series reassignment, so that all points of a post carry the current series. The spec keeps the value each point was collected with; a rebuild would change stored history and is not specified here.
+- Whether a snapshot taken more than an hour after its offset should be left out of the equal-age comparison. The spec includes it with its as-of age; excluding it would need a tolerance that the operator should set after the first live week.
