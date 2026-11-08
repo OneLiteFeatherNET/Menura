@@ -10,12 +10,10 @@ import net.onelitefeather.menura.core.publish.StepRecord;
 
 import java.sql.Connection;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -230,9 +228,5 @@ public final class InMemoryPostStore implements PostStore {
 
     private static Instant time(Post post) {
         return post.publishedAt() != null ? post.publishedAt() : post.scheduledAt();
-    }
-
-    static List<Post> copy(List<Post> values) {
-        return new ArrayList<>(Objects.requireNonNull(values));
     }
 }

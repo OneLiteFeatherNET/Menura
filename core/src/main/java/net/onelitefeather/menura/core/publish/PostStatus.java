@@ -62,8 +62,11 @@ public enum PostStatus {
         return this == DRAFT || this == IN_REVIEW;
     }
 
-    /** Statuses in which a revision may be proposed. */
+    /**
+     * Statuses in which a revision may be proposed. A failed post takes one so that its time or text can be fixed before it
+     * is scheduled again.
+     */
     public boolean revisable() {
-        return this == DRAFT || this == IN_REVIEW || this == APPROVED || this == SCHEDULED;
+        return this == DRAFT || this == IN_REVIEW || this == APPROVED || this == SCHEDULED || this == FAILED;
     }
 }

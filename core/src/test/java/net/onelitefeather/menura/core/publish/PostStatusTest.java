@@ -48,6 +48,12 @@ class PostStatusTest {
     }
 
     @Test
+    void aFailedPostTakesARevisionSoThatItsTimeCanBeFixed() {
+        assertTrue(PostStatus.FAILED.revisable(), "a failed post takes a revision before it is scheduled again");
+        assertFalse(PostStatus.PUBLISHED.revisable(), "a published post takes no revision");
+    }
+
+    @Test
     void theWireNameParsesCaseInsensitively() {
         assertEquals(PostStatus.IN_REVIEW, PostStatus.parse(" In_Review ").orElseThrow(), "the wire name parses");
         assertFalse(PostStatus.parse("archived").isPresent(), "an unknown status is refused");
