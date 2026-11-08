@@ -40,6 +40,7 @@ class BrandKitContractTest {
         assertSecured(api, "/brand-kit/pins/{consumer}", PathItem::getGet, "read a pin");
         assertSecured(api, "/brand-kit/pins/{consumer}", PathItem::getPut, "set a pin");
         assertSecured(api, "/brand-kit/pins/{consumer}", PathItem::getDelete, "remove a pin");
+        assertSecured(api, "/brand-kit/events", PathItem::getGet, "publication notifications");
     }
 
     @Test

@@ -38,9 +38,29 @@ class BrandKitHttpTest {
     @Inject
     InMemoryBrandKitRepository repository;
 
+    @Inject
+    InMemoryBrandKitAssets assets;
+
     @BeforeEach
     void startEmpty() {
         repository.clear();
+        assets.clear();
+    }
+
+    @Test
+    void aMissingLanguageNamesTheLanguagesThatExistAndSubstitutesNone() throws Exception {
+        BrandKit base = InitialBrandKit.create();
+        BrandKit withTexts = new BrandKit(base.colours(), base.ramps(), base.textRoles(), base.typography(), base.marks(),
+                base.voice(), List.of(new BrandKit.LanguageText("de", "Danke", List.of("#menura")),
+                new BrandKit.LanguageText("en", "Thanks", List.of())), base.templates());
+        client.toBlocking().exchange(withPerson(publish(withTexts), EDITOR, "EDITOR"), String.class);
+
+        HttpClientResponseException refused = assertThrows(HttpClientResponseException.class, () ->
+                client.toBlocking().exchange(withPerson(HttpRequest.GET("/brand-kit/texts/fr"), VIEWER, "VIEWER")));
+
+        String detail = refused.getResponse().getBody(String.class).orElse("");
+        assertEquals(404, refused.getStatus().getCode());
+        assertTrue(detail.contains("[de, en]"), "the problem names the languages that exist: " + detail);
     }
 
     @Test

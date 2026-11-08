@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** The publication rules of a brand kit, each on its own behaviour, starting from the valid first kit. */
 class BrandKitRulesTest {
+
+    private static final String ASSET = "3f1c2a4e-5b6d-4c7e-9f8a-0b1c2d3e4f50";
 
     @Test
     void theInitialKitIsPublishable() {
@@ -50,11 +54,50 @@ class BrandKitRulesTest {
     }
 
     @Test
-    void aTypographyRoleWithoutAFontFileIsRefusedAndNamed() {
+    void aTypographyRoleWithoutAFontAssetIsRefusedAndNamed() {
         BrandKit base = InitialBrandKit.create();
-        BrandKit kit = withTypography(base, List.of(new TypographyRole("headline", "", 64)));
+        BrandKit kit = withTypography(base, List.of(new TypographyRole("headline", "", List.of(64, 48))));
 
-        assertTrue(violations(kit).contains("typography role 'headline' has no font file"), violations(kit).toString());
+        assertTrue(violations(kit).contains("typography role 'headline' has no font asset"), violations(kit).toString());
+    }
+
+    @Test
+    void aTypographyRoleWithoutASizeSetIsRefused() {
+        BrandKit kit = withTypography(InitialBrandKit.create(),
+                List.of(new TypographyRole("body", ASSET, List.of())));
+
+        assertTrue(violations(kit).contains("typography role 'body' has no positive size set"), violations(kit).toString());
+    }
+
+    @Test
+    void aTypographyRoleWithAVerifiableFontAssetAndSizesIsAccepted() {
+        BrandKit kit = withTypography(InitialBrandKit.create(),
+                List.of(new TypographyRole("body", ASSET, List.of(32, 24))));
+
+        assertEquals(List.of(), violations(kit), "a font asset id with a size set is publishable");
+    }
+
+    @Test
+    void aMarkVariantWithoutAnAssetIsRefusedAndNamed() {
+        BrandKit base = InitialBrandKit.create();
+        BrandKit kit = new BrandKit(base.colours(), base.ramps(), base.textRoles(), base.typography(),
+                List.of(new BrandKit.Mark("feather", List.of(new BrandKit.MarkVariant("light", "marks/light.svg",
+                        new BrandKit.SafeArea(10, 10, 10, 10))))), base.voice(), base.texts(), base.templates());
+
+        assertTrue(violations(kit).contains("mark 'feather' variant 'light' has no asset"), violations(kit).toString());
+    }
+
+    @Test
+    void theReferencedAssetsAreTheFontsAndTheMarkFiles() {
+        BrandKit base = InitialBrandKit.create();
+        UUID mark = UUID.fromString("9b2d1f0e-3c4a-4e5f-8a6b-7c8d9e0f1a2b");
+        BrandKit kit = new BrandKit(base.colours(), base.ramps(), base.textRoles(),
+                List.of(new TypographyRole("body", ASSET, List.of(32))),
+                List.of(new BrandKit.Mark("feather", List.of(new BrandKit.MarkVariant("light", mark.toString(),
+                        new BrandKit.SafeArea(10, 10, 10, 10))))), base.voice(), base.texts(), base.templates());
+
+        assertEquals(Set.of(UUID.fromString(ASSET), mark), BrandKitRules.referencedAssets(kit),
+                "the server checks exactly these assets against the library");
     }
 
     @Test

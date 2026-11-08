@@ -5,12 +5,14 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.sse.Event;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.QueryValue;
 import net.onelitefeather.menura.core.brand.BrandKit;
@@ -23,6 +25,7 @@ import net.onelitefeather.menura.core.problem.ProblemException;
 import net.onelitefeather.menura.server.audit.RequestIds;
 import net.onelitefeather.menura.server.auth.CurrentPerson;
 import net.onelitefeather.menura.server.auth.RequiresRole;
+import org.reactivestreams.Publisher;
 
 import java.sql.SQLException;
 
@@ -36,8 +39,10 @@ public class BrandKitController {
 
     private final BrandKits kits;
     private final IdentifierGenerator identifiers;
+    private final BrandKitNotifications notifications;
 
-    public BrandKitController(BrandKits kits, IdentifierGenerator identifiers) {
+    public BrandKitController(BrandKits kits, IdentifierGenerator identifiers, BrandKitNotifications notifications) {
+        this.notifications = notifications;
         this.kits = kits;
         this.identifiers = identifiers;
     }
@@ -97,8 +102,19 @@ public class BrandKitController {
                                            @Nullable @QueryValue String consumer, HttpRequest<?> request) throws SQLException {
         StoredKitVersion stored = kits.resolve(version, consumer);
         LanguageText text = stored.kit().text(language).orElseThrow(() -> new ProblemException(404, "Not Found",
-                "This brand kit version has no text for this language, and no other language is substituted."));
+                "This brand kit version has no text for the language '" + language + "'. Available languages: "
+                        + stored.kit().texts().stream().map(LanguageText::language).sorted().toList()
+                        + ". No other language is substituted."));
         return HttpResponse.ok(text).header(HttpHeaders.CACHE_CONTROL, "no-store");
+    }
+
+    /** The version notifications as Server-Sent Events. Every signed-in role may subscribe; a reconnect reads the version. */
+    @RequiresRole
+    @Get("/events")
+    @Produces(MediaType.TEXT_EVENT_STREAM)
+    public Publisher<Event<String>> events(HttpRequest<?> request) {
+        person(request);
+        return notifications.stream();
     }
 
     @RequiresRole

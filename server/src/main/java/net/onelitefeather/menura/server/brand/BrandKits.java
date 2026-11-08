@@ -2,15 +2,13 @@ package net.onelitefeather.menura.server.brand;
 
 import jakarta.inject.Singleton;
 import net.onelitefeather.menura.core.brand.BrandKit;
+import net.onelitefeather.menura.core.brand.BrandKitEvents;
+import net.onelitefeather.menura.core.brand.BrandKitEvents.KitPublished;
 import net.onelitefeather.menura.core.brand.BrandKitRules;
 import net.onelitefeather.menura.core.brand.InitialBrandKit;
 import net.onelitefeather.menura.core.db.Transactions;
-import net.onelitefeather.menura.core.id.IdentifierGenerator;
 import net.onelitefeather.menura.core.problem.ProblemException;
-import net.onelitefeather.menura.server.audit.AuditEntry;
 import net.onelitefeather.menura.server.audit.AuditLog;
-import net.onelitefeather.menura.server.audit.AuditRepository;
-import net.onelitefeather.menura.server.audit.Channel;
 import net.onelitefeather.menura.server.auth.CurrentPerson;
 import net.onelitefeather.menura.server.security.Caller;
 
@@ -18,56 +16,62 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
  * The central brand kit: publication of versions, reads of a version (the newest, a named one, or the one a consumer has
- * pinned), and the pins of consumers. Versions are immutable; a refused publication writes nothing. The first version is
- * seeded from the overlay theme the first time the kit is touched, by the system rather than by a person.
+ * pinned), and the pins of consumers. Versions are immutable; a refused publication writes nothing. A publication
+ * notifies the event sink after it has committed. The first version is seeded from the overlay theme the first time the
+ * kit is touched; the seed writes no audit entry, because the audit log has no system actor.
  */
 @Singleton
 public class BrandKits {
 
-    /** The person named on the seeded first version and on its audit entry. */
+    /** The person named as publisher of the seeded first version (the nil person; no audit entry names it). */
     static final UUID SYSTEM_PERSON = new UUID(0L, 0L);
     private static final String TARGET = "brand_kit";
     private static final Pattern CONSUMER = Pattern.compile("[a-z][a-z0-9-]{0,63}");
 
     private final Transactions transactions;
     private final AuditLog auditLog;
-    private final AuditRepository audit;
     private final BrandKitRepository kits;
-    private final IdentifierGenerator identifiers;
+    private final BrandKitAssets assets;
+    private final BrandKitEvents events;
     private final Clock clock;
 
-    public BrandKits(Transactions transactions, AuditLog auditLog, AuditRepository audit, BrandKitRepository kits,
-                     IdentifierGenerator identifiers, Clock clock) {
+    public BrandKits(Transactions transactions, AuditLog auditLog, BrandKitRepository kits, BrandKitAssets assets,
+                     BrandKitEvents events, Clock clock) {
         this.transactions = transactions;
         this.auditLog = auditLog;
-        this.audit = audit;
         this.kits = kits;
-        this.identifiers = identifiers;
+        this.assets = assets;
+        this.events = events;
         this.clock = clock;
     }
 
     /**
-     * Publishes a draft as the next version. The draft is checked first; a refusal names the violations and writes
-     * nothing. The version and its audit entry commit together.
+     * Publishes a draft as the next version. The draft is checked first, then every referenced font and mark must be a
+     * verified library asset. A refusal names the problems and writes nothing. The version and its audit entry commit
+     * together; only then is the notification sent.
      */
     public StoredKitVersion publish(CurrentPerson viewer, BrandKit draft, String requestId) throws SQLException {
         BrandKit prepared = BrandKitRules.prepare(draft);
         Caller caller = new Caller(viewer.personId(), viewer.channel());
-        return auditLog.write(caller, "brand_kit.publish", TARGET, requestId, connection -> {
+        StoredKitVersion version = auditLog.write(caller, "brand_kit.publish", TARGET, requestId, connection -> {
             kits.lockPublications(connection);
             seedIfEmpty(connection);
+            requireVerifiedAssets(connection, prepared);
             int next = kits.latest(connection).map(latest -> latest.version() + 1).orElse(1);
-            StoredKitVersion version = new StoredKitVersion(next, prepared, viewer.personId(), clock.instant());
-            if (!kits.insert(connection, version)) {
+            StoredKitVersion stored = new StoredKitVersion(next, prepared, viewer.personId(), clock.instant());
+            if (!kits.insert(connection, stored)) {
                 throw new ProblemException(409, "Publication Conflict", "Another publication took the version number; retry.");
             }
-            return version;
+            return stored;
         });
+        events.published(new KitPublished(version.version(), version.createdAt()));
+        return version;
     }
 
     /** The newest version. */
@@ -142,10 +146,14 @@ public class BrandKits {
             return;
         }
         Instant now = clock.instant();
-        StoredKitVersion seed = new StoredKitVersion(1, BrandKitRules.prepare(InitialBrandKit.create()), SYSTEM_PERSON, now);
-        if (kits.insert(connection, seed)) {
-            audit.insert(connection, new AuditEntry(identifiers.next(), SYSTEM_PERSON, "brand_kit.seed", TARGET, now,
-                    Channel.WEB, "seed"));
+        kits.insert(connection, new StoredKitVersion(1, BrandKitRules.prepare(InitialBrandKit.create()), SYSTEM_PERSON, now));
+    }
+
+    private void requireVerifiedAssets(Connection connection, BrandKit kit) throws SQLException {
+        Set<UUID> unknown = assets.unknown(connection, BrandKitRules.referencedAssets(kit));
+        if (!unknown.isEmpty()) {
+            throw new ProblemException(422, "Brand Kit Refused", "The brand kit references assets that are not verified "
+                    + "library assets: " + unknown.stream().map(UUID::toString).sorted().toList() + ".");
         }
     }
 

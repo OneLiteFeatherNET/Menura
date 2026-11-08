@@ -16,11 +16,13 @@ import net.onelitefeather.menura.core.problem.ProblemException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -60,6 +62,8 @@ public final class BrandKitRules {
     public static final String JOIN_DOMAIN = "join_domain";
 
     private static final Pattern NAME = Pattern.compile("[a-z][a-z0-9-]*");
+    private static final Pattern ASSET_ID = Pattern.compile(
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", Pattern.CASE_INSENSITIVE);
     private static final double EPSILON = 1e-9;
 
     private BrandKitRules() {
@@ -166,11 +170,11 @@ public final class BrandKitRules {
             if (!seen.add(role.role())) {
                 violations.add("typography role '" + role.role() + "' is defined twice");
             }
-            if (role.fontFile() == null || role.fontFile().isBlank()) {
-                violations.add("typography role '" + role.role() + "' has no font file");
+            if (!isAssetId(role.fontAsset())) {
+                violations.add("typography role '" + role.role() + "' has no font asset");
             }
-            if (role.sizePx() <= 0) {
-                violations.add("typography role '" + role.role() + "' has no positive size");
+            if (role.sizesPx().isEmpty() || role.sizesPx().stream().anyMatch(size -> size <= 0)) {
+                violations.add("typography role '" + role.role() + "' has no positive size set");
             }
         }
     }
@@ -186,8 +190,8 @@ public final class BrandKitRules {
             }
             for (MarkVariant variant : mark.variants()) {
                 String element = "mark '" + mark.name() + "' variant '" + variant.name() + "'";
-                if (variant.file() == null || variant.file().isBlank()) {
-                    violations.add(element + " has no file");
+                if (!isAssetId(variant.asset())) {
+                    violations.add(element + " has no asset");
                 }
                 if (variant.safeArea() == null) {
                     violations.add(element + " has no safe area");
@@ -196,6 +200,30 @@ public final class BrandKitRules {
                 }
             }
         }
+    }
+
+    /**
+     * The library assets a kit references: the font of every typography role and the file of every mark variant. The
+     * server checks that each one is a verified asset before it publishes the kit.
+     */
+    public static Set<UUID> referencedAssets(BrandKit kit) {
+        Set<UUID> assets = new LinkedHashSet<>();
+        kit.typography().forEach(role -> {
+            if (isAssetId(role.fontAsset())) {
+                assets.add(UUID.fromString(role.fontAsset()));
+            }
+        });
+        kit.marks().forEach(mark -> mark.variants().forEach(variant -> {
+            if (isAssetId(variant.asset())) {
+                assets.add(UUID.fromString(variant.asset()));
+            }
+        }));
+        return Set.copyOf(assets);
+    }
+
+    /** Whether the value names an asset: a canonical UUID string. */
+    static boolean isAssetId(String value) {
+        return value != null && ASSET_ID.matcher(value).matches();
     }
 
     private static boolean withinPercent(SafeArea area) {

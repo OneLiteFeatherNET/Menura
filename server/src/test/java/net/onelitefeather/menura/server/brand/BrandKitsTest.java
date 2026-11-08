@@ -1,6 +1,7 @@
 package net.onelitefeather.menura.server.brand;
 
 import net.onelitefeather.menura.core.brand.BrandKit;
+import net.onelitefeather.menura.core.brand.BrandKitEvents;
 import net.onelitefeather.menura.core.brand.BrandKit.ColourToken;
 import net.onelitefeather.menura.core.brand.InitialBrandKit;
 import net.onelitefeather.menura.core.auth.Role;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The brand kit service on in-memory collaborators, each test with its own fixture and a fixed clock. */
 class BrandKitsTest {
@@ -41,12 +43,67 @@ class BrandKitsTest {
     private final InMemoryAuditRepository audit = new InMemoryAuditRepository();
     private final DirectTransactions transactions = new DirectTransactions();
     private final IdentifierGenerator identifiers = new IdentifierGenerator(new DeterministicRandom());
+    private final InMemoryBrandKitAssets assets = new InMemoryBrandKitAssets();
+    private final RecordingEvents events = new RecordingEvents();
     private final BrandKits kits = new BrandKits(transactions, new AuditLog(transactions, clock, identifiers, audit),
-            audit, repository, identifiers, clock);
+            repository, assets, events, clock);
 
     @BeforeEach
     void startEmpty() {
         repository.clear();
+        assets.clear();
+    }
+
+    @Test
+    void aPublicationNotifiesTheEventSinkOnceWithTheVersionAndTheClockTime() throws SQLException {
+        kits.publish(EDITOR_PERSON, changedPrimary("#2a1a5e"), "req-n1");
+
+        assertEquals(List.of(new BrandKitEvents.KitPublished(2, clock.instant())), events.published,
+                "one notification naming version 2, stamped with the injected clock");
+    }
+
+    @Test
+    void aRefusedPublicationNotifiesNobody() {
+        assertThrows(ProblemException.class, () -> kits.publish(EDITOR_PERSON, withSurfaceWithoutDark(), "req-n2"));
+
+        assertEquals(List.of(), events.published, "a refused publication emits no notification");
+    }
+
+    @Test
+    void aFontOrMarkThatIsNotAVerifiedAssetRefusesThePublicationAndNamesIt() {
+        UUID font = UUID.fromString("3f1c2a4e-5b6d-4c7e-9f8a-0b1c2d3e4f50");
+        BrandKit kit = withFont(font.toString());
+
+        ProblemException refused = assertThrows(ProblemException.class, () -> kits.publish(EDITOR_PERSON, kit, "req-a1"));
+
+        assertEquals(422, refused.status());
+        assertTrue(refused.detail().contains(font.toString()), "the detail names the unknown asset: " + refused.detail());
+    }
+
+    @Test
+    void aFontThatIsAVerifiedAssetPublishes() throws SQLException {
+        UUID font = UUID.fromString("3f1c2a4e-5b6d-4c7e-9f8a-0b1c2d3e4f50");
+        assets.verify(font);
+
+        StoredKitVersion published = kits.publish(EDITOR_PERSON, withFont(font.toString()), "req-a2");
+
+        assertEquals(2, published.version(), "a verified asset is accepted and the version is stored");
+    }
+
+    static final class RecordingEvents implements BrandKitEvents {
+        final List<BrandKitEvents.KitPublished> published = new ArrayList<>();
+
+        @Override
+        public void published(BrandKitEvents.KitPublished event) {
+            published.add(event);
+        }
+    }
+
+    private static BrandKit withFont(String asset) {
+        BrandKit base = InitialBrandKit.create();
+        return new BrandKit(base.colours(), base.ramps(), base.textRoles(),
+                List.of(new BrandKit.TypographyRole("body", asset, List.of(32))), base.marks(), base.voice(),
+                base.texts(), base.templates());
     }
 
     @Test
@@ -65,8 +122,7 @@ class BrandKitsTest {
         kits.current();
 
         assertEquals(1, repository.latest(null).orElseThrow().version(), "the second read finds the seed and writes nothing");
-        assertEquals(1, audit.entries().stream().filter(entry -> entry.action().equals("brand_kit.seed")).count(),
-                "the seed is audited once");
+        assertEquals(List.of(), audit.entries(), "the seed writes no audit entry: the audit log has no system actor");
     }
 
     @Test

@@ -1,10 +1,7 @@
 package net.onelitefeather.menura.core.brand;
 
 import net.onelitefeather.menura.core.brand.BrandKit.ColourToken;
-import net.onelitefeather.menura.core.brand.BrandKit.Mark;
-import net.onelitefeather.menura.core.brand.BrandKit.MarkVariant;
 import net.onelitefeather.menura.core.brand.BrandKit.Parameter;
-import net.onelitefeather.menura.core.brand.BrandKit.SafeArea;
 import net.onelitefeather.menura.core.brand.BrandKit.Slot;
 import net.onelitefeather.menura.core.brand.BrandKit.Template;
 import net.onelitefeather.menura.core.brand.BrandKit.TextRole;
@@ -15,12 +12,11 @@ import java.util.List;
 
 /**
  * The first kit version. Its colour roles are the role values of the stream overlay theme (the Material Design 3
- * scheme generated from the seed {@value #SEED} in web/src/theme/seed.json, light and dark), and its mark is the feather
- * logo. No colour appears here that is not a token of the kit: the templates refer to tokens only.
+ * scheme generated from the seed {@value #SEED} in web/src/theme/seed.json, light and dark). No colour appears here
+ * that is not a token of the kit: the templates refer to tokens only.
  *
- * <p>Typography, voice and the per-language texts are not part of this seed: the font files and the copy are supplied by
- * the marketing owner and are published as a later version. The mark files are referenced by name; the files
- * themselves are uploaded with the mark.
+ * <p>Typography, marks, voice and the per-language texts are not part of this seed. Fonts and logos are verified assets
+ * of the library and the copy is supplied by the marketing owner; they are published as a later version.
  */
 public final class InitialBrandKit {
 
@@ -30,17 +26,13 @@ public final class InitialBrandKit {
     private InitialBrandKit() {
     }
 
-    /** The draft of the first version, before publication derives its tones. */
+    /**
+     * The draft of the first version, before publication derives its tones. It carries no mark: the feather logo is a
+     * library asset that is uploaded first, and the mark is published with the version that references it.
+     */
     public static BrandKit create() {
         return new BrandKit(colours(), List.of(new TonalRamp("brand", SEED, List.of())), textRoles(), List.of(),
-                List.of(new Mark("feather", List.of(
-                        new MarkVariant("light", "marks/feather-light.svg", margin()),
-                        new MarkVariant("dark", "marks/feather-dark.svg", margin())))),
-                "", List.of(), templates());
-    }
-
-    private static SafeArea margin() {
-        return new SafeArea(10, 10, 10, 10);
+                List.of(), "", List.of(), templates());
     }
 
     private static List<ColourToken> colours() {

@@ -1100,6 +1100,28 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+  /brand-kit/events:
+    get:
+      tags:
+        - Brand
+      operationId: streamBrandKitEvents
+      summary: Server-Sent Events of brand kit publications.
+      description: |
+        Any signed-in role. Each published version sends one event named brand-kit.published whose data is
+        {"version": N} and whose id is N; clients then read the version they need. Only publications made while the
+        client is connected are sent, so a client that reconnects reads GET /brand-kit to resynchronise. A heartbeat
+        event named heartbeat is sent at least every 25 seconds, so that the stream is not closed as idle.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: An event stream of brand kit notifications.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -1920,20 +1942,24 @@ components:
           description: The name of a colour token.
     TypographyRole:
       type: object
-      description: The font file and size of one role, such as headline, body or caption.
+      description: >-
+        One role, such as headline, body or caption, with its font and its set of sizes. The font is a verified asset of
+        the library, referenced by its id; the file is never sent with the kit. A role without a font asset is refused.
       required:
         - role
-        - fontFile
-        - sizePx
+        - fontAsset
+        - sizesPx
       properties:
         role:
           type: string
-        fontFile:
-          type: string
-          description: The font file of the role. Required for every role.
-        sizePx:
-          type: integer
-          minimum: 1
+        fontAsset:
+          $ref: "#/components/schemas/Identifier"
+        sizesPx:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            minimum: 1
     Mark:
       type: object
       description: A logo or mark with named variants.
@@ -1949,16 +1975,18 @@ components:
             $ref: "#/components/schemas/MarkVariant"
     MarkVariant:
       type: object
-      description: One variant of a mark, with the safe area no other element may enter.
+      description: >-
+        One variant of a mark: the verified library asset that holds its file, referenced by id, and the safe area no
+        other element may enter.
       required:
         - name
-        - file
+        - asset
         - safeArea
       properties:
         name:
           type: string
-        file:
-          type: string
+        asset:
+          $ref: "#/components/schemas/Identifier"
         safeArea:
           $ref: "#/components/schemas/SafeArea"
     SafeArea:

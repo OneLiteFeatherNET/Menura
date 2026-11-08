@@ -10,9 +10,9 @@ import java.util.Locale;
  * Derives the tones of a seed colour. The result is a pure function of the seed: the same seed always yields the same
  * tones, and the tones are stored in the kit version so that later changes of this function never alter a version.
  *
- * <p>The hue and saturation come from the seed; each tone sets the lightness to its own value, in HSL. This stands in
- * for the Material Design 3 HCT tone steps until a reviewed HCT implementation is adopted (see the design decisions of
- * the change add-brand-kit).
+ * <p>The hue and saturation come from the seed; each tone sets the lightness to its own value, in HSL. This is an
+ * approximation (Näherung) of the Material Design 3 HCT tone steps, which is not implemented here; it stays until a
+ * reviewed HCT implementation is adopted (see the design decisions of the change add-brand-kit).
  */
 public final class TonalPalette {
 

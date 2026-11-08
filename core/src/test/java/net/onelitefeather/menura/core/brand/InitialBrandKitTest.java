@@ -4,6 +4,7 @@ import net.onelitefeather.menura.core.brand.BrandKit.ColourToken;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,13 +28,8 @@ class InitialBrandKitTest {
     }
 
     @Test
-    void theMarkIsTheFeatherWithALightAndADarkVariantEachWithASafeArea() {
-        BrandKit.Mark feather = InitialBrandKit.create().marks().get(0);
-
-        assertEquals("feather", feather.name());
-        assertEquals(2, feather.variants().size(), "a light and a dark variant");
-        feather.variants().forEach(variant -> assertTrue(variant.safeArea() != null, "variant " + variant.name()
-                + " declares a safe area"));
+    void theSeedCarriesNoMarkBecauseTheLogoIsNotYetAVerifiedAsset() {
+        assertEquals(List.of(), InitialBrandKit.create().marks(), "a mark is published once its logo is a library asset");
     }
 
     @Test

@@ -61,8 +61,15 @@ public record BrandKit(List<ColourToken> colours, List<TonalRamp> ramps, List<Te
     public record TextRole(String name, String colour, String background) {
     }
 
-    /** The font file and size of one typography role, such as headline, body or caption. */
-    public record TypographyRole(String role, String fontFile, int sizePx) {
+    /**
+     * One typography role, such as headline, body or caption: the font file it uses and the set of sizes in pixels. The
+     * font is a verified asset of the library, referenced by its id; the kit never carries the file itself.
+     */
+    public record TypographyRole(String role, String fontAsset, List<Integer> sizesPx) {
+
+        public TypographyRole {
+            sizesPx = copy(sizesPx);
+        }
     }
 
     /** A logo or mark with named variants; each variant has its own safe area. */
@@ -73,8 +80,11 @@ public record BrandKit(List<ColourToken> colours, List<TonalRamp> ramps, List<Te
         }
     }
 
-    /** One variant of a mark: its file and the margin, in percent of the mark's frame, that no other element may enter. */
-    public record MarkVariant(String name, String file, SafeArea safeArea) {
+    /**
+     * One variant of a mark: the verified library asset that holds its file (referenced by id) and the margin, in
+     * percent of the mark's frame, that no other element may enter.
+     */
+    public record MarkVariant(String name, String asset, SafeArea safeArea) {
     }
 
     /** A safe area in percent of the frame, per side. */

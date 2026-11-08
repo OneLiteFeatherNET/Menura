@@ -63,7 +63,8 @@ class RouteTableTest {
             "GET /brand-kit/texts/{language}",
             "GET /brand-kit/pins/{consumer}",
             "PUT /brand-kit/pins/{consumer}",
-            "DELETE /brand-kit/pins/{consumer}");
+            "DELETE /brand-kit/pins/{consumer}",
+            "GET /brand-kit/events");
 
     private static final Set<Class<?>> BINARY_BODIES = Set.of(byte[].class, InputStream.class, ByteBuffer.class,
             StreamingFileUpload.class, CompletedFileUpload.class);
