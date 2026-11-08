@@ -44,4 +44,29 @@ public final class JdkHttpTransport implements HttpTransport {
             throw new IOException("interrupted while reaching the platform", e);
         }
     }
+
+    @Override
+    public Answer call(String method, URI uri, String bearerToken, java.util.Map<String, String> headers, byte[] body)
+            throws IOException {
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IOException("platform endpoints are reached over HTTPS only");
+        }
+        HttpRequest.Builder request = HttpRequest.newBuilder(uri).timeout(Duration.ofMinutes(2));
+        if (bearerToken != null) {
+            request.header("Authorization", "Bearer " + bearerToken);
+        }
+        headers.forEach(request::header);
+        request.method(method, body == null || body.length == 0 ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofByteArray(body));
+        try {
+            HttpResponse<String> response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+            return new Answer(response.statusCode(), response.body(),
+                    response.headers().firstValue("Location").map(String::trim),
+                    response.headers().firstValue("Range").map(String::trim),
+                    response.headers().firstValue("Retry-After").map(String::trim));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted while reaching the platform", e);
+        }
+    }
 }

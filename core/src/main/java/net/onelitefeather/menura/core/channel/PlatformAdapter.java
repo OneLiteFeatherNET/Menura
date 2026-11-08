@@ -57,6 +57,14 @@ public interface PlatformAdapter {
 
     PublishResult publish(String accessToken, PublishRequest request);
 
+    /**
+     * The step-wise publication of this adapter, or empty when the platform publishes in one call through
+     * {@link #publish}. The publication job uses it for upload, metadata, playlist, schedule and thumbnail steps.
+     */
+    default Optional<StepwisePublisher> stepwise() {
+        return Optional.empty();
+    }
+
     PublicationStatus status(String accessToken, String platformItemId);
 
     void delete(String accessToken, String platformItemId);
