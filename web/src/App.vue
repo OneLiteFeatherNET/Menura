@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { fetchSession, roleLabel, signInUrl, signOut, type SessionInfo } from './auth/session';
 import LoadState from './components/ui/LoadState.vue';
 import BrandKitPage from './brand/BrandKitPage.vue';
+import PoolPage from './library/PoolPage.vue';
 
 // The shell shows who is signed in and with which role. Feature navigation is added by the feature changes.
 const status = ref<'loading' | 'error' | 'ready'>('loading');
@@ -43,6 +44,7 @@ onMounted(load);
     <md-divider></md-divider>
     <main class="content">
       <BrandKitPage v-if="session" />
+      <PoolPage v-if="session" />
     </main>
   </div>
 </template>
