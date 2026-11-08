@@ -43,23 +43,20 @@ describe('app shell', () => {
     expect(wrapper.find('.rail-brand').text()).toContain('Menura');
   });
 
-  it('renders the group headings of the rail in order, the roadmap last', async () => {
+  it('renders the six navigation items of the rail in order, without phases or a roadmap', async () => {
     const wrapper = await mountShell(['VIEWER']);
 
-    const headings = wrapper.findAll('.rail section h2').map((heading) => heading.text());
-    expect(headings).toEqual(['Überblick', 'Wiedererkennung', 'Messbarkeit', 'Roadmap']);
+    const items = wrapper.findAll('.rail .rail-item').map((item) => item.text());
+    expect(items).toEqual(['Übersicht', 'Pool', 'Kalender', 'Serien', 'Analytics', 'Brand-Kit']);
+    expect(wrapper.find('.rail').text(), 'no phase label').not.toContain('Phase');
+    expect(wrapper.find('.rail').text(), 'no roadmap').not.toContain('Roadmap');
   });
 
-  it('labels each group list with the text of its heading', async () => {
+  it('lists the navigation items in one list without group headings', async () => {
     const wrapper = await mountShell(['VIEWER']);
 
-    const sections = wrapper.findAll('.rail section');
-    expect(sections).toHaveLength(4);
-    for (const section of sections) {
-      const labelId = section.find('ul').attributes('aria-labelledby');
-      expect(labelId, 'the list needs aria-labelledby').toBeTruthy();
-      expect(section.find(`[id="${labelId}"]`).text()).toBe(section.find('h2').text());
-    }
+    expect(wrapper.findAll('.rail h2')).toHaveLength(0);
+    expect(wrapper.findAll('.rail ul')).toHaveLength(1);
   });
 
   it('marks the brand kit as active on the render bundle sub-page and not the overview', async () => {
@@ -69,15 +66,6 @@ describe('app shell', () => {
     const overview = wrapper.findAll('.rail-item').find((link) => link.text() === 'Übersicht');
     expect(brandKit?.classes()).toContain('is-active');
     expect(overview?.classes()).not.toContain('is-active');
-  });
-
-  it('greys out the later phases in the rail, each with its phase number', async () => {
-    const wrapper = await mountShell(['VIEWER']);
-
-    const later = wrapper.findAll('.rail-item.is-later');
-    expect(later).toHaveLength(5);
-    expect(later[0]?.text()).toContain('Planung & Kalender');
-    expect(later[0]?.text()).toContain('Phase 2');
   });
 
   it('renders the routed page in the main content area', async () => {

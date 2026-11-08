@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { api } from '../api/client';
-import FirstJoins from '../components/FirstJoins.vue';
-import LoadState from '../components/LoadState.vue';
-import ViewPercent from '../components/ViewPercent.vue';
-import { useAsync } from '../composables/useAsync';
-import { latestWeekOf, weeksOf } from '../domain/attribution';
-import { audienceLabel, formatCount } from '../domain/format';
+import { api } from '../../api/client';
+import FirstJoins from '../../components/FirstJoins.vue';
+import LoadState from '../../components/LoadState.vue';
+import ViewPercent from '../../components/ViewPercent.vue';
+import { useAsync } from '../../composables/useAsync';
+import { latestWeekOf, weeksOf } from '../../domain/attribution';
+import { audienceLabel, formatCount } from '../../domain/format';
 
 const selectedWeek = ref('');
 
@@ -43,7 +43,7 @@ function onWeekChange(event: Event): void {
   <div class="page">
     <header class="page-head">
       <div>
-        <h2>Analytics</h2>
+        <h2>Serien</h2>
         <p class="page-lead">
           Serien im Vergleich. Sortiert nach Engaged Views, so wie sie geliefert wurden.
         </p>

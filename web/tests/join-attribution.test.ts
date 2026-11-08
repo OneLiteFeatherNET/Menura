@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../src/api/client';
 import type { WeeklyAttribution } from '../src/api/types';
-import JoinAttributionView from '../src/views/JoinAttributionView.vue';
+import JoinAttributionView from '../src/features/analytics/JoinAttributionTab.vue';
 import { SOURCE_ORDER, stackedColumns, summaryOf } from '../src/domain/attribution';
 
 const WEEK_45: WeeklyAttribution = {

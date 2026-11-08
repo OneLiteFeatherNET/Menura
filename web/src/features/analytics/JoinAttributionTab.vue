@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { api } from '../api/client';
-import type { JoinSource } from '../api/types';
-import LoadState from '../components/LoadState.vue';
-import { useAsync } from '../composables/useAsync';
-import { SOURCE_ORDER, stackedColumns, summaryOf, weeksOf, type WeekSummary } from '../domain/attribution';
-import { formatCount, PLATFORM_LABELS } from '../domain/format';
+import { api } from '../../api/client';
+import type { JoinSource } from '../../api/types';
+import LoadState from '../../components/LoadState.vue';
+import { useAsync } from '../../composables/useAsync';
+import { SOURCE_ORDER, stackedColumns, summaryOf, weeksOf, type WeekSummary } from '../../domain/attribution';
+import { formatCount, PLATFORM_LABELS } from '../../domain/format';
 
 // Segment colours are M3 role tokens. Every segment also carries its value and the legend names it.
 const SOURCE_COLOR: Record<JoinSource, string> = {
