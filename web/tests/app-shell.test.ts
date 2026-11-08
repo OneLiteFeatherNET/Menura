@@ -68,7 +68,7 @@ describe('app shell', () => {
     const { wrapper } = await mountAt('/');
 
     const labels = wrapper.findAll('nav a').map((link) => link.attributes('aria-label'));
-    expect(labels).toEqual(['Übersicht', 'Pool', 'Brand-Kit', 'Kanäle']);
+    expect(labels).toEqual(['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle']);
   });
 
   it('links the Kanäle entry to the channels path, which the consent callback returns to', async () => {

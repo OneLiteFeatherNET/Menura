@@ -5,6 +5,7 @@ import { fetchSession, roleLabel, signInUrl, signOut, type SessionInfo } from '.
 import LoadState from './components/ui/LoadState.vue';
 import NavRail from './components/ui/NavRail.vue';
 import ChannelsPage from './features/channels/ChannelsPage.vue';
+import SeriesPage from './components/series/SeriesPage.vue';
 import { canOpen, findArea, normalizePath, visibleAreas } from './navigation/areas';
 import OverviewPage from './navigation/OverviewPage.vue';
 
@@ -76,6 +77,7 @@ onMounted(load);
           <!-- The pages that show per-role content take the roles as a prop; every other page is mounted as it is. -->
           <OverviewPage v-if="Component.type === OverviewPage" :roles="session.roles" :areas="overviewAreas" />
           <ChannelsPage v-else-if="Component.type === ChannelsPage" :roles="session.roles" />
+          <SeriesPage v-else-if="Component.type === SeriesPage" :roles="session.roles" />
           <component :is="Component" v-else />
         </RouterView>
       </main>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { fetchBrandKit } from '../../brand/brandKit';
 import PageHeader from '../ui/PageHeader.vue';
 import {
@@ -15,8 +15,9 @@ import SeriesForm from './SeriesForm.vue';
 import SeriesOverviewView from './SeriesOverview.vue';
 
 // The series page: the overview, the creation form (editors only) and one series. It loads the data and reports the
-// outcome of each action to the view components.
-defineProps<{ canEdit: boolean }>();
+// outcome of each action to the view components. Only the editor role creates and changes series, as on the server.
+const props = defineProps<{ roles: string[] }>();
+const canEdit = computed(() => props.roles.includes('EDITOR'));
 
 type Mode = 'list' | 'create' | 'detail';
 type Status = 'loading' | 'error' | 'empty' | 'ready';

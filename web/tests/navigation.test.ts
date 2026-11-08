@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AREAS, canOpen, findArea, normalizePath, visibleAreas, type AppArea } from '../src/navigation/areas';
 
-const LABELS = ['Übersicht', 'Pool', 'Brand-Kit', 'Kanäle'];
+const LABELS = ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'];
 const ROLES = ['VIEWER', 'EDITOR', 'PUBLISHER', 'OPERATOR', 'ADMIN'];
 
 function labelsFor(roles: string[], areas?: readonly AppArea[]): string[] {
@@ -82,7 +82,7 @@ describe('area table', () => {
   it('gives no planned area a page component or a route', () => {
     const planned = AREAS.filter((area) => !area.exists);
 
-    expect(planned.map((area) => area.path)).toEqual(['/kalender', '/serien', '/analytics']);
+    expect(planned.map((area) => area.path)).toEqual(['/kalender', '/analytics']);
     expect(planned.filter((area) => area.component), 'planned areas have no component').toEqual([]);
   });
 
