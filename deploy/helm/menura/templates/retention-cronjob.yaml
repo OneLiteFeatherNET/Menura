@@ -1,0 +1,53 @@
+{{- if .Values.jobs.retention.enabled }}
+# Moves raw recordings older than the retention policy to the cold storage class and records the new media state
+# (change add-content-library). Off by default; the policy switch is jobs.retention.policyEnabled. The run prints
+# counts only.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "menura.fullname" . }}-retention
+  labels:
+    {{- include "menura.componentLabels" (dict "root" . "component" "jobs") | nindent 4 }}
+spec:
+  schedule: {{ .Values.jobs.retention.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "menura.componentLabels" (dict "root" . "component" "jobs") | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- include "menura.podSecurity" . | nindent 10 }}
+          containers:
+            - name: retention
+              image: {{ include "menura.image" (dict "root" . "component" "jobs") }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - jobs
+                - run
+                - retention
+              env:
+                {{- include "menura.databaseEnv" . | nindent 16 }}
+                {{- include "menura.libraryEnv" . | nindent 16 }}
+                - name: MENURA_RETENTION_ENABLED
+                  value: {{ ternary "true" "false" (.Values.jobs.retention.policyEnabled | default false) | quote }}
+                - name: MENURA_RETENTION_RAW_MAX_AGE
+                  value: {{ .Values.jobs.retention.rawMaxAge | quote }}
+                - name: MENURA_RETENTION_BATCH_SIZE
+                  value: {{ int .Values.jobs.retention.batchSize | quote }}
+              {{- include "menura.secretEnvFrom" . | nindent 14 }}
+              {{- include "menura.containerSecurity" . | nindent 14 }}
+              {{- with .Values.jobs.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+{{- end }}

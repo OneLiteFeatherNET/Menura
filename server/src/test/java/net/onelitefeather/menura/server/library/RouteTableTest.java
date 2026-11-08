@@ -65,7 +65,20 @@ class RouteTableTest {
             "GET /brand-kit/pins/{consumer}",
             "PUT /brand-kit/pins/{consumer}",
             "DELETE /brand-kit/pins/{consumer}",
-            "GET /brand-kit/events");
+            "GET /brand-kit/events",
+            "GET /library/items",
+            "PUT /library/items/{id}/tags",
+            "POST /library/clips",
+            "GET /library/clips/{id}",
+            "PATCH /library/clips/{id}",
+            "DELETE /library/clips/{id}",
+            "GET /library/search",
+            "GET /library/raw-items/{id}/lineage",
+            "PUT /library/raw-items/{id}/transcript",
+            "DELETE /library/raw-items/{id}/media",
+            "POST /library/timelines",
+            "GET /library/timelines/{id}",
+            "POST /library/finished-assets/{id}/registration");
 
     private static final Set<Class<?>> BINARY_BODIES = Set.of(byte[].class, InputStream.class, ByteBuffer.class,
             StreamingFileUpload.class, CompletedFileUpload.class);
