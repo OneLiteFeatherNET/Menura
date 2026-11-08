@@ -31,11 +31,12 @@ spec:
               protocol: TCP
           env:
             {{- include "menura.databaseEnv" . | nindent 12 }}
+            {{- include "menura.channelEnv" . | nindent 12 }}
             {{- range $name, $value := .Values.jobs.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
             {{- end }}
-          {{- include "menura.databaseEnvFrom" . | nindent 10 }}
+          {{- include "menura.secretEnvFrom" . | nindent 10 }}
           {{- include "menura.containerSecurity" . | nindent 10 }}
           {{- with .Values.jobs.resources }}
           resources:

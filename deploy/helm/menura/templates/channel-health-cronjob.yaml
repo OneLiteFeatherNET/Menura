@@ -1,0 +1,46 @@
+{{- if .Values.jobs.channelHealth.enabled }}
+# Refreshes the channel tokens before they expire and marks rejected grants (change add-channel-connections). The run
+# reads the token keys and the YouTube app from channels.existingSecret; it prints counts only.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "menura.fullname" . }}-channel-health
+  labels:
+    {{- include "menura.componentLabels" (dict "root" . "component" "jobs") | nindent 4 }}
+spec:
+  schedule: {{ .Values.jobs.channelHealth.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "menura.componentLabels" (dict "root" . "component" "jobs") | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- include "menura.podSecurity" . | nindent 10 }}
+          containers:
+            - name: channel-health
+              image: {{ include "menura.image" (dict "root" . "component" "jobs") }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - jobs
+                - run
+                - channel-health
+              env:
+                {{- include "menura.databaseEnv" . | nindent 16 }}
+                {{- include "menura.channelEnv" . | nindent 16 }}
+              {{- include "menura.secretEnvFrom" . | nindent 14 }}
+              {{- include "menura.containerSecurity" . | nindent 14 }}
+              {{- with .Values.jobs.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+{{- end }}
