@@ -3,6 +3,7 @@ import BrandKitPage from '../brand/BrandKitPage.vue';
 import PoolPage from '../library/PoolPage.vue';
 import ChannelsPage from '../features/channels/ChannelsPage.vue';
 import SeriesPage from '../components/series/SeriesPage.vue';
+import AnalyticsPage from '../analytics/AnalyticsPage.vue';
 import OverviewPage from './OverviewPage.vue';
 
 /**
@@ -44,7 +45,7 @@ export const AREAS: readonly AppArea[] = [
   { path: '/pool', label: 'Pool', icon: ICON_POOL, roles: 'any', exists: true, component: PoolPage },
   { path: '/kalender', label: 'Kalender', icon: ICON_CALENDAR, roles: 'any', exists: false },
   { path: '/serien', label: 'Serien', icon: ICON_SERIES, roles: 'any', exists: true, component: SeriesPage },
-  { path: '/analytics', label: 'Analytics', icon: ICON_ANALYTICS, roles: 'any', exists: false },
+  { path: '/analytics', label: 'Analytics', icon: ICON_ANALYTICS, roles: 'any', exists: true, component: AnalyticsPage },
   { path: '/brand-kit', label: 'Brand-Kit', icon: ICON_BRAND_KIT, roles: 'any', exists: true, component: BrandKitPage },
   { path: '/channels', label: 'Kanäle', icon: ICON_CHANNELS, roles: 'any', exists: true, component: ChannelsPage },
 ];

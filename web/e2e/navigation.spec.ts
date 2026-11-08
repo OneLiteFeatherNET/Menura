@@ -2,13 +2,13 @@ import type { Page } from '@playwright/test';
 import { APP, ROLES, ROLE_LABELS, expect, signInAs, test, type TestRole } from './fixtures';
 
 // The items of the navigation per role. Every existing area is open to any signed-in person, so each role sees the
-// same four items; a role that is later shut out of an area is listed without that area (web/src/navigation/areas.ts).
+// same five items; a role that is later shut out of an area is listed without that area (web/src/navigation/areas.ts).
 const EXPECTED_NAV: Record<TestRole, string[]> = {
-  viewer: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
-  editor: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
-  publisher: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
-  operator: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
-  admin: ['Übersicht', 'Pool', 'Serien', 'Brand-Kit', 'Kanäle'],
+  viewer: ['Übersicht', 'Pool', 'Serien', 'Analytics', 'Brand-Kit', 'Kanäle'],
+  editor: ['Übersicht', 'Pool', 'Serien', 'Analytics', 'Brand-Kit', 'Kanäle'],
+  publisher: ['Übersicht', 'Pool', 'Serien', 'Analytics', 'Brand-Kit', 'Kanäle'],
+  operator: ['Übersicht', 'Pool', 'Serien', 'Analytics', 'Brand-Kit', 'Kanäle'],
+  admin: ['Übersicht', 'Pool', 'Serien', 'Analytics', 'Brand-Kit', 'Kanäle'],
 };
 
 const rail = (page: Page) => page.getByRole('navigation', { name: 'Hauptnavigation' });
