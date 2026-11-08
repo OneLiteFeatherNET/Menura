@@ -3,5 +3,6 @@ import '@material/web/divider/divider.js';
 import './theme/tokens.css';
 import './style.css';
 import App from './App.vue';
+import { createAppRouter } from './router';
 
-createApp(App).mount('#app');
+createApp(App).use(createAppRouter()).mount('#app');
