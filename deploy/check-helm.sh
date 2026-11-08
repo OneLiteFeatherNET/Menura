@@ -300,8 +300,8 @@ secret_pods="$({
   yq -N 'select(.kind == "Deployment") | select(.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-channels") | .metadata.name' "$rendered_channels"
   yq -N 'select(.kind == "CronJob") | select(.spec.jobTemplate.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-channels") | .metadata.name' "$rendered_channels"
 } | grep -c . || true)"
-if [[ "$secret_pods" -ne 5 ]]; then
-  report "expected server, jobs, channel health, external post sync and metric collection pods to read the channel Secret, found $secret_pods"
+if [[ "$secret_pods" -ne 6 ]]; then
+  report "expected server, jobs, channel health, external post sync, metric collection and publication pods to read the channel Secret, found $secret_pods"
 fi
 
 # The analytics time zone (change add-content-analytics) reaches the server and the metric collection from the values.
@@ -342,6 +342,27 @@ for variable in MENURA_RETENTION_ENABLED MENURA_RETENTION_RAW_MAX_AGE MENURA_RET
     report "the retention CronJob must set $variable"
   fi
 done
+
+# The publication CronJob (change add-content-distribution) runs 'jobs run publish-due' with one job at a time: concurrency
+# policy Forbid and parallelism 1, and its schedule comes from jobs.publishDue.schedule.
+publish_selector='select(.kind == "CronJob" and (.metadata.name | test("-publish-due$")))'
+publish_command="$(yq -N "$publish_selector | .spec.jobTemplate.spec.template.spec.containers[0].command | join(\" \")" "$rendered")"
+if [[ "$publish_command" != "jobs run publish-due" ]]; then
+  report "the publication CronJob must run 'jobs run publish-due' (found '$publish_command')"
+fi
+publish_policy="$(yq -N "$publish_selector | .spec.concurrencyPolicy" "$rendered")"
+publish_parallelism="$(yq -N "$publish_selector | .spec.jobTemplate.spec.parallelism" "$rendered")"
+if [[ "$publish_policy" != "Forbid" || "$publish_parallelism" != "1" ]]; then
+  report "the publication CronJob must run one job at a time (concurrencyPolicy Forbid, parallelism 1), found '$publish_policy' and '$publish_parallelism'"
+fi
+publish_schedule="$(yq -N "$publish_selector | .spec.schedule" "$rendered")"
+if [[ "$publish_schedule" != "$(yq -r '.jobs.publishDue.schedule' "$chart/values.yaml")" ]]; then
+  report "the publication CronJob must take its schedule from jobs.publishDue.schedule"
+fi
+publish_count="$(yq -N "$publish_selector | .metadata.name" "$rendered" | grep -c . || true)"
+if [[ "$publish_count" -ne 1 ]]; then
+  report "expected exactly one publication CronJob, found $publish_count"
+fi
 
 if [[ "$fail" -ne 0 ]]; then
   exit 1

@@ -38,6 +38,9 @@ spec:
             # The team's time zone for the publish hour and weekday of the analytics (change add-content-analytics).
             - name: MENURA_ANALYTICS_TIME_ZONE
               value: {{ .Values.analytics.timeZone | quote }}
+            # The installation time zone of the content calendar and the episode slots (change add-content-distribution).
+            - name: MENURA_CALENDAR_TIME_ZONE
+              value: {{ .Values.calendar.timeZone | quote }}
             {{- range $name, $value := .Values.server.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}

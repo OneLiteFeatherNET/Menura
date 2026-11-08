@@ -471,7 +471,7 @@ public final class PostService {
         }
     }
 
-    /** A channel a plan may use: it exists, is connected and its platform publishes in this build. */
+    /** A channel a plan may use: it exists, is connected, and its platform is supported in this build. */
     private Channel channelForPlan(Connection c, UUID channelId) throws SQLException {
         Channel channel = channels.findChannel(c, channelId)
                 .orElseThrow(() -> new ProblemException(422, "Unprocessable Entity", "The channel does not exist."));

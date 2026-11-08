@@ -2165,8 +2165,8 @@ paths:
       operationId: planPosts
       summary: Plans one finished asset onto several channels, one post per channel with its own text and time.
       description: |
-        Each channel is checked on its own. A channel that does not exist, is not connected or whose platform does not
-        publish in this build is refused and named with its reason; the other posts are stored.
+        Each channel is checked on its own. A channel that does not exist, is not connected or whose platform is not
+        supported in this build is refused and named with its reason; the other posts are stored.
       security:
         - sessionCookie: []
       requestBody:
