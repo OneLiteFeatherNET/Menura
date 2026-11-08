@@ -1,6 +1,7 @@
 import type { Component } from 'vue';
 import BrandKitPage from '../brand/BrandKitPage.vue';
 import PoolPage from '../library/PoolPage.vue';
+import CalendarPage from '../calendar/CalendarPage.vue';
 import ChannelsPage from '../features/channels/ChannelsPage.vue';
 import SeriesPage from '../components/series/SeriesPage.vue';
 import AnalyticsPage from '../analytics/AnalyticsPage.vue';
@@ -39,11 +40,11 @@ const ICON_BRAND_KIT =
 const ICON_CHANNELS =
   'M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z';
 
-// The areas whose pages do not exist yet keep their place in the order. Their roles are set when the page arrives.
 export const AREAS: readonly AppArea[] = [
   { path: '/', label: 'Übersicht', icon: ICON_HOME, roles: 'any', exists: true, component: OverviewPage },
   { path: '/pool', label: 'Pool', icon: ICON_POOL, roles: 'any', exists: true, component: PoolPage },
-  { path: '/kalender', label: 'Kalender', icon: ICON_CALENDAR, roles: 'any', exists: false },
+  // Any signed-in person reads the calendar; planning, review and approval are decided per action on the page.
+  { path: '/kalender', label: 'Kalender', icon: ICON_CALENDAR, roles: 'any', exists: true, component: CalendarPage },
   { path: '/serien', label: 'Serien', icon: ICON_SERIES, roles: 'any', exists: true, component: SeriesPage },
   { path: '/analytics', label: 'Analytics', icon: ICON_ANALYTICS, roles: 'any', exists: true, component: AnalyticsPage },
   { path: '/brand-kit', label: 'Brand-Kit', icon: ICON_BRAND_KIT, roles: 'any', exists: true, component: BrandKitPage },

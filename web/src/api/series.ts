@@ -158,3 +158,12 @@ export async function createSeries(draft: SeriesDraft, fetcher: Fetcher = fetch)
   });
   return readJson<Series>(response, 'Die Serie konnte nicht gespeichert werden.');
 }
+
+/** Every series, active and inactive, for the calendar filter and the episode planning. */
+export async function listSeries(fetcher: Fetcher = fetch): Promise<Series[]> {
+  const response = await fetcher(`${apiBase()}/series`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  });
+  return readJson<Series[]>(response, 'Die Serien konnten nicht geladen werden.');
+}
