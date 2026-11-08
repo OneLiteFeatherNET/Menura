@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(twitch)` (code PR). Phase: 2 (Planning & Scheduling). Depends on: `add-channel-connections`, `add-content-distribution`, `add-asset-upload`, `add-twitch-insights`.
+Conventional Commits: `feat(twitch)` (code PR). Phase: 2 (Platforms & Join Attribution). Depends on: `add-channel-connections`, `add-content-distribution`, `add-asset-upload`, `add-twitch-insights`.
 
 Strand: platform.
 
@@ -13,10 +13,10 @@ Twitch does not offer a video upload API. Publishing finished videos to Twitch i
 ## What Changes
 
 - Create clips while the broadcast is live, from the connected channel, and store the clip identifier and link on the planned stream.
-- Lineage of imported Twitch broadcasts to the recordings they match is specified in `add-content-library` (phase 4), not here.
+- Lineage of imported Twitch broadcasts to the recordings they match is specified in `add-content-library` (phase 1), not here.
 - Update the channel's stream title and category from the planned stream when the planned stream starts, or when a publisher asks for it.
 - Sync the Twitch stream schedule with Menura's planned streams: planned streams become schedule segments, changes and cancellations are mirrored, and a planned stream that Twitch cannot accept (for example a channel type that may not create segments) is reported.
-- Imports of VODs, highlights and clips, their view counts and removed items are specified in `add-twitch-insights` (phase 1), not here.
+- Imports of VODs, highlights and clips, their view counts and removed items are specified in `add-twitch-insights` (phase 2), not here.
 - **BREAKING:** none. This is the first Twitch integration.
 - Non-Goal: uploading or publishing video to Twitch. Twitch offers no video upload endpoint; this is not planned.
 - Non-Goal: downloading VOD media from Twitch. No official download endpoint exists; Menura references the broadcast and uses its own recording.

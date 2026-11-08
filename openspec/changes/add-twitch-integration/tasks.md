@@ -33,4 +33,4 @@
 
 ## Note
 
-Imports of VODs, highlights and clips, their view counts and removed items are implemented in `add-twitch-insights` (phase 1). The lineage of imported broadcasts to recordings is implemented in `add-content-library` (phase 4).
+Imports of VODs, highlights and clips, their view counts and removed items are implemented in `add-twitch-insights` (phase 2). The lineage of imported broadcasts to recordings is implemented in `add-content-library` (phase 1).
