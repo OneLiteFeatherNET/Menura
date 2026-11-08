@@ -1,6 +1,6 @@
 # Proposal
 
-Conventional Commits: `feat(brand)` (code PR). Phase: 1 (Recognition & Measurability). Depends on: `add-access-control`.
+Conventional Commits: `feat(brand)` (code PR). Phase: 1 (Pool, Calendar & Analytics). Depends on: `add-access-control`.
 
 Strand: platform.
 

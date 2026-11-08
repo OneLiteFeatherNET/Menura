@@ -25,7 +25,7 @@ Constraints from the project context: the cluster runs no ffmpeg and no renderin
 - Rejected: wait for Phase 5. Shorts would keep being cut against the cut tool's own colours for another phase.
 
 **External renderer reads a JSON render bundle until Phase 5.** The cut tool reads a JSON render bundle of a named kit version and draws the shorts from it. Menura does not render anything until `add-local-editing-mcp` ships.
-- Rejected: Menura renders in Phase 1. That would pull ingest, the content library and the media job queue forward into Phase 1.
+- Rejected: Menura renders in Phase 1. That would pull ingest and the media job queue forward from Phase 4 into Phase 1.
 - Rejected: keep the look in the renderer's code. It has already drifted from the overlay, and a second copy of the palette would drift again.
 
 **Seed from the overlay theme.** The first version takes its colour roles from the stream overlay theme (its Material Design 3 CSS custom properties) and its mark from the feather logo, because the overlay is what viewers already see on stream.
