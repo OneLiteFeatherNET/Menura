@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.server.post;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.post.ExternalPostService;
 import net.onelitefeather.menura.core.post.ExternalPostStore.SyncStatus;
@@ -37,6 +38,7 @@ public final class ExternalPostViews {
      * channelState is {@code needs_reconnection} while the posts are waiting for a reconnection.
      */
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record ExternalPostPage(UUID channelId, String channelState, Instant lastSuccessfulSyncAt,
                                    Instant lastFailedSyncAt, String syncFailureReason, List<ExternalPostView> items,
                                    String nextCursor) {
@@ -44,6 +46,7 @@ public final class ExternalPostViews {
 
     /** One external post. url is null when the post is removed. */
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record ExternalPostView(UUID id, String platform, String title, String format, Instant publishedAt, String url,
                                    String status, Instant removedAt) {
     }
