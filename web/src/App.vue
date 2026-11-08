@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { fetchSession, roleLabel, signInUrl, signOut, type SessionInfo } from './auth/session';
 import LoadState from './components/ui/LoadState.vue';
 import BrandKitPage from './brand/BrandKitPage.vue';
 import PoolPage from './library/PoolPage.vue';
+import ChannelsPage from './features/channels/ChannelsPage.vue';
 
-// The shell shows who is signed in and with which role. Feature navigation is added by the feature changes.
+// The shell shows who is signed in and with which role. The navigation lists the features a signed-in person can open.
 const status = ref<'loading' | 'error' | 'ready'>('loading');
 const session = ref<SessionInfo | null>(null);
+const onChannelsPage = computed(() => window.location.pathname.replace(/\/+$/, '') === '/channels');
 
 async function load() {
   status.value = 'loading';
@@ -42,9 +44,18 @@ onMounted(load);
       </div>
     </header>
     <md-divider></md-divider>
+    <nav v-if="session" class="nav" aria-label="Hauptnavigation">
+      <a class="nav__link" href="/channels" :aria-current="onChannelsPage ? 'page' : undefined">Kanäle</a>
+    </nav>
     <main class="content">
-      <BrandKitPage v-if="session" />
-      <PoolPage v-if="session" />
+      <ChannelsPage v-if="session && onChannelsPage" :roles="session.roles" />
+      <template v-else-if="session">
+        <BrandKitPage />
+        <PoolPage />
+      </template>
+      <p v-else-if="!session && status === 'ready' && onChannelsPage" class="content__hint">
+        Melden Sie sich an, um die Kanäle zu verwalten.
+      </p>
     </main>
   </div>
 </template>
@@ -98,8 +109,41 @@ onMounted(load);
   cursor: pointer;
 }
 
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+}
+
+.nav__link {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.nav__link[aria-current='page'] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.nav__link:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
 .content {
   flex: 1;
   padding: 16px;
+}
+
+.content__hint {
+  margin: 0;
+  font-size: 14px;
 }
 </style>
