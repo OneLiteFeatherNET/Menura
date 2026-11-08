@@ -40,7 +40,10 @@ public class JdbcContentRepository implements ContentRepository {
               select a.id, 'raw' as kind, 'raw' as stage, 'active' as status, a.uploader_id, a.stream_title as title,
                      cast(null as uuid) as raw_item_id, cast(null as uuid) as asset_id,
                      cast(null as integer) as start_seconds, cast(null as integer) as end_seconds,
-                     false as used, a.created_at
+                     exists (select 1 from menura.clip c
+                               join menura.lineage_edge e on e.parent_kind = 'clip' and e.parent_id = c.id
+                              where c.raw_item_id = a.id) as used,
+                     a.created_at
                 from menura.asset a
                where a.kind = 'raw_material'
               union all
@@ -63,7 +66,7 @@ public class JdbcContentRepository implements ContentRepository {
                and (cast(? as text) is null or exists (select 1 from menura.item_tag t
                                                         where t.item_id = p.id and t.tag = cast(? as text)))
                and (cast(? as text) is null or p.stage = cast(? as text))
-               and (cast(? as text) is null or p.kind <> 'clip' or p.used = (cast(? as text) = 'used'))
+               and (cast(? as text) is null or p.used = (cast(? as text) = 'used'))
                and (cast(? as date) is null or cast(p.created_at at time zone 'UTC' as date) >= cast(? as date))
                and (cast(? as date) is null or cast(p.created_at at time zone 'UTC' as date) <= cast(? as date))
                and (cast(? as timestamptz) is null or (p.created_at, p.id) < (cast(? as timestamptz), cast(? as uuid)))

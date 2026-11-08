@@ -110,7 +110,7 @@ public final class InMemoryContentRepository implements ContentRepository {
         List<PoolRow> rows = new ArrayList<>();
         for (RawItem raw : rawItems.values()) {
             rows.add(new PoolRow(raw.id(), "raw", Stage.RAW, ClipStatus.ACTIVE, raw.uploaderId(), raw.title(), null, null,
-                    null, null, false, raw.createdAt()));
+                    null, null, isRawUsedNow(raw.id()), raw.createdAt()));
         }
         for (ClipRecord clip : clips.values()) {
             rows.add(new PoolRow(clip.id(), "clip", clip.stage(), clip.status(), clip.uploaderId(), clip.title(),
@@ -144,7 +144,7 @@ public final class InMemoryContentRepository implements ContentRepository {
         if (filter.stage() != null && filter.stage() != row.stage()) {
             return false;
         }
-        if (filter.usage() != null && "clip".equals(row.kind()) && row.used() != "used".equals(filter.usage())) {
+        if (filter.usage() != null && row.used() != "used".equals(filter.usage())) {
             return false;
         }
         LocalDate created = LocalDate.ofInstant(row.createdAt(), ZoneOffset.UTC);
@@ -243,6 +243,12 @@ public final class InMemoryContentRepository implements ContentRepository {
     @Override
     public boolean isClipUsed(Connection connection, UUID clipId) {
         return isClipUsedNow(clipId);
+    }
+
+    /** A raw item is used when one of its clips is in a timeline, as the pool and search SQL decide. */
+    private boolean isRawUsedNow(UUID rawItem) {
+        return clips.values().stream().filter(clip -> clip.rawItemId().equals(rawItem))
+                .anyMatch(clip -> isClipUsedNow(clip.id()));
     }
 
     private boolean isClipUsedNow(UUID clipId) {

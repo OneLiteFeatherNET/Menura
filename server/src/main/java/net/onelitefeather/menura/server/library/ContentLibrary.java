@@ -244,7 +244,7 @@ public class ContentLibrary {
 
     private ContentViews.PoolItemView poolItem(PoolRow row, ItemTags tags) {
         ItemTags known = tags == null ? new ItemTags(Set.of(), Set.of()) : tags;
-        String usage = "clip".equals(row.kind()) ? (row.used() ? "used" : "never_used") : null;
+        String usage = row.used() ? "used" : "never_used";
         return new ContentViews.PoolItemView(row.id(), row.kind(), row.stage().value(), row.status().value(), row.uploaderId(),
                 row.title(), row.rawItemId(), row.assetId(), row.startSeconds(), row.endSeconds(), usage,
                 List.copyOf(new TreeSet<>(known.personTags())), List.copyOf(new TreeSet<>(known.freeTags())), row.createdAt());
