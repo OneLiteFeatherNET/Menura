@@ -29,7 +29,7 @@ export interface SafeArea {
 
 export interface MarkVariant {
   name: string;
-  file: string;
+  asset: string;
   safeArea: SafeArea;
 }
 
@@ -76,7 +76,7 @@ export interface BrandKit {
   colours: ColourToken[];
   ramps: TonalRamp[];
   textRoles: { name: string; colour: string; background: string }[];
-  typography: { role: string; fontFile: string; sizePx: number }[];
+  typography: { role: string; fontAsset: string; sizesPx: number[] }[];
   marks: Mark[];
   voice: string;
   texts: { language: string; endCard: string; hashtags: string[] }[];

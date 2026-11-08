@@ -43,8 +43,8 @@ export const sampleVersion: BrandKitVersion = {
       {
         name: 'feather',
         variants: [
-          { name: 'light', file: 'marks/feather-light.svg', safeArea: { top: 10, right: 10, bottom: 10, left: 10 } },
-          { name: 'dark', file: 'marks/feather-dark.svg', safeArea: { top: 10, right: 10, bottom: 10, left: 10 } },
+          { name: 'light', asset: '3f1c2a4e-5b6d-4c7e-9f8a-0b1c2d3e4f50', safeArea: { top: 10, right: 10, bottom: 10, left: 10 } },
+          { name: 'dark', asset: '9b2d1f0e-3c4a-4e5f-8a6b-7c8d9e0f1a2b', safeArea: { top: 10, right: 10, bottom: 10, left: 10 } },
         ],
       },
     ],

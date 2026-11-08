@@ -82,7 +82,7 @@ const status = computed(() => (props.status === 'ready' && !props.version ? 'emp
             <li v-for="mark in kit?.marks ?? []" :key="mark.name">
               <p class="brand-kit__mark-name">{{ mark.name }}</p>
               <MetaList
-                :items="mark.variants.map((variant) => ({ label: variant.name, value: variant.file }))"
+                :items="mark.variants.map((variant) => ({ label: variant.name, value: variant.asset }))"
               />
             </li>
           </CardGrid>
