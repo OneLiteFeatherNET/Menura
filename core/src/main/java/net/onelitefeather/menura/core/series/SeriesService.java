@@ -165,6 +165,11 @@ public final class SeriesService implements ExternalPostListener {
         return assignment;
     }
 
+    /** The decision on a post, if it has one. */
+    public Optional<SeriesAssignment> assignmentOf(Connection connection, UUID postId) throws SQLException {
+        return series.findAssignment(connection, postId);
+    }
+
     /**
      * The import hook: a post the import has just stored is assigned to the one active series whose hashtag its description
      * contains. Two matching series flag the post for an editor and assign nothing. A post without a matching hashtag gets no
@@ -266,7 +271,7 @@ public final class SeriesService implements ExternalPostListener {
         }
     }
 
-    private void requireBrandValues(ContentSeries checked) {
+    private void requireBrandValues(ContentSeries checked) throws SQLException {
         ColourToken colour = brandColour(checked.colourToken());
         ColourToken text = brandColour(checked.badgeToken());
         double ratio = Math.min(Colour.contrast(text.light(), colour.light()), Colour.contrast(text.dark(), colour.dark()));
@@ -281,7 +286,7 @@ public final class SeriesService implements ExternalPostListener {
         }
     }
 
-    private ColourToken brandColour(String name) {
+    private ColourToken brandColour(String name) throws SQLException {
         return brand.colour(name).filter(token -> Colour.isHex(token.light()) && Colour.isHex(token.dark()))
                 .orElseThrow(() -> new ProblemException(400, "Invalid series",
                         "The brand kit has no colour token '" + name + "'."));

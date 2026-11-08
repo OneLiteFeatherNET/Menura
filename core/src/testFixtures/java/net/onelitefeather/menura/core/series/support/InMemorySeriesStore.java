@@ -113,6 +113,15 @@ public final class InMemorySeriesStore implements SeriesStore {
         return writes;
     }
 
+    /** Removes every row and resets the counters, for a test that shares the fake with the server. */
+    public void clear() {
+        series.clear();
+        assignments.clear();
+        episodes.clear();
+        counters.clear();
+        writes = 0;
+    }
+
     private static String key(UUID seriesId, UUID postId) {
         return seriesId + "/" + postId;
     }

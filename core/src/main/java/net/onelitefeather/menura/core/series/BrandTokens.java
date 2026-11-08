@@ -2,6 +2,7 @@ package net.onelitefeather.menura.core.series;
 
 import net.onelitefeather.menura.core.brand.BrandKit.ColourToken;
 
+import java.sql.SQLException;
 import java.util.Optional;
 
 /**
@@ -11,8 +12,8 @@ import java.util.Optional;
 public interface BrandTokens {
 
     /** The colour token of this name in the current brand kit, if the kit defines it. */
-    Optional<ColourToken> colour(String name);
+    Optional<ColourToken> colour(String name) throws SQLException;
 
     /** Whether the current brand kit has a layout template of this format. */
-    boolean hasTemplate(String format);
+    boolean hasTemplate(String format) throws SQLException;
 }
