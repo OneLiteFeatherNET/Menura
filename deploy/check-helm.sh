@@ -38,8 +38,9 @@ rendered_disabled="$(mktemp)"
 rendered_pull="$(mktemp)"
 rendered_storage="$(mktemp)"
 rendered_channels="$(mktemp)"
+rendered_join="$(mktemp)"
 rendered_retention="$(mktemp)"
-trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull" "$rendered_storage" "$rendered_channels" "$rendered_retention"' EXIT
+trap 'rm -f "$rendered" "$rendered_disabled" "$rendered_pull" "$rendered_storage" "$rendered_channels" "$rendered_join" "$rendered_retention"' EXIT
 helm template "$release" "$chart" >"$rendered"
 
 # Hosts across all HTTPRoutes, one per line, sorted.
@@ -302,6 +303,13 @@ secret_pods="$({
 } | grep -c . || true)"
 if [[ "$secret_pods" -ne 6 ]]; then
   report "expected server, jobs, channel health, external post sync, metric collection and publication pods to read the channel Secret, found $secret_pods"
+fi
+
+# The join proxy credential (change add-join-attribution) reaches the server only, from its own Secret.
+helm template "$release" "$chart" --set joinAttribution.existingSecret=menura-join >"$rendered_join"
+join_pods="$(yq -N 'select(.kind == "Deployment" or .kind == "CronJob") | select(.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-join") | .metadata.name' "$rendered_join" | grep -c . || true)"
+if [[ "$join_pods" -ne 1 ]] || ! yq -N 'select(.kind == "Deployment") | select(.metadata.labels."app.kubernetes.io/component" == "server") | .spec.template.spec.containers[0].envFrom[]?.secretRef.name' "$rendered_join" | grep -qx menura-join; then
+  report "expected only the server to read the join proxy Secret, found $join_pods pods"
 fi
 
 # The analytics time zone (change add-content-analytics) reaches the server and the metric collection from the values.
