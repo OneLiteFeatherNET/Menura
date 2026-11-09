@@ -3,6 +3,7 @@ package net.onelitefeather.menura.core.publish;
 import net.onelitefeather.menura.core.channel.PlatformAdapter.Visibility;
 import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadStart;
+import net.onelitefeather.menura.core.library.ChapterMark;
 import net.onelitefeather.menura.core.publish.PostService.DraftCommand;
 import net.onelitefeather.menura.core.publish.PostService.PostDetail;
 import net.onelitefeather.menura.core.publish.PublicationRunner.Report;
@@ -203,6 +204,53 @@ class StepwisePublicationTest {
 
         assertTrue(refused.problems().stream().anyMatch(problem -> "visibility_undeclared".equals(problem.code())),
                 "the missing visibility is named");
+    }
+
+    @Test
+    void theChapterLinesOfTheTimelineReachTheDescriptionOfTheUpload() throws Exception {
+        PublishFixture world = new PublishFixture(false, PublishSettings.from(Map.of()), true);
+        UUID asset = world.storedVideo(MIB);
+        world.chapters.register(asset, List.of(new ChapterMark(0, "Intro"), new ChapterMark(90, "Setup"),
+                new ChapterMark(300, "Demo")));
+        planned(world, world.connectChannel("main"), asset, null, Visibility.PRIVATE, SLOT);
+        world.clock.advance(Duration.between(PublishFixture.NOW, SLOT));
+
+        world.runner.runOnce();
+
+        assertEquals("Text\n\n00:00 Intro\n01:30 Setup\n05:00 Demo", world.stepwise.starts().get(0).description(),
+                "the upload carries the post text and one chapter line per mark");
+    }
+
+    @Test
+    void aPostWithoutATimelineUploadsItsDescriptionUnchanged() throws Exception {
+        PublishFixture world = new PublishFixture(false, PublishSettings.from(Map.of()), true);
+        planned(world, world.connectChannel("main"), world.storedVideo(MIB), null, Visibility.PRIVATE, SLOT);
+        world.clock.advance(Duration.between(PublishFixture.NOW, SLOT));
+
+        world.runner.runOnce();
+
+        assertEquals("Text", world.stepwise.starts().get(0).description(), "no chapter lines are added without a timeline");
+    }
+
+    @Test
+    void chapterLinesThatPushTheDescriptionOverTheLimitStopTheUploadBeforeItStarts() throws Exception {
+        PublishFixture world = new PublishFixture(false, PublishSettings.from(Map.of()), true);
+        UUID channel = world.connectChannel("main");
+        UUID asset = world.storedVideo(MIB);
+        world.chapters.register(asset, List.of(new ChapterMark(0, "Intro"), new ChapterMark(90, "Setup")));
+        UUID post = world.service.create(editor(), new DraftCommand(channel, asset, null, null, null, "Clip",
+                "x".repeat(4990), List.of(), Visibility.PRIVATE, SLOT)).post().id();
+        world.service.declareMadeForKids(editor(), post, false);
+        world.service.submit(editor(), post);
+        world.service.approve(publisher(), post);
+        world.service.schedule(publisher(), post);
+        world.clock.advance(Duration.between(PublishFixture.NOW, SLOT));
+
+        Report report = world.runner.runOnce();
+
+        assertEquals(1, report.failed(), "the post fails instead of being uploaded with a truncated or too long description");
+        assertTrue(world.stepwise.starts().isEmpty(), "the platform is not called when the description would be too long");
+        assertEquals(PostStatus.FAILED, world.service.get(post).post().status(), "the post is marked as failed");
     }
 
     // ----------------------------------------------------------------- helpers

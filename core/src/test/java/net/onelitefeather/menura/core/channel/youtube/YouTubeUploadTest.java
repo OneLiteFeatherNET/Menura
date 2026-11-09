@@ -8,6 +8,8 @@ import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadProgress;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadStart;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.VideoState;
 import net.onelitefeather.menura.core.channel.UploadSessionExpired;
+import net.onelitefeather.menura.core.library.ChapterLines;
+import net.onelitefeather.menura.core.library.ChapterMark;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -54,6 +56,21 @@ class YouTubeUploadTest {
         assertTrue(sent.body().contains("\"title\":\"A title\""), "the title of the post is sent");
         assertEquals(String.valueOf(SIZE), sent.headers().get("X-Upload-Content-Length"), "the size is announced");
         assertEquals("video/mp4", sent.headers().get("X-Upload-Content-Type"), "the content type is announced");
+    }
+
+    @Test
+    void theChapterLinesOfTheDescriptionReachTheUploadRequestBody() {
+        ScriptedHttp http = new ScriptedHttp().call("POST", UPLOAD, new HttpTransport.Answer(200, "",
+                Optional.of(SESSION), Optional.empty(), Optional.empty()));
+        String description = ChapterLines.appendTo("The description",
+                List.of(new ChapterMark(0, "Intro"), new ChapterMark(90, "Setup")));
+
+        adapter(http).startUpload(TOKEN, new UploadStart("A title", description, List.of(), Visibility.PUBLIC, false, null,
+                SIZE, "video/mp4"));
+
+        assertTrue(http.sent().get(0).body().contains(
+                        "\"description\":\"The description\\n\\n00:00 Intro\\n01:30 Setup\""),
+                "the chapter lines are sent in the snippet description, one per line");
     }
 
     @Test

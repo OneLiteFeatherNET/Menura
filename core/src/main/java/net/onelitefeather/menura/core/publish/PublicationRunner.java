@@ -9,8 +9,12 @@ import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
 import net.onelitefeather.menura.core.channel.StepwisePublisher;
 import net.onelitefeather.menura.core.channel.UploadSessionExpired;
+import net.onelitefeather.menura.core.channel.youtube.YouTubeAdapter;
 import net.onelitefeather.menura.core.db.Transactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
+import net.onelitefeather.menura.core.library.ChapterLines;
+import net.onelitefeather.menura.core.library.ChapterMark;
+import net.onelitefeather.menura.core.library.TimelineChapters;
 import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.post.ExternalPostListener;
 import net.onelitefeather.menura.core.post.ExternalPostStore;
@@ -72,6 +76,8 @@ public final class PublicationRunner {
     static final String THUMBNAIL_FORMAT = "The thumbnail must be a JPEG or PNG image.";
     static final String THUMBNAIL_FAILED = "The platform could not process the video, so no thumbnail was set.";
     static final String WAITING_PROCESSING = "The platform is still processing the video; the thumbnail waits for it.";
+    static final String DESCRIPTION_TOO_LONG = "The description with its chapter lines is longer than "
+            + PublishRules.YOUTUBE.maxDescription() + " characters.";
 
     /** The bytes sent per chunk of a resumable upload: a multiple of 256 KiB, as the platform requires for all but the last. */
     static final int CHUNK_BYTES = 8 * 1024 * 1024;
@@ -86,7 +92,7 @@ public final class PublicationRunner {
      * What a step-wise platform needs besides its port: the token key that seals the session location of an upload, the
      * stored media of the finished assets, and the quota ledger that charges every platform call.
      */
-    public record Stepwise(TokenCipher cipher, MediaStorage media, QuotaLedger quota) {
+    public record Stepwise(TokenCipher cipher, MediaStorage media, QuotaLedger quota, TimelineChapters chapters) {
     }
 
     private enum Action { PUBLISH, HANDOVER, CONFIRM, FINISH }
@@ -425,7 +431,7 @@ public final class PublicationRunner {
         boolean waiting = false;
         try {
             if (post.externalId() == null) {
-                post = upload(post, platform, token, now);
+                post = upload(post, platform, token, now, claim.channel().platform());
             }
             if (!done.contains(PostStep.SCHEDULE)) {
                 readBack(post, platform, token, now);
@@ -487,10 +493,26 @@ public final class PublicationRunner {
     }
 
     /**
+     * The description the platform receives: the post text, then for YouTube one chapter line per mark of the timeline the
+     * finished asset was made from. A description the platform would refuse stops the step before the upload starts.
+     */
+    private String descriptionOf(Post post, String platformName) throws SQLException {
+        List<ChapterMark> chapters = YouTubeAdapter.PLATFORM.equals(platformName)
+                ? transactions.inTransaction(c -> stepwise.chapters().chaptersOf(c, post.assetId()))
+                : List.of();
+        String description = ChapterLines.appendTo(post.description(), chapters);
+        if (description.length() > PublishRules.YOUTUBE.maxDescription()) {
+            throw new StepStop(new Stop(PostStep.UPLOAD, DESCRIPTION_TOO_LONG, false, null));
+        }
+        return description;
+    }
+
+    /**
      * The upload: starts a session only when none is recorded, reads the confirmed bytes before any resumption, sends the
      * asset chunk by chunk from the stored object, and records the platform item once the last byte is confirmed.
      */
-    private Post upload(Post post, StepwisePublisher platform, String token, Instant now) throws SQLException {
+    private Post upload(Post post, StepwisePublisher platform, String token, Instant now, String platformName)
+            throws SQLException {
         FinishedAsset asset = transactions.inTransaction(c -> posts.finishedAsset(c, post.assetId()))
                 .orElseThrow(() -> new StepStop(new Stop(PostStep.UPLOAD, NO_ASSET, false, null)));
         String contentType = contentTypeOf(asset.format());
@@ -519,11 +541,12 @@ public final class PublicationRunner {
             }
         }
         if (session == null) {
+            String description = descriptionOf(post, platformName);
             charge(post, QuotaBudget.VIDEOS_INSERT, now, PostStep.UPLOAD);
             YouTubeDeclaration declaration = transactions.inTransaction(c -> posts.declaration(c, post.id()));
             boolean timed = post.scheduledAt().isAfter(now);
             try {
-                session = platform.startUpload(token, new StepwisePublisher.UploadStart(post.title(), post.description(),
+                session = platform.startUpload(token, new StepwisePublisher.UploadStart(post.title(), description,
                         tagsOf(post), timed ? PlatformAdapter.Visibility.PRIVATE : post.visibility(),
                         declaration.madeForKids() == null ? Boolean.FALSE : declaration.madeForKids(),
                         timed ? post.scheduledAt().truncatedTo(ChronoUnit.SECONDS) : null, total, contentType));

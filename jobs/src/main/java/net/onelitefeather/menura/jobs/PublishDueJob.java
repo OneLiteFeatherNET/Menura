@@ -10,6 +10,7 @@ import net.onelitefeather.menura.core.config.ChannelSettings;
 import net.onelitefeather.menura.core.config.MenuraSettings;
 import net.onelitefeather.menura.core.db.DataSourceTransactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
+import net.onelitefeather.menura.core.library.JdbcTimelineChapters;
 import net.onelitefeather.menura.core.post.JdbcExternalPostStore;
 import net.onelitefeather.menura.core.publish.JdbcPostStore;
 import net.onelitefeather.menura.core.publish.JdbcQuotaStore;
@@ -86,7 +87,7 @@ public final class PublishDueJob implements Job {
         try (S3Client s3 = S3MediaStorage.client(environment)) {
             PublicationRunner.Stepwise stepwise = new PublicationRunner.Stepwise(cipher,
                     new S3MediaStorage(s3, S3MediaStorage.bucket(environment)),
-                    new QuotaLedger(QuotaBudget.youtubeDefaults(), new JdbcQuotaStore()));
+                    new QuotaLedger(QuotaBudget.youtubeDefaults(), new JdbcQuotaStore()), new JdbcTimelineChapters());
             PublicationRunner.Report report = new PublicationRunner(transactions, clock, new IdentifierGenerator(random),
                     new JdbcPostStore(), channelStore, connections, registry, externalPosts, series, settings, stepwise)
                     .runOnce();

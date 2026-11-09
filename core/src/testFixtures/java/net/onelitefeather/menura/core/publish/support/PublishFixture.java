@@ -76,6 +76,8 @@ public final class PublishFixture {
     /** The step-wise platform, when the world was built with step-wise publication. */
     public final ScriptedStepwise stepwise = new ScriptedStepwise();
     public final InMemoryQuotaUsage quotaUsage = new InMemoryQuotaUsage();
+    /** The chapter marks of the timelines the finished assets came from; empty unless a test registers some. */
+    public final InMemoryTimelineChapters chapters = new InMemoryTimelineChapters();
 
     /** A world whose platform publishes at its time ({@code native = false}) or accepts a timed publication itself. */
     public PublishFixture(boolean nativeScheduling) {
@@ -100,7 +102,7 @@ public final class PublishFixture {
         PublicationRunner.Stepwise steps = stepwise
                 ? new PublicationRunner.Stepwise(TokenCipher.of(Base64.getEncoder().encodeToString(
                 "0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.US_ASCII)), null, new SecureRandom()),
-                media, new QuotaLedger(QuotaBudget.youtubeDefaults(), quotaUsage))
+                media, new QuotaLedger(QuotaBudget.youtubeDefaults(), quotaUsage), chapters)
                 : null;
         this.runner = new PublicationRunner(new DirectTransactions(), clock, identifiers, posts, channels, connections,
                 platforms, externalPosts, series, settings, steps);
