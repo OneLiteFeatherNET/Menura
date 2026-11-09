@@ -13,4 +13,6 @@ dependencies {
     testImplementation(platform(libs.testcontainers.bom))
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.testcontainers.junit.jupiter)
+    // Validates the iCalendar feed against RFC 5545 in tests only (IcsFeedTest); never on the runtime path.
+    testImplementation(libs.ical4j)
 }
