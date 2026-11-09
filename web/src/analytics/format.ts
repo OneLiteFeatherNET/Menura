@@ -4,6 +4,7 @@ import { WEEKDAY_LABELS } from '../api/series';
 import type {
   CollectionOutcome,
   EqualAgeBy,
+  InternalMetric,
   Metric,
   SeriesAnalytics,
 } from '../api/analytics';
@@ -56,6 +57,32 @@ export function formatMetricValue(metric: Metric | undefined): string {
 
 export function metricLabel(name: string): string {
   return METRIC_LABELS[name] ?? name;
+}
+
+/** The German names of the internal metrics the server knows; any other name is shown as it is sent. */
+export const INTERNAL_METRIC_LABELS: Record<string, string> = {
+  first_joins: 'Erste Beitritte',
+};
+
+/** The mark of an internal value the source reports as an estimate. */
+export const ESTIMATE_TEXT = 'geschätzt';
+
+/** What a series without internal values shows. */
+export const NO_INTERNAL_TEXT = '–';
+
+/**
+ * One internal metric as text: its name, its value and, for an estimate, the mark 'geschätzt'. A value that was never
+ * stored reads 'nicht verfügbar', never 0.
+ */
+export function internalMetricText(metric: InternalMetric): string {
+  const name = INTERNAL_METRIC_LABELS[metric.metric] ?? metric.metric;
+  const value = metric.value === null ? NOT_AVAILABLE : formatNumber(metric.value);
+  return metric.estimate ? `${name}: ${value} (${ESTIMATE_TEXT})` : `${name}: ${value}`;
+}
+
+/** All internal metrics of a series as one text, or the dash when there are none. */
+export function internalMetricsText(metrics: readonly InternalMetric[]): string {
+  return metrics.length === 0 ? NO_INTERNAL_TEXT : metrics.map(internalMetricText).join(', ');
 }
 
 /** The metric with this name, or undefined when the list does not contain it. */

@@ -99,7 +99,24 @@ export function sampleSeriesRow(overrides: Partial<SeriesAnalytics> = {}): Serie
     posts: 6,
     metrics: sampleMetrics({ views: 2100, engaged_views: 950, average_view_percentage: 52.1, likes: 90 }, 6),
     weeks: [],
+    internal: [],
     ...overrides,
+  };
+}
+
+/** A series with first joins of the platform's estimate, one with a measured value and one without a stored value. */
+export function sampleSeriesWithInternal(): AnalyticsSeries {
+  return {
+    from: '2026-08-11',
+    to: '2026-11-08',
+    series: [
+      sampleSeriesRow({
+        internal: [
+          { source: 'joins', metric: 'first_joins', estimate: true, value: 12, values: 3 },
+          { source: 'joins', metric: 'first_joins', estimate: false, value: null, values: 0 },
+        ],
+      }),
+    ],
   };
 }
 

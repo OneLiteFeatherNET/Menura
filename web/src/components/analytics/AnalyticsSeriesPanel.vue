@@ -5,6 +5,7 @@ import {
   NO_POSTS_TEXT,
   NO_POSTS_TITLE,
   formatMetricValue,
+  internalMetricsText,
   metricOf,
   rankSeries,
 } from '../../analytics/format';
@@ -12,8 +13,9 @@ import DataTable, { type DataColumn } from '../ui/DataTable.vue';
 import EmptyState from '../ui/EmptyState.vue';
 import LoadState from '../ui/LoadState.vue';
 
-// The series ranked by engaged views, highest first, with the average view percentage. A series whose platform gives no
-// value reads 'nicht verfügbar'. The posts in no series are listed last under their own name.
+// The series ranked by engaged views, highest first, with the average view percentage and the registered internal metrics
+// (estimates marked 'geschätzt'). A series whose platform gives no value reads 'nicht verfügbar'. The posts in no series
+// are listed last under their own name.
 const props = defineProps<{
   status: 'loading' | 'error' | 'ready';
   series: SeriesAnalytics[] | null;
@@ -29,6 +31,7 @@ const columns: DataColumn[] = [
   { key: 'posts', label: 'Beiträge' },
   { key: 'engaged', label: 'Engagierte Aufrufe' },
   { key: 'average', label: 'Ø Anteil angesehen' },
+  { key: 'internal', label: 'Interne Kennzahlen' },
 ];
 
 const ranked = computed(() => rankSeries(props.series ?? []));
@@ -41,6 +44,7 @@ const rows = computed(() =>
     posts: String(series.posts),
     engaged: formatMetricValue(metricOf(series.metrics, 'engaged_views')),
     average: formatMetricValue(metricOf(series.metrics, 'average_view_percentage')),
+    internal: internalMetricsText(series.internal),
   })),
 );
 
