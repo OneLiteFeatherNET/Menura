@@ -135,10 +135,11 @@ The server's envFrom: the shared Secrets plus, on the server only, the object st
 {{- end }}
 
 {{/*
-The publication job's envFrom: the shared Secrets plus the object storage Secret (S3 credentials), because the YouTube
-upload streams the finished assets from object storage. The join attribution Secret is not listed.
+The envFrom of the jobs that read object storage: the shared Secrets plus the object storage Secret (S3 credentials).
+These are the publication job (the YouTube upload streams the finished assets) and the retention job (it moves raw
+recordings to cold storage). The join attribution Secret is not listed.
 */}}
-{{- define "menura.publishJobSecretEnvFrom" -}}
+{{- define "menura.storageJobSecretEnvFrom" -}}
 {{- $secrets := list -}}
 {{- with .Values.database.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
 {{- with .Values.channels.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}

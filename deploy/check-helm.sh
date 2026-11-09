@@ -272,11 +272,12 @@ if grep -q 'menura-storage' <(yq -N 'select(.kind == "Deployment" or .kind == "J
   report "the jobs and migrate pods must not reference the storage Secret"
 fi
 
-# The publication CronJob streams finished assets from object storage (the YouTube upload), so it reads the storage Secret
-# through envFrom. No other job CronJob reads object storage, so none of them may get it.
+# The publication CronJob streams finished assets from object storage (the YouTube upload) and the retention CronJob moves
+# raw recordings to cold storage, so both read the storage Secret through envFrom. No other job CronJob may get it.
 storage_cronjobs="$(yq -N 'select(.kind == "CronJob") | select(.spec.jobTemplate.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-storage") | .metadata.name' "$rendered_storage" | sort)"
-if [[ "$storage_cronjobs" != "$release-publish-due" ]]; then
-  report "only the publication CronJob may read the storage Secret menura-storage (found '$storage_cronjobs')"
+expected_storage_cronjobs="$(printf '%s\n' "$release-publish-due" "$release-retention" | sort)"
+if [[ "$storage_cronjobs" != "$expected_storage_cronjobs" ]]; then
+  report "only the publication and retention CronJobs may read the storage Secret menura-storage (expected '$expected_storage_cronjobs', found '$storage_cronjobs')"
 fi
 
 # Channel connections (change add-channel-connections): the token key and the YouTube client secret reach the pods only

@@ -78,7 +78,7 @@ cluster sets 1 and 2, the public hosts do not meet principle 11.
 
 - `storage.*` names the S3 endpoint (`https://s3.onelitefeather.net`), region and the private bucket. The S3 keys come
   from `storage.existingSecret` (keys `MENURA_S3_ACCESS_KEY_ID` and `MENURA_S3_SECRET_ACCESS_KEY`), created outside the
-  chart and injected into the server pods only.
+  chart and injected into the server pods and the jobs that read object storage (publication and retention).
 - The bucket's CORS rule must allow the web app origin (`https://menura.onelitefeather.net`) for `PUT` and `GET` only,
   with the `x-amz-checksum-sha256` header allowed. No other origin, wildcard or credentialed CORS is allowed (principle 14).
 - `library.partSizeBytes` must not exceed 99614720 (95 MiB, principle 15); `check-helm.sh` enforces it.
