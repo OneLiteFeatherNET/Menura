@@ -22,7 +22,8 @@ export default defineConfig({
   webServer: [
     {
       command: 'node e2e/support/run-server.mjs',
-      url: 'http://localhost:8080/health',
+      // The readiness port opens after the health check and the test-only seed (e2e/support/run-server.mjs).
+      url: 'http://localhost:8081/ready',
       timeout: 300_000,
       reuseExistingServer: false,
     },

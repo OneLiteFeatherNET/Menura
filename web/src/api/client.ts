@@ -6,17 +6,20 @@ import { apiBase, type Fetcher } from '../auth/session';
 export class ApiError extends Error {
   readonly status: number;
   readonly title: string;
+  /** The problem list of the answer, when it has one (the schedule dry run lists its problems); empty otherwise. */
+  readonly problems: unknown[];
 
-  constructor(status: number, title: string, detail: string) {
+  constructor(status: number, title: string, detail: string, problems: unknown[] = []) {
     super(detail);
     this.name = 'ApiError';
     this.status = status;
     this.title = title;
+    this.problems = problems;
   }
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
 }
 
@@ -41,12 +44,14 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}, 
 async function problemOf(response: Response): Promise<ApiError> {
   let title = response.statusText || `HTTP ${response.status}`;
   let detail = title;
+  let problems: unknown[] = [];
   try {
-    const body = (await response.json()) as { title?: unknown; detail?: unknown };
+    const body = (await response.json()) as { title?: unknown; detail?: unknown; problems?: unknown };
     if (typeof body.title === 'string') title = body.title;
     if (typeof body.detail === 'string') detail = body.detail;
+    if (Array.isArray(body.problems)) problems = body.problems;
   } catch {
     // A failure without a problem body keeps the status text.
   }
-  return new ApiError(response.status, title, detail);
+  return new ApiError(response.status, title, detail, problems);
 }

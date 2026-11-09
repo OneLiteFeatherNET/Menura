@@ -6,9 +6,14 @@ import { describe, expect, it } from 'vitest';
 const e2eDirectory = resolve(process.cwd(), 'e2e');
 const FIXED_WAIT = /waitForTimeout\s*\(|\bsetTimeout\s*\(|\bsleep\s*\(|\bThread\.sleep\s*\(/;
 
+// The support directory holds the harness that starts the server and the seed, not tests. Its readiness loop polls a
+// process that is starting, which is not a wait for a page, so it is outside this rule.
+const HARNESS_DIRECTORY = join(e2eDirectory, 'support');
+
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
     const path = join(directory, entry);
+    if (path === HARNESS_DIRECTORY) return [];
     if (statSync(path).isDirectory()) return sourceFiles(path);
     return /\.(?:ts|js|mjs)$/.test(entry) ? [path] : [];
   });

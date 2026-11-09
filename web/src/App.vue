@@ -6,6 +6,7 @@ import LoadState from './components/ui/LoadState.vue';
 import NavRail from './components/ui/NavRail.vue';
 import ChannelsPage from './features/channels/ChannelsPage.vue';
 import SeriesPage from './components/series/SeriesPage.vue';
+import CalendarPage from './calendar/CalendarPage.vue';
 import { canOpen, findArea, normalizePath, visibleAreas } from './navigation/areas';
 import OverviewPage from './navigation/OverviewPage.vue';
 
@@ -78,6 +79,7 @@ onMounted(load);
           <OverviewPage v-if="Component.type === OverviewPage" :roles="session.roles" :areas="overviewAreas" />
           <ChannelsPage v-else-if="Component.type === ChannelsPage" :roles="session.roles" />
           <SeriesPage v-else-if="Component.type === SeriesPage" :roles="session.roles" />
+          <CalendarPage v-else-if="Component.type === CalendarPage" :roles="session.roles" />
           <component :is="Component" v-else />
         </RouterView>
       </main>
