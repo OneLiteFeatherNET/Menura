@@ -16,5 +16,6 @@ export async function expectNoSeriousA11yViolations(element: Element): Promise<v
     console.warn(`a11y (${violation.impact}): ${violation.id} - ${violation.help}`);
   }
   const summary = blocking.map((v) => `${v.impact}: ${v.id} (${v.nodes.length} node(s)) - ${v.help}`);
-  expect(summary, 'serious or critical accessibility violations').toEqual([]);
+  const rules = blocking.map((v) => v.id).join(', ');
+  expect(summary, `serious or critical accessibility violations: ${rules}`).toEqual([]);
 }
