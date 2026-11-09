@@ -65,7 +65,8 @@ public final class PostService {
 
     /** A post with what its page or calendar item shows: its channel, the asset kind, steps, attempts and problems. */
     public record PostDetail(Post post, Channel channel, String assetKind, List<StepRecord> steps,
-                             List<AttemptRecord> attempts, List<DryRun.Problem> problems) {
+                             List<AttemptRecord> attempts, List<DryRun.Problem> problems, YouTubeDeclaration declaration,
+                             PostUpload upload) {
     }
 
     /** One channel of a multi-channel plan, with its own text and time. */
@@ -119,6 +120,9 @@ public final class PostService {
                     command.sourcePostId(), command.title(), command.description(), command.hashtags(),
                     command.visibility(), command.scheduledAt());
             posts.insert(c, post);
+            if (command.visibility() != null) {
+                declareVisibility(c, post.id());
+            }
             return detail(c, post, true);
         });
     }
@@ -136,8 +140,44 @@ public final class PostService {
             }
             requireCover(c, content.coverAssetId());
             Post changed = post.edited(content, playlist, now);
+            if (content.visibility() != null) {
+                declareVisibility(c, id);
+            }
             return detail(c, posts.update(c, changed), true);
         });
+    }
+
+    /**
+     * Declares the made-for-kids answer of a YouTube post (change add-youtube-integration). The answer is required before
+     * scheduling; no platform default is used. Allowed while the post can still be edited.
+     */
+    public PostDetail declareMadeForKids(PostActor actor, UUID id, boolean madeForKids) throws SQLException {
+        return declareYouTube(actor, id, madeForKids, null);
+    }
+
+    /**
+     * Declares the YouTube answers of a post: the made-for-kids answer and, when given, whether the post is planned as a Short
+     * (a null {@code planShort} keeps the current answer). Allowed while the post can still be edited.
+     */
+    public PostDetail declareYouTube(PostActor actor, UUID id, boolean madeForKids, Boolean planShort) throws SQLException {
+        requireEditor(actor);
+        return transactions.inTransaction(c -> {
+            Post post = requirePost(c, id);
+            if (!post.status().editable()) {
+                throw new ProblemException(409, "Conflict", "A post in status " + post.status().value()
+                        + " is not edited; propose a revision instead.");
+            }
+            YouTubeDeclaration current = posts.declaration(c, id);
+            posts.putDeclaration(c, id, new YouTubeDeclaration(current.visibilityDeclared(), madeForKids,
+                    planShort == null ? current.plannedShort() : planShort));
+            return detail(c, post, true);
+        });
+    }
+
+    /** Records that the visibility of a post was chosen by a person, which the platform needs before scheduling. */
+    private void declareVisibility(Connection c, UUID id) throws SQLException {
+        YouTubeDeclaration current = posts.declaration(c, id);
+        posts.putDeclaration(c, id, new YouTubeDeclaration(true, current.madeForKids(), current.plannedShort()));
     }
 
     /** Deletes a draft or a post in review. A post that was approved, scheduled or published is kept. */
@@ -224,6 +264,9 @@ public final class PostService {
                             command.seriesId(), command.sourcePostId(), item.title(), item.description(), item.hashtags(),
                             item.visibility(), item.scheduledAt());
                     posts.insert(c, post);
+                    if (item.visibility() != null) {
+                        declareVisibility(c, post.id());
+                    }
                     created.add(detail(c, post, true));
                 } catch (ProblemException refusal) {
                     refused.add(new Refusal(item.channelId(), refusal.detail()));
@@ -503,7 +546,8 @@ public final class PostService {
         List<DryRun.Problem> problems = post.status() == PostStatus.PUBLISHED || post.status() == PostStatus.FAILED
                 ? List.of() : PostFacts.problems(c, posts, channels, post, channel);
         return new PostDetail(post, channel, kind, posts.steps(c, post.id()),
-                withAttempts ? posts.attempts(c, post.id()) : List.of(), problems);
+                withAttempts ? posts.attempts(c, post.id()) : List.of(), problems, posts.declaration(c, post.id()),
+                posts.upload(c, post.id()).orElse(null));
     }
 
     private static void requireEditor(PostActor actor) {

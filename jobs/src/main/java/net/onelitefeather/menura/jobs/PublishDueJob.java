@@ -12,8 +12,12 @@ import net.onelitefeather.menura.core.db.DataSourceTransactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
 import net.onelitefeather.menura.core.post.JdbcExternalPostStore;
 import net.onelitefeather.menura.core.publish.JdbcPostStore;
+import net.onelitefeather.menura.core.publish.JdbcQuotaStore;
 import net.onelitefeather.menura.core.publish.PublicationRunner;
 import net.onelitefeather.menura.core.publish.PublishSettings;
+import net.onelitefeather.menura.core.publish.QuotaBudget;
+import net.onelitefeather.menura.core.publish.QuotaLedger;
+import software.amazon.awssdk.services.s3.S3Client;
 import net.onelitefeather.menura.core.series.BrandTokens;
 import net.onelitefeather.menura.core.series.JdbcSeriesStore;
 import net.onelitefeather.menura.core.series.JoinDomain;
@@ -79,11 +83,17 @@ public final class PublishDueJob implements Job {
                 channelStore, NO_BRAND_KIT, JoinDomain.NONE);
         PublishSettings settings = PublishSettings.from(environment);
 
-        PublicationRunner.Report report = new PublicationRunner(transactions, clock, new IdentifierGenerator(random),
-                new JdbcPostStore(), channelStore, connections, registry, externalPosts, series, settings).runOnce();
-        System.out.println("publish-due claimed=" + report.claimed() + " published=" + report.published()
-                + " handedOver=" + report.handedOver() + " confirmed=" + report.confirmed() + " retried=" + report.retried()
-                + " failed=" + report.failed() + " waiting=" + report.waiting());
+        try (S3Client s3 = S3MediaStorage.client(environment)) {
+            PublicationRunner.Stepwise stepwise = new PublicationRunner.Stepwise(cipher,
+                    new S3MediaStorage(s3, S3MediaStorage.bucket(environment)),
+                    new QuotaLedger(QuotaBudget.youtubeDefaults(), new JdbcQuotaStore()));
+            PublicationRunner.Report report = new PublicationRunner(transactions, clock, new IdentifierGenerator(random),
+                    new JdbcPostStore(), channelStore, connections, registry, externalPosts, series, settings, stepwise)
+                    .runOnce();
+            System.out.println("publish-due claimed=" + report.claimed() + " published=" + report.published()
+                    + " handedOver=" + report.handedOver() + " confirmed=" + report.confirmed() + " retried=" + report.retried()
+                    + " failed=" + report.failed() + " waiting=" + report.waiting());
+        }
     }
 
     /** The publication never reads the brand kit; reaching it would be a programming error. */

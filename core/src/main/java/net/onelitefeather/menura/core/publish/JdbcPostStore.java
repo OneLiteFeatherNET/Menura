@@ -131,6 +131,91 @@ public final class JdbcPostStore implements PostStore {
     }
 
     @Override
+    public Optional<FinishedAsset> finishedAsset(Connection connection, UUID assetId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("select kind, format, storage_key, size_bytes, "
+                + "width, height, duration_seconds from menura.asset where id = ? and kind in ('video', 'image')")) {
+            statement.setObject(1, assetId);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    return Optional.empty();
+                }
+                int width = rs.getInt(5);
+                boolean noWidth = rs.wasNull();
+                int height = rs.getInt(6);
+                boolean noHeight = rs.wasNull();
+                int duration = rs.getInt(7);
+                boolean noDuration = rs.wasNull();
+                return Optional.of(new FinishedAsset(rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4),
+                        noWidth ? null : width, noHeight ? null : height, noDuration ? null : duration));
+            }
+        }
+    }
+
+    @Override
+    public YouTubeDeclaration declaration(Connection connection, UUID postId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("select visibility_declared, made_for_kids, "
+                + "planned_short from menura.youtube_post_declaration where post_id = ?")) {
+            statement.setObject(1, postId);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    return YouTubeDeclaration.none();
+                }
+                boolean madeForKids = rs.getBoolean(2);
+                return new YouTubeDeclaration(rs.getBoolean(1), rs.wasNull() ? null : madeForKids, rs.getBoolean(3));
+            }
+        }
+    }
+
+    @Override
+    public void putDeclaration(Connection connection, UUID postId, YouTubeDeclaration declaration) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("insert into menura.youtube_post_declaration "
+                + "(post_id, visibility_declared, made_for_kids, planned_short) values (?, ?, ?, ?) on conflict (post_id) "
+                + "do update set visibility_declared = excluded.visibility_declared, made_for_kids = excluded.made_for_kids, "
+                + "planned_short = excluded.planned_short")) {
+            statement.setObject(1, postId);
+            statement.setBoolean(2, declaration.visibilityDeclared());
+            if (declaration.madeForKids() == null) {
+                statement.setNull(3, java.sql.Types.BOOLEAN);
+            } else {
+                statement.setBoolean(3, declaration.madeForKids());
+            }
+            statement.setBoolean(4, declaration.plannedShort());
+            statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public Optional<PostUpload> upload(Connection connection, UUID postId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("select session_sealed, total_bytes, "
+                + "confirmed_bytes, applied_visibility, visibility_problem from menura.post_upload where post_id = ?")) {
+            statement.setObject(1, postId);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next() ? Optional.of(new PostUpload(rs.getBytes(1), rs.getLong(2), rs.getLong(3),
+                        rs.getString(4), rs.getString(5))) : Optional.empty();
+            }
+        }
+    }
+
+    @Override
+    public void putUpload(Connection connection, UUID postId, PostUpload upload, Instant at) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("insert into menura.post_upload (post_id, "
+                + "session_sealed, total_bytes, confirmed_bytes, applied_visibility, visibility_problem, updated_at) "
+                + "values (?, ?, ?, ?, ?, ?, ?) on conflict (post_id) do update set session_sealed = excluded.session_sealed, "
+                + "total_bytes = excluded.total_bytes, confirmed_bytes = excluded.confirmed_bytes, "
+                + "applied_visibility = excluded.applied_visibility, visibility_problem = excluded.visibility_problem, "
+                + "updated_at = excluded.updated_at")) {
+            statement.setObject(1, postId);
+            statement.setBytes(2, upload.session());
+            statement.setLong(3, upload.totalBytes());
+            statement.setLong(4, upload.confirmedBytes());
+            statement.setString(5, upload.appliedVisibility());
+            statement.setString(6, upload.visibilityProblem());
+            statement.setTimestamp(7, Timestamp.from(at));
+            statement.executeUpdate();
+        }
+    }
+
+    @Override
     public List<StepRecord> steps(Connection connection, UUID postId) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("select post_id, step, state, changed_at, reason "
                 + "from menura.post_step where post_id = ? order by case step when 'upload' then 1 when 'schedule' then 2 "
@@ -192,6 +277,16 @@ public final class JdbcPostStore implements PostStore {
             statement.setTimestamp(4, timestamp(attempt.finishedAt()));
             statement.setString(5, attempt.outcome());
             statement.setString(6, attempt.reason());
+            statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public void deleteAttempt(Connection connection, UUID postId, int attempt) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "delete from menura.post_attempt where post_id = ? and attempt = ?")) {
+            statement.setObject(1, postId);
+            statement.setInt(2, attempt);
             statement.executeUpdate();
         }
     }

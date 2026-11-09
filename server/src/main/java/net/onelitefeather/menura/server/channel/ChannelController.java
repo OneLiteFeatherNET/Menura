@@ -16,6 +16,7 @@ import io.micronaut.core.annotation.Nullable;
 import net.onelitefeather.menura.core.channel.Actor;
 import net.onelitefeather.menura.core.channel.ChannelSnapshot;
 import net.onelitefeather.menura.core.channel.ConnectionService;
+import net.onelitefeather.menura.core.publish.ChannelQuotaService;
 import net.onelitefeather.menura.core.paging.Cursor;
 import net.onelitefeather.menura.core.paging.PageRequest;
 import net.onelitefeather.menura.core.problem.ProblemException;
@@ -53,11 +54,14 @@ public class ChannelController {
     private final ConnectionService connections;
     private final CurrentPerson currentPerson;
     private final IdentifierGenerator identifiers;
+    private final ChannelQuotaService quota;
 
-    public ChannelController(ConnectionService connections, CurrentPerson currentPerson, IdentifierGenerator identifiers) {
+    public ChannelController(ConnectionService connections, CurrentPerson currentPerson, IdentifierGenerator identifiers,
+                             ChannelQuotaService quota) {
         this.connections = connections;
         this.currentPerson = currentPerson;
         this.identifiers = identifiers;
+        this.quota = quota;
     }
 
     @Get
@@ -78,6 +82,17 @@ public class ChannelController {
     @ExecuteOn(TaskExecutors.BLOCKING)
     ChannelView get(@PathVariable UUID id) throws SQLException {
         return ChannelViews.of(connections.snapshot(id));
+    }
+
+    /**
+     * The remaining daily quota of a YouTube channel: the units and the uploads of the current Pacific day that are still
+     * left, and when they start over (change add-youtube-integration). Any signed-in person may read it.
+     */
+    @Get("/{id}/quota")
+    @RequiresRole
+    @ExecuteOn(TaskExecutors.BLOCKING)
+    ChannelQuotaView quota(@PathVariable UUID id) throws SQLException {
+        return ChannelQuotaView.of(quota.quota(id));
     }
 
     /** Starts a connection of a new channel. The browser is sent to the platform's consent with the returned URL. */

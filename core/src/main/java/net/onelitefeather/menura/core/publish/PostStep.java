@@ -2,12 +2,14 @@ package net.onelitefeather.menura.core.publish;
 
 import java.util.Optional;
 
-/** The steps a publication of a post goes through, in this order. Each step has its own row with its state and time. */
+/** The steps a publication of a post goes through. Each step has its own row with its state and time. */
 public enum PostStep {
     UPLOAD("upload"),
     SCHEDULE("schedule"),
     METADATA("metadata"),
-    PUBLISH("publish");
+    PUBLISH("publish"),
+    PLAYLIST("playlist"),
+    THUMBNAIL("thumbnail");
 
     private final String value;
 

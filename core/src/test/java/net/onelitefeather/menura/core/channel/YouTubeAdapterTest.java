@@ -27,6 +27,7 @@ class YouTubeAdapterTest {
 
     private static final String READONLY = ChannelFixture.YOUTUBE_READONLY;
     private static final String UPLOAD = ChannelFixture.YOUTUBE_UPLOAD;
+    private static final String FORCE_SSL = "https://www.googleapis.com/auth/youtube.force-ssl";
 
     @Test
     void consentUrlCarriesStateChallengeOfflineAccessAndTheRegisteredRedirect() {
@@ -50,8 +51,8 @@ class YouTubeAdapterTest {
 
         assertEquals(Set.of(READONLY), world.youtube.scopesFor(Set.of()),
                 "without an enabled feature only the account scope is requested");
-        assertEquals(Set.of(READONLY, UPLOAD), world.youtube.scopesFor(Set.of("publish")),
-                "enabling publishing adds the upload scope and nothing more");
+        assertEquals(Set.of(READONLY, UPLOAD, FORCE_SSL), world.youtube.scopesFor(Set.of("publish")),
+                "enabling publishing adds the upload scope and the force-ssl scope that playlist inserts need");
         assertEquals(Set.of(READONLY), world.youtube.scopesFor(Set.of("chapters")),
                 "a feature the adapter does not declare requests no scope");
     }
@@ -186,11 +187,11 @@ class YouTubeAdapterTest {
     }
 
     @Test
-    void publishingIsDeclaredUnsupportedInThisBuildAndRevocationIsOffered() {
+    void publishingIsDoneInStepsAndNativeSchedulingIsDeclaredAndRevocationIsOffered() {
         ChannelFixture world = new ChannelFixture();
 
-        assertFalse(world.youtube.capabilities().publishing(), "publishing lands in the YouTube integration change");
-        assertFalse(world.youtube.capabilities().nativeScheduling(), "scheduling is enabled with publishing");
+        assertTrue(world.youtube.capabilities().publishing(), "publishing is available through the step-wise upload");
+        assertTrue(world.youtube.capabilities().nativeScheduling(), "scheduled publication is native (publishAt)");
         assertTrue(world.youtube.capabilities().revocation(), "Google offers revocation, requested on disconnect");
         assertThrows(PlatformAdapter.Unsupported.class,
                 () -> world.youtube.publish("ya29.a", new PlatformAdapter.PublishRequest("t", PlatformAdapter.Visibility.PRIVATE, null)));

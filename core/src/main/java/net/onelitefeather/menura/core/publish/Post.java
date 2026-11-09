@@ -113,6 +113,14 @@ public record Post(UUID id, UUID channelId, UUID assetId, UUID coverAssetId, UUI
                 failureReason, attempts, nextAttemptAt, leaseOwner, leaseUntil, revision, createdAt, at);
     }
 
+    /** A stepwise upload produced the platform item: its identifier and URL are kept while the post stays scheduled. */
+    public Post uploaded(String externalId, String url, Instant at) {
+        requireStatus(PostStatus.SCHEDULED, "record an upload");
+        return new Post(id, channelId, assetId, coverAssetId, seriesId, sourcePostId, authorId, status, title, description,
+                hashtags, visibility, playlistId, scheduledAt, approvedBy, approvedAt, handedOverAt, externalId, url, null,
+                failureReason, attempts, nextAttemptAt, leaseOwner, leaseUntil, revision, createdAt, at);
+    }
+
     public Post published(String externalId, String url, Instant publishedAt, Instant at) {
         Post next = moved(PostStatus.PUBLISHED, at);
         return new Post(id, channelId, assetId, coverAssetId, seriesId, sourcePostId, authorId, next.status, title,
@@ -155,6 +163,17 @@ public record Post(UUID id, UUID channelId, UUID assetId, UUID coverAssetId, UUI
         return new Post(id, channelId, assetId, coverAssetId, seriesId, sourcePostId, authorId, status, title, description,
                 hashtags, visibility, playlistId, scheduledAt, approvedBy, approvedAt, handedOverAt, externalId, externalUrl,
                 publishedAt, failureReason, attempts + 1, nextAttemptAt, leaseOwner, leaseUntil, revision, createdAt, at);
+    }
+
+    /**
+     * A run that only waits (the platform still processes the video, or the quota is used up) is not an attempt: the attempt
+     * counter goes back by one, never below zero.
+     */
+    public Post attemptRevoked(Instant at) {
+        return new Post(id, channelId, assetId, coverAssetId, seriesId, sourcePostId, authorId, status, title, description,
+                hashtags, visibility, playlistId, scheduledAt, approvedBy, approvedAt, handedOverAt, externalId, externalUrl,
+                publishedAt, failureReason, Math.max(0, attempts - 1), nextAttemptAt, leaseOwner, leaseUntil, revision,
+                createdAt, at);
     }
 
     /** The same post with the revision the store gave it when it was written. */

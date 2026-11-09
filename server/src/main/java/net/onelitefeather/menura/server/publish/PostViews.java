@@ -40,7 +40,22 @@ public final class PostViews {
                 post.playlistId(), post.scheduledAt(), post.handedOverAt(), post.approvedBy(), post.approvedAt(),
                 post.publishedAt(), post.externalUrl(), post.externalId(), post.failureReason(), post.attempts(),
                 post.nextAttemptAt(), post.revision(), steps(detail.steps()), attempts(detail.attempts()),
-                problems(detail.problems()), post.createdAt(), post.updatedAt());
+                problems(detail.problems()), post.createdAt(), post.updatedAt(), youtubeMadeForKids(detail),
+                detail.declaration().visibilityDeclared(), detail.declaration().plannedShort(), appliedVisibility(detail),
+                visibilityProblem(detail));
+    }
+
+    /** The made-for-kids answer of a YouTube post; null while none was given. */
+    private static Boolean youtubeMadeForKids(PostDetail detail) {
+        return detail.declaration().madeForKids();
+    }
+
+    private static String appliedVisibility(PostDetail detail) {
+        return detail.upload() == null ? null : detail.upload().appliedVisibility();
+    }
+
+    private static String visibilityProblem(PostDetail detail) {
+        return detail.upload() == null ? null : detail.upload().visibilityProblem();
     }
 
     /** A calendar item: the post, with its time in the installation time zone. */
@@ -109,7 +124,8 @@ public final class PostViews {
                            Instant handedOverAt, UUID approvedBy, Instant approvedAt, Instant publishedAt, String url,
                            String externalId, String failureReason, int attempts, Instant nextAttemptAt, int revision,
                            List<StepView> steps, List<AttemptView> attemptHistory, List<ProblemView> problems,
-                           Instant createdAt, Instant updatedAt) {
+                           Instant createdAt, Instant updatedAt, Boolean madeForKids, boolean visibilityDeclared,
+                           boolean plannedShort, String appliedVisibility, String visibilityProblem) {
     }
 
     /** One calendar item: a post with its start instant and its local date and time. */

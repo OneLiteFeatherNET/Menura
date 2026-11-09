@@ -12,6 +12,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Patch;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Put;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.serde.annotation.Serdeable;
@@ -96,6 +97,15 @@ public class PostController {
         return PostViews.post(posts.schedule(PostActors.of(request), id));
     }
 
+    /** The made-for-kids declaration of a YouTube post; scheduling is refused until it is given (add-youtube-integration). */
+    @Put("/{id}/youtube-declaration")
+    @RequiresRole({Role.EDITOR, Role.PUBLISHER})
+    @ExecuteOn(TaskExecutors.BLOCKING)
+    PostView declareMadeForKids(HttpRequest<?> request, @PathVariable UUID id, @Body MadeForKidsBody body)
+            throws SQLException {
+        return PostViews.post(posts.declareYouTube(PostActors.of(request), id, body.madeForKids(), body.planShort()));
+    }
+
     @Get("/{id}/revisions")
     @RequiresRole
     @ExecuteOn(TaskExecutors.BLOCKING)
@@ -156,6 +166,9 @@ public class PostController {
 
     /** The body of an edit: only the fields given change. */
     @Serdeable
+    public record MadeForKidsBody(boolean madeForKids, Boolean planShort) {
+    }
+
     public record PatchBody(UUID channelId, UUID coverAssetId, String title, String description, List<String> hashtags,
                             String visibility, Instant scheduledAt) {
 

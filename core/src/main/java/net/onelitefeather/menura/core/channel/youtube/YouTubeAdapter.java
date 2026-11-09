@@ -7,6 +7,8 @@ import net.onelitefeather.menura.core.channel.PlatformAdapter;
 import net.onelitefeather.menura.core.channel.PlatformCapabilities;
 import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.PlatformFeature;
+import net.onelitefeather.menura.core.channel.StepwisePublisher;
+import net.onelitefeather.menura.core.channel.UploadSessionExpired;
 import net.onelitefeather.menura.core.problem.ProblemException;
 
 import java.io.IOException;
@@ -39,7 +41,7 @@ import java.util.stream.Collectors;
  * <p>Every request goes to a Google host from {@link #HOSTS} over HTTPS. Tokens and client secrets are sent in the
  * request only and never placed in an error message.
  */
-public final class YouTubeAdapter implements PlatformAdapter {
+public final class YouTubeAdapter implements PlatformAdapter, StepwisePublisher {
 
     public static final String PLATFORM = "youtube";
 
@@ -57,6 +59,20 @@ public final class YouTubeAdapter implements PlatformAdapter {
 
     static final String READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
     static final String UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload";
+    /**
+     * Needed by playlistItems.insert, which does not accept youtube.upload (checked 2026-11-08 at
+     * https://developers.google.com/youtube/v3/docs/playlistItems/insert: youtubepartner, youtube or youtube.force-ssl).
+     * youtube.force-ssl is the narrowest of them that thumbnails.set and playlistItems.insert both accept.
+     */
+    static final String FORCE_SSL_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl";
+    /**
+     * The resumable upload endpoint (checked 2026-11-08 at
+     * https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol and the videos.insert reference).
+     */
+    static final String UPLOAD_ENDPOINT = "https://www.googleapis.com/upload/youtube/v3/videos";
+    static final String THUMBNAIL_ENDPOINT = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set";
+    /** Chunks of a resumable upload are multiples of 256 KB except the last one (resumable upload guide). */
+    static final long CHUNK_ALIGNMENT = 256L * 1024L;
     static final String ANALYTICS_READONLY_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly";
     static final String PUBLISH_FEATURE = "publish";
     static final String INSIGHTS_FEATURE = "insights";
@@ -119,14 +135,14 @@ public final class YouTubeAdapter implements PlatformAdapter {
 
     @Override
     public PlatformCapabilities capabilities() {
-        return new PlatformCapabilities(false, false, true, true, true);
+        return new PlatformCapabilities(true, true, true, true, true);
     }
 
     @Override
     public List<PlatformFeature> features() {
         return List.of(
                 new PlatformFeature(ACCOUNT_FEATURE, Set.of(READONLY_SCOPE)),
-                new PlatformFeature(PUBLISH_FEATURE, Set.of(UPLOAD_SCOPE)),
+                new PlatformFeature(PUBLISH_FEATURE, Set.of(UPLOAD_SCOPE, FORCE_SSL_SCOPE)),
                 new PlatformFeature(INSIGHTS_FEATURE, Set.of(READONLY_SCOPE, ANALYTICS_READONLY_SCOPE)));
     }
 
@@ -203,7 +219,113 @@ public final class YouTubeAdapter implements PlatformAdapter {
 
     @Override
     public PublicationStatus status(String accessToken, String platformItemId) {
-        throw new Unsupported("the status of a YouTube publication");
+        VideoState state = video(accessToken, platformItemId);
+        return state.visibility() == Visibility.PRIVATE ? PublicationStatus.PENDING : PublicationStatus.PUBLISHED;
+    }
+
+    @Override
+    public Optional<StepwisePublisher> stepwise() {
+        return Optional.of(this);
+    }
+
+    /**
+     * Starts a resumable upload of a video (videos.insert, uploadType=resumable). Quota: 100 units and one upload of the
+     * daily cap, charged by the caller before this call. The snippet carries the post's title, description and tags; the
+     * status carries the visibility and the made-for-kids declaration explicitly, and the publish time when one is set.
+     * Documented 2026-11-08: a publish time is honoured only for a private video that was never published
+     * (https://developers.google.com/youtube/v3/docs/videos). No categoryId is sent: the reference does not mark it required
+     * for videos.insert, which is an assumption to confirm in the test upload (task 1.2).
+     */
+    @Override
+    public String startUpload(String accessToken, UploadStart start) {
+        HttpTransport.Answer answer = raw("POST", endpoint(UPLOAD_ENDPOINT, "uploadType", "resumable", "part",
+                        "snippet,status"), accessToken,
+                Map.of("Content-Type", "application/json; charset=UTF-8",
+                        "X-Upload-Content-Length", Long.toString(start.sizeBytes()),
+                        "X-Upload-Content-Type", start.contentType()),
+                uploadBody(start).getBytes(StandardCharsets.UTF_8), "the upload start");
+        if (answer.status() / 100 != 2 || answer.location().isEmpty()) {
+            throw failureOf(answer, "the upload start");
+        }
+        return answer.location().get();
+    }
+
+    /**
+     * Sends one chunk at its offset. Quota: none; the chunks belong to the videos.insert call that started the session.
+     * A 308 answer names the bytes the platform holds in its Range header; a 200 or 201 answer completes the upload.
+     */
+    @Override
+    public UploadProgress sendChunk(String accessToken, String sessionLocation, long offset, long total,
+                                    String contentType, byte[] chunk) {
+        if (chunk.length == 0 || offset < 0 || offset + chunk.length > total) {
+            throw new IllegalArgumentException("the chunk lies outside the upload");
+        }
+        long last = offset + chunk.length - 1;
+        HttpTransport.Answer answer = raw("PUT", sessionLocation, accessToken, Map.of("Content-Type", contentType,
+                "Content-Range", "bytes " + offset + "-" + last + "/" + total), chunk, "the upload of bytes");
+        return progressOf(answer, total, "the upload of bytes");
+    }
+
+    /**
+     * Asks the platform how many bytes it holds of the session, without sending any. Quota: none.
+     * An expired session answers 404 and is reported as {@link UploadSessionExpired}.
+     */
+    @Override
+    public UploadProgress uploadStatus(String accessToken, String sessionLocation, long total) {
+        HttpTransport.Answer answer = raw("PUT", sessionLocation, accessToken, Map.of("Content-Length", "0",
+                "Content-Range", "bytes */" + total), new byte[0], "the upload status");
+        return progressOf(answer, total, "the upload status");
+    }
+
+    /**
+     * Adds a video to a playlist (playlistItems.insert). Quota: 50 units, charged by the caller. A 409 answer means the
+     * video is already in the playlist, which is the state a retry wants, so it is not a failure.
+     */
+    @Override
+    public void addToPlaylist(String accessToken, String playlistId, String platformItemId) {
+        String body = "{\"snippet\":{\"playlistId\":" + jsonString(playlistId) + ",\"resourceId\":{\"kind\":\"youtube#video\","
+                + "\"videoId\":" + jsonString(platformItemId) + "}}}";
+        HttpTransport.Answer answer = raw("POST", endpoint(PLAYLIST_ITEMS_ENDPOINT, "part", "snippet"), accessToken,
+                Map.of("Content-Type", "application/json; charset=UTF-8"), body.getBytes(StandardCharsets.UTF_8),
+                "the playlist insert");
+        if (answer.status() == 409 || answer.status() / 100 == 2) {
+            return;
+        }
+        throw failureOf(answer, "the playlist insert");
+    }
+
+    /**
+     * The privacy, publish time, made-for-kids value and processing state of a video (videos.list, part status and
+     * processingDetails). Quota: 1 unit, charged by the caller. A processing status of succeeded means processed.
+     */
+    @Override
+    public VideoState video(String accessToken, String platformItemId) {
+        Map<String, Object> document = parse(send("GET", endpoint(VIDEOS_ENDPOINT, "part",
+                "status,processingDetails", "id", platformItemId), null, accessToken, "the video read"));
+        for (Map<?, ?> video : objects(document.get("items"))) {
+            if (!platformItemId.equals(text(video, "id"))) {
+                continue;
+            }
+            Map<?, ?> status = mapOf(video.get("status"));
+            Map<?, ?> processing = mapOf(video.get("processingDetails"));
+            Boolean madeForKids = status.get("selfDeclaredMadeForKids") instanceof Boolean value ? value : null;
+            return new VideoState(visibilityOf(text(status, "privacyStatus")), madeForKids,
+                    instantOf(text(status, "publishAt")), text(processing, "processingStatus"));
+        }
+        throw new PlatformException(PlatformException.Kind.REJECTED, "YouTube has no such video.", null);
+    }
+
+    /**
+     * Sets the custom thumbnail of a processed video (thumbnails.set, uploadType=media). Quota: 50 units, charged by the
+     * caller. Thumbnails must be JPEG or PNG and at most 50 MB (checked 2026-11-08).
+     */
+    @Override
+    public void setThumbnail(String accessToken, String platformItemId, String contentType, byte[] image) {
+        HttpTransport.Answer answer = raw("POST", endpoint(THUMBNAIL_ENDPOINT, "videoId", platformItemId,
+                "uploadType", "media"), accessToken, Map.of("Content-Type", contentType), image, "the thumbnail");
+        if (answer.status() / 100 != 2) {
+            throw failureOf(answer, "the thumbnail");
+        }
     }
 
     @Override
@@ -382,6 +504,130 @@ public final class YouTubeAdapter implements PlatformAdapter {
         } catch (IOException failure) {
             throw new PlatformException(PlatformException.Kind.UNAVAILABLE,
                     "YouTube could not be reached for " + what + ".", null);
+        }
+    }
+
+    /** A raw request (upload protocol, playlist insert, thumbnail) to a Google host from {@link #HOSTS} over HTTPS. */
+    private HttpTransport.Answer raw(String method, String endpoint, String bearer, Map<String, String> headers,
+                                     byte[] body, String what) {
+        URI uri = URI.create(endpoint);
+        if (!"https".equals(uri.getScheme()) || !HOSTS.contains(uri.getHost())) {
+            throw new IllegalStateException("the YouTube adapter may only reach its Google endpoints");
+        }
+        try {
+            return http.call(method, uri, bearer, headers, body);
+        } catch (IOException failure) {
+            throw new PlatformException(PlatformException.Kind.UNAVAILABLE,
+                    "YouTube could not be reached for " + what + ".", null);
+        } catch (UnsupportedOperationException notRaw) {
+            throw new PlatformException(PlatformException.Kind.UNAVAILABLE,
+                    "This build cannot send " + what + " to YouTube.", null);
+        }
+    }
+
+    /** The progress of an upload from its answer: 308 names the confirmed bytes, 200 or 201 completes it. */
+    private static UploadProgress progressOf(HttpTransport.Answer answer, long total, String what) {
+        if (answer.status() == 404) {
+            throw new UploadSessionExpired();
+        }
+        if (answer.status() == 200 || answer.status() == 201) {
+            String id = text(parseOrEmpty(answer.body()), "id");
+            if (id.isBlank()) {
+                throw new PlatformException(PlatformException.Kind.UNAVAILABLE,
+                        "YouTube completed " + what + " without a video.", null);
+            }
+            return new UploadProgress(total, id, WATCH_URL + id);
+        }
+        if (answer.status() == 308) {
+            return new UploadProgress(confirmedBytes(answer.range()), null, null);
+        }
+        throw failureOf(answer, what);
+    }
+
+    /** The bytes held by the platform: the Range header is zero-based and inclusive; no header means none. */
+    private static long confirmedBytes(Optional<String> range) {
+        if (range.isEmpty()) {
+            return 0L;
+        }
+        String value = range.get();
+        int dash = value.lastIndexOf('-');
+        if (!value.startsWith("bytes=") || dash < 0) {
+            throw new PlatformException(PlatformException.Kind.UNAVAILABLE, "YouTube answered an upload range that cannot be read.",
+                    null);
+        }
+        try {
+            return Long.parseLong(value.substring(dash + 1)) + 1;
+        } catch (NumberFormatException notNumber) {
+            throw new PlatformException(PlatformException.Kind.UNAVAILABLE, "YouTube answered an upload range that cannot be read.",
+                    null);
+        }
+    }
+
+    private static PlatformException failureOf(HttpTransport.Answer answer, String what) {
+        return failureOf(new HttpTransport.Reply(answer.status(), answer.body() == null ? "" : answer.body(),
+                answer.retryAfter()), what);
+    }
+
+    /** The upload's snippet and status, with visibility, made-for-kids and publish time always present. */
+    private static String uploadBody(UploadStart start) {
+        StringBuilder tags = new StringBuilder("[");
+        for (String tag : start.tags()) {
+            if (tags.length() > 1) {
+                tags.append(',');
+            }
+            tags.append(jsonString(tag));
+        }
+        tags.append(']');
+        String publishAt = start.publishAt() == null ? "" : ",\"publishAt\":" + jsonString(start.publishAt().toString());
+        return "{\"snippet\":{\"title\":" + jsonString(start.title()) + ",\"description\":" + jsonString(start.description())
+                + ",\"tags\":" + tags + "},\"status\":{\"privacyStatus\":" + jsonString(privacyOf(start.visibility()))
+                + ",\"selfDeclaredMadeForKids\":" + start.madeForKids() + publishAt + "}}";
+    }
+
+    private static String privacyOf(Visibility visibility) {
+        return visibility.name().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static Visibility visibilityOf(String privacy) {
+        return switch (privacy) {
+            case "public" -> Visibility.PUBLIC;
+            case "unlisted" -> Visibility.UNLISTED;
+            case "private" -> Visibility.PRIVATE;
+            default -> null;
+        };
+    }
+
+    /** A JSON string literal with the characters JSON requires escaped. */
+    static String jsonString(String value) {
+        StringBuilder out = new StringBuilder("\"");
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.append('"').toString();
+    }
+
+    private static Map<String, Object> parseOrEmpty(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return parse(json);
+        } catch (PlatformException notJson) {
+            return Map.of();
         }
     }
 

@@ -332,12 +332,12 @@ class YouTubeInsightsTest {
     }
 
     @Test
-    void listingAndMetricsAreDeclaredSupportedWhilePublishingIsNot() {
+    void listingAndMetricsAreDeclaredSupported() {
         PlatformCapabilities capabilities = adapter(new RecordedYouTube()).capabilities();
 
         assertTrue(capabilities.listing(), "the uploads of a channel can be listed");
         assertTrue(capabilities.metrics(), "the statistics of a video can be read");
-        assertFalse(capabilities.publishing(), "publishing lands in the YouTube integration change");
+        assertTrue(capabilities.publishing(), "publishing is available through the step-wise upload");
     }
 
     private static Map<String, String> query(Sent sent) {
