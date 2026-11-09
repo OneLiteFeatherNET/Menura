@@ -14,9 +14,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -40,6 +42,7 @@ public final class InMemoryContentRepository implements ContentRepository {
     private final Map<UUID, List<IndexedSegment>> segments = new HashMap<>();
     private final Map<UUID, String> transcriptFormats = new HashMap<>();
     private final List<Edge> edges = new ArrayList<>();
+    private final Map<UUID, List<ChannelRef>> publications = new HashMap<>();
     private long nextSegment;
 
     private record IndexedSegment(long order, TranscriptSegment segment) {
@@ -162,7 +165,7 @@ public final class InMemoryContentRepository implements ContentRepository {
         if (filter.stage() != null && filter.stage() != row.stage()) {
             return false;
         }
-        if (filter.usage() != null && row.used() != "used".equals(filter.usage())) {
+        if (filter.usage() != null && !matchesUsage(row.id(), row.used(), filter.usage())) {
             return false;
         }
         LocalDate created = LocalDate.ofInstant(row.createdAt(), ZoneOffset.UTC);
@@ -223,8 +226,7 @@ public final class InMemoryContentRepository implements ContentRepository {
                 .noneMatch(clip -> clip.rawItemId().equals(raw.id()) && clip.stage() == filter.stage())) {
             return false;
         }
-        if (filter.usage() != null && clips.values().stream().filter(clip -> clip.rawItemId().equals(raw.id()))
-                .anyMatch(clip -> isClipUsedNow(clip.id())) != "used".equals(filter.usage())) {
+        if (filter.usage() != null && !matchesUsage(raw.id(), isRawUsedNow(raw.id()), filter.usage())) {
             return false;
         }
         return (filter.from() == null || raw.streamDate() == null || !raw.streamDate().isBefore(filter.from()))
@@ -267,6 +269,46 @@ public final class InMemoryContentRepository implements ContentRepository {
     private boolean isRawUsedNow(UUID rawItem) {
         return clips.values().stream().filter(clip -> clip.rawItemId().equals(rawItem))
                 .anyMatch(clip -> isClipUsedNow(clip.id()));
+    }
+
+    /** The usage filter: published is used and published on a channel, used is in a timeline, never_used is neither. */
+    private boolean matchesUsage(UUID item, boolean used, String usage) {
+        return switch (usage) {
+            case "published" -> !publishedOnNow(item).isEmpty();
+            case "used" -> used;
+            default -> !used;
+        };
+    }
+
+    /** Publishes a finished asset on a channel, as the posts and external post origins of content distribution do. */
+    public void publishFinishedAsset(UUID asset, UUID channelId, String channelName) {
+        publications.computeIfAbsent(asset, id -> new ArrayList<>()).add(new ChannelRef(channelId, channelName));
+    }
+
+    @Override
+    public Map<UUID, List<ChannelRef>> publishedOn(Connection connection, Collection<UUID> items) {
+        Map<UUID, List<ChannelRef>> channels = new HashMap<>();
+        for (UUID item : items) {
+            List<ChannelRef> found = publishedOnNow(item);
+            if (!found.isEmpty()) {
+                channels.put(item, found);
+            }
+        }
+        return channels;
+    }
+
+    /** The channels of the finished assets made from an item: the item itself, a clip of it, or a raw item of a clip. */
+    private List<ChannelRef> publishedOnNow(UUID item) {
+        Set<ChannelRef> found = new LinkedHashSet<>();
+        for (RegisteredAsset registration : registrations.values()) {
+            boolean madeFromItem = registration.assetId().equals(item) || clipsOf(null, registration.timelineId()).stream()
+                    .map(clips::get).filter(Objects::nonNull)
+                    .anyMatch(clip -> clip.id().equals(item) || clip.rawItemId().equals(item));
+            if (madeFromItem) {
+                found.addAll(publications.getOrDefault(registration.assetId(), List.of()));
+            }
+        }
+        return List.copyOf(found);
     }
 
     private boolean isClipUsedNow(UUID clipId) {

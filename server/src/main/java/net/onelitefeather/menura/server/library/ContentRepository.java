@@ -55,6 +55,10 @@ public interface ContentRepository {
     record LineageRow(UUID rawItemId, UUID assetId, String assetTitle, UUID timelineId, UUID clipId) {
     }
 
+    /** A channel a finished asset was published on: its identifier and display name. */
+    record ChannelRef(UUID id, String name) {
+    }
+
     /** The tags of an item: free tags and the people (person tags) who appear in it. */
     record ItemTags(Set<String> freeTags, Set<UUID> personTags) {
     }
@@ -81,6 +85,13 @@ public interface ContentRepository {
 
     /** Replaces both tag sets of an item. */
     void replaceTags(Connection connection, UUID item, ItemTags tags) throws SQLException;
+
+    /**
+     * The channels each of the given items was published on. An item is published on a channel when a finished asset
+     * made from it (a timeline that uses the item or one of its clips) was published from a Menura post on that channel.
+     * An item that was never published has no entry.
+     */
+    Map<UUID, List<ChannelRef>> publishedOn(Connection connection, Collection<UUID> items) throws SQLException;
 
     /**
      * One page of the pool, newest first, after the keyset position (both null for the first page). The filter is

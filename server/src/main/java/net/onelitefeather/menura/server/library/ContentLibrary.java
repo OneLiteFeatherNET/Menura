@@ -13,6 +13,7 @@ import net.onelitefeather.menura.core.db.Transactions;
 import net.onelitefeather.menura.core.problem.ProblemException;
 import net.onelitefeather.menura.server.audit.AuditLog;
 import net.onelitefeather.menura.server.auth.CurrentPerson;
+import net.onelitefeather.menura.server.library.ContentRepository.ChannelRef;
 import net.onelitefeather.menura.server.library.ContentRepository.ClipRecord;
 import net.onelitefeather.menura.server.library.ContentRepository.ItemTags;
 import net.onelitefeather.menura.server.library.ContentRepository.LineageRow;
@@ -95,8 +96,11 @@ public class ContentLibrary {
         int fetch = page.limit() + 1;
         List<ContentViews.PoolItemView> items = transactions.inTransaction(connection -> {
             List<PoolRow> rows = content.pool(connection, filter, seek, seekId, fetch);
-            Map<UUID, ItemTags> tags = content.tagsOf(connection, rows.stream().map(PoolRow::id).toList());
-            return rows.stream().map(row -> poolItem(row, tags.get(row.id()))).toList();
+            List<UUID> ids = rows.stream().map(PoolRow::id).toList();
+            Map<UUID, ItemTags> tags = content.tagsOf(connection, ids);
+            Map<UUID, List<ChannelRef>> published = content.publishedOn(connection, ids);
+            return rows.stream().map(row -> poolItem(row, tags.get(row.id()), published.getOrDefault(row.id(), List.of())))
+                    .toList();
         });
         boolean more = items.size() > page.limit();
         List<ContentViews.PoolItemView> shown = more ? items.subList(0, page.limit()) : items;
@@ -238,19 +242,21 @@ public class ContentLibrary {
         UUID uploader = query.mine() ? viewer.personId() : query.uploaderId();
         Stage stage = query.stage() == null ? null : Stage.parse(query.stage());
         String usage = query.usage();
-        if (usage != null && !usage.equals("used") && !usage.equals("never_used")) {
-            throw new ProblemException(400, "Invalid filter", "The field 'usage' must be used or never_used.");
+        if (usage != null && !usage.equals("used") && !usage.equals("never_used") && !usage.equals("published")) {
+            throw new ProblemException(400, "Invalid filter", "The field 'usage' must be used, never_used or published.");
         }
         String tag = query.tag() == null ? null : FreeTag.parse(query.tag());
         return new PoolFilter(uploader, query.personId(), tag, stage, usage, query.from(), query.to());
     }
 
-    private ContentViews.PoolItemView poolItem(PoolRow row, ItemTags tags) {
+    private ContentViews.PoolItemView poolItem(PoolRow row, ItemTags tags, List<ChannelRef> published) {
         ItemTags known = tags == null ? new ItemTags(Set.of(), Set.of()) : tags;
-        String usage = row.used() ? "used" : "never_used";
+        String usage = !published.isEmpty() ? "published" : row.used() ? "used" : "never_used";
         return new ContentViews.PoolItemView(row.id(), row.kind(), row.stage().value(), row.status().value(), row.uploaderId(),
                 row.title(), row.rawItemId(), row.assetId(), row.startSeconds(), row.endSeconds(), usage,
-                List.copyOf(new TreeSet<>(known.personTags())), List.copyOf(new TreeSet<>(known.freeTags())), row.createdAt());
+                List.copyOf(new TreeSet<>(known.personTags())), List.copyOf(new TreeSet<>(known.freeTags())),
+                published.stream().map(channel -> new ContentViews.PublicationView(channel.id(), channel.name())).toList(),
+                row.createdAt());
     }
 
     static ContentViews.ClipView clipView(ClipRecord clip, Set<String> freeTags) {

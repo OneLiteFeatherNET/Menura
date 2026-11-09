@@ -1197,8 +1197,9 @@ paths:
         or suggested) and registered finished assets (kind clip, stage rendered, assetId set). Every person with a Menura
         role sees every item. Filters combine with AND: mine selects the caller's own items, uploader a named member,
         person an item tagged with that person, tag a free tag, stage one stage, and usage applies to every item
-        (used when a timeline uses the item or one of its clips, never_used otherwise). Each item names its uploaderId, personTags
-        and freeTags.
+        (used when a timeline uses the item or one of its clips, never_used otherwise, published when the finished asset
+        made from it was published on a channel). Each item names its uploaderId, personTags, freeTags and the channels it
+        was published on (publishedOn).
       security:
         - sessionCookie: []
       parameters:
@@ -2794,13 +2795,14 @@ components:
     Usage:
       name: usage
       in: query
-      description: used when a timeline uses the item or one of its clips, never_used otherwise. Finished assets are never used in phase 1.
+      description: used when a timeline uses the item or one of its clips, never_used otherwise. published selects the items published on at least one channel; every published item is also used, so used keeps them too. Finished assets are never used in phase 1.
       required: false
       schema:
         type: string
         enum:
           - used
           - never_used
+          - published
     From:
       name: from
       in: query
@@ -3980,6 +3982,7 @@ components:
         - uploaderId
         - personTags
         - freeTags
+        - publishedOn
         - createdAt
       properties:
         id:
@@ -4034,8 +4037,9 @@ components:
           enum:
             - used
             - never_used
+            - published
             - null
-          description: Set for every item. used when a timeline uses the item or one of its clips; finished assets are never used.
+          description: Set for every item. published when the item was published on at least one channel (then it is also used); used when a timeline uses the item or one of its clips; finished assets are never used.
         personTags:
           type: array
           description: The hub people who appear in the item.
@@ -4045,6 +4049,19 @@ components:
           type: array
           items:
             type: string
+        publishedOn:
+          type: array
+          description: The channels the item was published on through a finished asset made from it; empty when none.
+          items:
+            type: object
+            required:
+              - channelId
+              - channelName
+            properties:
+              channelId:
+                $ref: "#/components/schemas/Identifier"
+              channelName:
+                type: string
         createdAt:
           type: string
           format: date-time
