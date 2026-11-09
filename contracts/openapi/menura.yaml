@@ -4890,6 +4890,7 @@ components:
         - weekStart
         - posts
         - metrics
+        - internal
       properties:
         isoWeek:
           type: string
@@ -4903,6 +4904,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AnalyticsMetric"
+        internal:
+          type: array
+          description: The metrics of the registered internal sources of the series that week, with their estimate flag.
+          items:
+            $ref: "#/components/schemas/AnalyticsInternalMetric"
     AnalyticsSeriesRow:
       type: object
       description: One series of the comparison, or the posts in no series (seriesId and label null).
@@ -4912,6 +4918,7 @@ components:
         - posts
         - metrics
         - weeks
+        - internal
       properties:
         seriesId:
           type:
@@ -4932,6 +4939,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AnalyticsWeek"
+        internal:
+          type: array
+          description: The metrics of the registered internal sources of the series over the period; empty for posts in no series.
+          items:
+            $ref: "#/components/schemas/AnalyticsInternalMetric"
     AnalyticsSeriesComparison:
       type: object
       required:
@@ -6188,3 +6200,33 @@ components:
                 - string
                 - "null"
               description: The installation join domain, or null while none is configured.
+    AnalyticsInternalMetric:
+      type: object
+      description: One metric of a registered internal source (change add-content-analytics). An estimate is shown as one and never as a measured value.
+      required:
+        - source
+        - metric
+        - estimate
+        - value
+        - values
+      properties:
+        source:
+          type: string
+          pattern: "^[a-z_]{1,40}$"
+          example: joins
+        metric:
+          type: string
+          pattern: "^[a-z_]{1,40}$"
+          example: first_joins
+        estimate:
+          type: boolean
+          description: True when the source reports the value as an estimate.
+        value:
+          type:
+            - number
+            - "null"
+          description: The sum of the values, null when no value of the metric was stored.
+        values:
+          type: integer
+          minimum: 0
+          description: How many stored values the sum uses.

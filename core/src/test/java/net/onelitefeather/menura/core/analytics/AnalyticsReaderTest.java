@@ -5,12 +5,17 @@ import net.onelitefeather.menura.core.analytics.support.AnalyticsFixture;
 import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.problem.ProblemException;
+import net.onelitefeather.menura.core.series.ContentSeries;
+import net.onelitefeather.menura.core.series.SeriesAssignment;
+import net.onelitefeather.menura.core.series.SeriesDraft;
+import net.onelitefeather.menura.core.series.support.SeriesFixture;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -122,6 +127,26 @@ class AnalyticsReaderTest {
                 LocalDate.of(2026, 12, 31), Set.of(Role.VIEWER));
 
         assertEquals(seriesB, comparison.series().get(0).seriesId(), "the series with more engaged views ranks first");
+    }
+
+    @Test
+    void aPostInASeriesTheCallerMayNotSeeAnswersNotFound() throws SQLException {
+        AnalyticsFixture world = new AnalyticsFixture(true);
+        UUID channel = world.connectedChannel("UC6");
+        ExternalPost post = world.publishedPost(channel, "hidden", world.now().minus(Duration.ofHours(5)), "short");
+        UUID seriesId = UUID.nameUUIDFromBytes("series-admins-only".getBytes());
+        SeriesDraft base = SeriesFixture.draft("Admins only", "#admins");
+        SeriesDraft restricted = new SeriesDraft(base.name(), base.badgeText(), base.colourToken(), base.badgeToken(),
+                base.openingFormula(), base.layoutTemplate(), base.hashtag(), base.audience(), base.weekday(),
+                base.postingSlot(), base.active(), Map.of(), List.of("admin"));
+        world.series.insert(null, ContentSeries.of(seriesId, restricted, world.now(), world.now()));
+        world.series.saveAssignment(null, new SeriesAssignment(post.id(), seriesId, false, null, null, null, world.now(),
+                null));
+
+        ProblemException hidden = assertThrows(ProblemException.class,
+                () -> world.reader.post(post.id(), Set.of(Role.VIEWER)));
+
+        assertEquals(404, hidden.status(), "a post in a series the caller may not see is answered like a missing post");
     }
 
     @Test

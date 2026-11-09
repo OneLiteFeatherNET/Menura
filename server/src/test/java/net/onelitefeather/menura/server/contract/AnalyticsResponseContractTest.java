@@ -10,17 +10,21 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
+import net.onelitefeather.menura.core.analytics.MetricRollups;
 import net.onelitefeather.menura.core.analytics.MetricStore;
 import net.onelitefeather.menura.core.analytics.Metrics;
 import net.onelitefeather.menura.core.analytics.support.InMemoryMetricStore;
 import net.onelitefeather.menura.core.channel.PlatformAdapter.PublishedItem;
+import net.onelitefeather.menura.core.db.Transactions;
 import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.post.support.InMemoryExternalPostStore;
 import net.onelitefeather.menura.server.security.HeaderIdentityFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
@@ -50,6 +54,9 @@ class AnalyticsResponseContractTest {
     @Inject
     InMemoryExternalPostStore posts;
 
+    @Inject
+    Transactions transactions;
+
     private final ResponseContract contract = ResponseContract.load();
 
     @BeforeEach
@@ -72,6 +79,7 @@ class AnalyticsResponseContractTest {
         ExternalPost post = publishedPost();
         metrics.ensurePartitions(null, NOW);
         metrics.storeReading(null, new MetricStore.Reading(post, Map.of(Metrics.VIEWS, 120L), null, NOW));
+        rollUp();
 
         JsonNode overview = get("/analytics/overview?from=2026-10-01&to=2026-12-31");
 
@@ -100,6 +108,7 @@ class AnalyticsResponseContractTest {
         ExternalPost post = publishedPost();
         metrics.ensurePartitions(null, NOW);
         metrics.storeReading(null, new MetricStore.Reading(post, Map.of(Metrics.VIEWS, 120L), null, NOW));
+        rollUp();
         metrics.storeSnapshots(null, java.util.List.of(new MetricStore.SnapshotValue(post.id(), 60, Metrics.VIEWS, 90L,
                 NOW, 60)));
 
@@ -125,6 +134,28 @@ class AnalyticsResponseContractTest {
                 () -> get("/analytics/external-posts/" + UUID.nameUUIDFromBytes("missing".getBytes())));
 
         assertEquals(404, missing.getStatus().getCode(), "a post that does not exist answers 404");
+    }
+
+    @Test
+    void aSeriesWithAnInternalMetricShowsItsEstimateFlagAndConformsToTheContract() throws Exception {
+        UUID series = UUID.fromString("5e71e500-0000-4000-8000-000000000001");
+        metrics.ensurePartitions(null, NOW);
+        metrics.storeInternal(null, new MetricStore.InternalPoint("joins", "first_joins", null, null, series,
+                LocalDate.of(2026, 11, 2), 5L, true), NOW);
+        rollUp();
+
+        JsonNode comparison = get("/analytics/series?from=2026-10-01&to=2026-12-31");
+
+        assertConforms("AnalyticsSeriesComparison", comparison);
+        JsonNode row = comparison.get("series").get(0);
+        assertEquals(series.toString(), row.get("seriesId").asText(), "the internal values belong to their series");
+        assertEquals("first_joins", row.get("internal").get(0).get("metric").asText(), "the internal metric is listed");
+        assertTrue(row.get("internal").get(0).get("estimate").asBoolean(), "the estimate flag is shown on the read");
+    }
+
+    /** Rebuilds the rollups, as the rollup job does after a collection. */
+    private void rollUp() throws SQLException {
+        new MetricRollups(transactions, metrics).rebuild();
     }
 
     private ExternalPost publishedPost() throws Exception {
