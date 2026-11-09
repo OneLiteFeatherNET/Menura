@@ -12,6 +12,8 @@ import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import net.onelitefeather.menura.core.brand.BrandKit;
 import net.onelitefeather.menura.core.brand.BrandKit.ColourToken;
+import net.onelitefeather.menura.core.attribution.JoinService;
+import net.onelitefeather.menura.core.attribution.support.InMemoryJoinStore;
 import net.onelitefeather.menura.core.brand.InitialBrandKit;
 import net.onelitefeather.menura.server.security.HeaderIdentityFilter;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,8 +21,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,10 +45,17 @@ class BrandKitHttpTest {
     @Inject
     InMemoryBrandKitAssets assets;
 
+    @Inject
+    InMemoryJoinStore joinStore;
+
+    @Inject
+    JoinService joins;
+
     @BeforeEach
     void startEmpty() {
         repository.clear();
         assets.clear();
+        joinStore.clear();
     }
 
     @Test
@@ -136,6 +147,27 @@ class BrandKitHttpTest {
 
         assertEquals(200, response.code());
         assertTrue(response.body().contains("\"join_domain\""), "the cta declares its join domain: " + response.body());
+    }
+
+    @Test
+    void theRenderBundleCarriesTheInstallationJoinDomainForTheShortCallToAction() throws Exception {
+        joins.saveSettings(UUID.fromString(EDITOR), "onelitefeather.net", null);
+
+        HttpResponse<String> response = client.toBlocking().exchange(
+                withPerson(HttpRequest.GET("/brand-kit/render-bundle"), VIEWER, "VIEWER"), String.class);
+
+        assertEquals(200, response.code());
+        assertTrue(response.body().contains("\"joinDomain\":\"onelitefeather.net\""),
+                "the bundle names the installation join domain for the cta: " + response.body());
+    }
+
+    @Test
+    void theRenderBundleCarriesNoJoinDomainWhileNoneIsConfigured() {
+        HttpResponse<String> response = client.toBlocking().exchange(
+                withPerson(HttpRequest.GET("/brand-kit/render-bundle"), VIEWER, "VIEWER"), String.class);
+
+        assertEquals(200, response.code(), "a missing join domain is not an error");
+        assertFalse(response.body().contains("\"joinDomain\":\""), "no join domain is carried: " + response.body());
     }
 
     @Test
