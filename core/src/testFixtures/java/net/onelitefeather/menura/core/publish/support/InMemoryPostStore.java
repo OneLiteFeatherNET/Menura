@@ -1,12 +1,15 @@
 package net.onelitefeather.menura.core.publish.support;
 
 import net.onelitefeather.menura.core.publish.AttemptRecord;
+import net.onelitefeather.menura.core.publish.FinishedAsset;
 import net.onelitefeather.menura.core.publish.Post;
 import net.onelitefeather.menura.core.publish.PostRevision;
 import net.onelitefeather.menura.core.publish.PostStatus;
 import net.onelitefeather.menura.core.publish.PostStep;
 import net.onelitefeather.menura.core.publish.PostStore;
+import net.onelitefeather.menura.core.publish.PostUpload;
 import net.onelitefeather.menura.core.publish.StepRecord;
+import net.onelitefeather.menura.core.publish.YouTubeDeclaration;
 
 import java.sql.Connection;
 import java.time.Instant;
@@ -33,9 +36,46 @@ public final class InMemoryPostStore implements PostStore {
     private final Map<UUID, UUID> originRevisions = new HashMap<>();
     private int writes;
 
+    private final Map<UUID, FinishedAsset> stored = new HashMap<>();
+    private final Map<UUID, YouTubeDeclaration> declarations = new HashMap<>();
+    private final Map<UUID, PostUpload> uploads = new HashMap<>();
+
     /** Registers an asset as finished (kind video or image) or raw material. */
     public void registerAsset(UUID assetId, String kind) {
         assets.put(assetId, kind);
+        stored.put(assetId, new FinishedAsset(kind, "mp4", "assets/" + assetId, 1_000_000L));
+    }
+
+    /** Registers a finished asset with its format, storage key and size, for the step-wise publication. */
+    public void registerStoredAsset(UUID assetId, FinishedAsset asset) {
+        assets.put(assetId, asset.kind());
+        stored.put(assetId, asset);
+    }
+
+    @Override
+    public Optional<FinishedAsset> finishedAsset(Connection connection, UUID assetId) {
+        FinishedAsset asset = stored.get(assetId);
+        return asset == null || asset.kind().equals("raw_material") ? Optional.empty() : Optional.of(asset);
+    }
+
+    @Override
+    public YouTubeDeclaration declaration(Connection connection, UUID postId) {
+        return declarations.getOrDefault(postId, YouTubeDeclaration.none());
+    }
+
+    @Override
+    public void putDeclaration(Connection connection, UUID postId, YouTubeDeclaration declaration) {
+        declarations.put(postId, declaration);
+    }
+
+    @Override
+    public Optional<PostUpload> upload(Connection connection, UUID postId) {
+        return Optional.ofNullable(uploads.get(postId));
+    }
+
+    @Override
+    public void putUpload(Connection connection, UUID postId, PostUpload upload, Instant at) {
+        uploads.put(postId, upload);
     }
 
     @Override

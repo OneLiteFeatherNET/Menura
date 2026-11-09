@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.publish;
 
+import net.onelitefeather.menura.core.channel.PlatformAdapter.Visibility;
 import net.onelitefeather.menura.core.problem.ProblemException;
 import net.onelitefeather.menura.core.series.Audience;
 import net.onelitefeather.menura.core.series.SeriesDraft;
@@ -367,15 +368,15 @@ class PostServiceTest {
     // ----------------------------------------------------------------- helpers
 
     private static DraftCommand draft(UUID channel, UUID asset, String title) {
-        return new DraftCommand(channel, asset, null, null, null, title, null, null, null, null);
+        return new DraftCommand(channel, asset, null, null, null, title, null, null, Visibility.PRIVATE, null);
     }
 
     private static DraftCommand draftAt(UUID channel, UUID asset, Instant at) {
-        return new DraftCommand(channel, asset, null, null, null, "Draft", null, null, null, at);
+        return new DraftCommand(channel, asset, null, null, null, "Draft", null, null, Visibility.PRIVATE, at);
     }
 
     private static DraftCommand draftAt(UUID channel, UUID asset, Instant at, String title) {
-        return new DraftCommand(channel, asset, null, null, null, title, null, null, null, at);
+        return new DraftCommand(channel, asset, null, null, null, title, null, null, Visibility.PRIVATE, at);
     }
 
     private static UUID planAt(PublishFixture world, UUID channel, Instant at) throws Exception {
@@ -391,6 +392,7 @@ class PostServiceTest {
     /** A post approved and scheduled at the given time. */
     private static UUID scheduled(PublishFixture world, UUID channel, Instant at, String title) throws Exception {
         UUID id = world.service.create(editor(), draftAt(channel, world.finishedVideo(), at, title)).post().id();
+        world.service.declareMadeForKids(editor(), id, false);
         world.service.submit(editor(), id);
         world.service.approve(publisher(), id);
         world.service.schedule(publisher(), id);

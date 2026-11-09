@@ -15,7 +15,11 @@ import net.onelitefeather.menura.core.post.support.InMemoryExternalPostStore;
 import net.onelitefeather.menura.core.publish.Content;
 import net.onelitefeather.menura.core.publish.PostActor;
 import net.onelitefeather.menura.core.publish.PostService;
+import net.onelitefeather.menura.core.publish.FinishedAsset;
 import net.onelitefeather.menura.core.publish.PublicationRunner;
+import net.onelitefeather.menura.core.publish.QuotaBudget;
+import net.onelitefeather.menura.core.publish.QuotaLedger;
+import net.onelitefeather.menura.core.secret.TokenCipher;
 import net.onelitefeather.menura.core.publish.PublishSettings;
 import net.onelitefeather.menura.core.secret.SecretGenerator;
 import net.onelitefeather.menura.core.series.Audience;
@@ -29,6 +33,9 @@ import net.onelitefeather.menura.core.auth.Role;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -64,20 +71,39 @@ public final class PublishFixture {
     public final PublicationRunner runner;
     public final PublishSettings settings;
 
+    /** The media of the test storage, keyed by storage key. */
+    public final InMemoryMedia media = new InMemoryMedia();
+    /** The step-wise platform, when the world was built with step-wise publication. */
+    public final ScriptedStepwise stepwise = new ScriptedStepwise();
+    public final InMemoryQuotaUsage quotaUsage = new InMemoryQuotaUsage();
+
     /** A world whose platform publishes at its time ({@code native = false}) or accepts a timed publication itself. */
     public PublishFixture(boolean nativeScheduling) {
         this(nativeScheduling, PublishSettings.from(Map.of()));
     }
 
     public PublishFixture(boolean nativeScheduling, PublishSettings settings) {
+        this(nativeScheduling, settings, false);
+    }
+
+    /** A world whose platform publishes in steps (the YouTube way) when {@code stepwise} is true. */
+    public PublishFixture(boolean nativeScheduling, PublishSettings settings, boolean stepwise) {
         this.youtube = new ScriptedAdapter(nativeScheduling);
+        if (stepwise) {
+            this.youtube.stepwise(this.stepwise);
+        }
         this.platforms = new PlatformRegistry(java.util.List.of(youtube));
         this.settings = settings;
         this.connections = new ConnectionService(new DirectTransactions(), clock, identifiers,
                 new SecretGenerator(new DeterministicRandom(9L)), channels, audit, platforms, Duration.ofMinutes(10), 0.8);
         this.service = new PostService(new DirectTransactions(), clock, identifiers, posts, channels, series, platforms, BERLIN);
+        PublicationRunner.Stepwise steps = stepwise
+                ? new PublicationRunner.Stepwise(TokenCipher.of(Base64.getEncoder().encodeToString(
+                "0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.US_ASCII)), null, new SecureRandom()),
+                media, new QuotaLedger(QuotaBudget.youtubeDefaults(), quotaUsage))
+                : null;
         this.runner = new PublicationRunner(new DirectTransactions(), clock, identifiers, posts, channels, connections,
-                platforms, externalPosts, series, settings);
+                platforms, externalPosts, series, settings, steps);
     }
 
     public static PostActor editor() {
@@ -108,6 +134,24 @@ public final class PublishFixture {
         channels.updateChannel(null, new Channel(channel.id(), channel.platform(), channel.platformAccountId(),
                 channel.displayName(), ConnectionState.NEEDS_RECONNECTION, "The grant was rejected.", channel.features(),
                 channel.grantedScopes(), null, channel.createdAt(), NOW, null));
+    }
+
+    /** A finished video of the given size in the test storage, for the step-wise publication. */
+    public UUID storedVideo(long sizeBytes) {
+        UUID id = identifiers.next();
+        String key = "assets/" + id;
+        posts.registerStoredAsset(id, new FinishedAsset("video", "mp4", key, sizeBytes));
+        media.put(key, sizeBytes);
+        return id;
+    }
+
+    /** A finished JPEG cover in the test storage. */
+    public UUID storedCover() {
+        UUID id = identifiers.next();
+        String key = "covers/" + id;
+        posts.registerStoredAsset(id, new FinishedAsset("image", "jpg", key, 200_000L));
+        media.put(key, 200_000L);
+        return id;
     }
 
     /** A finished video registered in the store; the post service plans only such assets. */

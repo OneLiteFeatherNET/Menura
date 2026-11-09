@@ -86,9 +86,19 @@ public interface StepwisePublisher {
     }
 
     /**
-     * The state of an item as the platform reports it. {@code publishAt} is null when no timed publication is set;
-     * {@code processed} is true once the platform has finished processing the video.
+     * The state of an item as the platform reports it. {@code publishAt} is null when no timed publication is set.
+     * {@code processingStatus} is the platform's own value (for example processing, succeeded, failed or terminated).
      */
-    record VideoState(Visibility visibility, Boolean madeForKids, Instant publishAt, boolean processed) {
+    record VideoState(Visibility visibility, Boolean madeForKids, Instant publishAt, String processingStatus) {
+
+        /** Whether the platform has finished processing the video. */
+        public boolean processed() {
+            return "succeeded".equals(processingStatus);
+        }
+
+        /** Whether processing ended without a usable video, so it will never finish. */
+        public boolean processingFailed() {
+            return "failed".equals(processingStatus) || "terminated".equals(processingStatus);
+        }
     }
 }

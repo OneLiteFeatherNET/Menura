@@ -4,6 +4,7 @@ import net.onelitefeather.menura.core.channel.PlatformAdapter;
 import net.onelitefeather.menura.core.channel.PlatformCapabilities;
 import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.PlatformFeature;
+import net.onelitefeather.menura.core.channel.StepwisePublisher;
 
 import java.net.URI;
 import java.util.ArrayDeque;
@@ -22,6 +23,7 @@ import java.util.Set;
 public final class ScriptedAdapter implements PlatformAdapter {
 
     private final boolean nativeScheduling;
+    private StepwisePublisher stepwise;
     private final Deque<Object> publishOutcomes = new ArrayDeque<>();
     private final Deque<PublicationStatus> statusOutcomes = new ArrayDeque<>();
     private final List<PublishRequest> requests = new ArrayList<>();
@@ -32,6 +34,17 @@ public final class ScriptedAdapter implements PlatformAdapter {
 
     public ScriptedAdapter(boolean nativeScheduling) {
         this.nativeScheduling = nativeScheduling;
+    }
+
+    /** Makes this adapter publish in steps through the given publisher (the YouTube way). */
+    public ScriptedAdapter stepwise(StepwisePublisher publisher) {
+        this.stepwise = publisher;
+        return this;
+    }
+
+    @Override
+    public Optional<StepwisePublisher> stepwise() {
+        return Optional.ofNullable(stepwise);
     }
 
     /** The next publish call throws or returns this outcome. */

@@ -42,6 +42,19 @@ public interface PostStore {
     /** The kind of a finished asset (video or image), or empty when the asset is missing or still raw material. */
     Optional<String> finishedAssetKind(Connection connection, UUID assetId) throws SQLException;
 
+    /** The stored finished asset of an asset id: a video or an image, or empty when missing or still raw material. */
+    Optional<FinishedAsset> finishedAsset(Connection connection, UUID assetId) throws SQLException;
+
+    /** The explicit YouTube declarations of a post; {@link YouTubeDeclaration#none()} while none were given. */
+    YouTubeDeclaration declaration(Connection connection, UUID postId) throws SQLException;
+
+    void putDeclaration(Connection connection, UUID postId, YouTubeDeclaration declaration) throws SQLException;
+
+    /** The resumable upload of a post, if one was started. */
+    Optional<PostUpload> upload(Connection connection, UUID postId) throws SQLException;
+
+    void putUpload(Connection connection, UUID postId, PostUpload upload, Instant at) throws SQLException;
+
     List<StepRecord> steps(Connection connection, UUID postId) throws SQLException;
 
     /** Writes one step row, replacing the earlier state of that step. */

@@ -113,6 +113,14 @@ public record Post(UUID id, UUID channelId, UUID assetId, UUID coverAssetId, UUI
                 failureReason, attempts, nextAttemptAt, leaseOwner, leaseUntil, revision, createdAt, at);
     }
 
+    /** A stepwise upload produced the platform item: its identifier and URL are kept while the post stays scheduled. */
+    public Post uploaded(String externalId, String url, Instant at) {
+        requireStatus(PostStatus.SCHEDULED, "record an upload");
+        return new Post(id, channelId, assetId, coverAssetId, seriesId, sourcePostId, authorId, status, title, description,
+                hashtags, visibility, playlistId, scheduledAt, approvedBy, approvedAt, handedOverAt, externalId, url, null,
+                failureReason, attempts, nextAttemptAt, leaseOwner, leaseUntil, revision, createdAt, at);
+    }
+
     public Post published(String externalId, String url, Instant publishedAt, Instant at) {
         Post next = moved(PostStatus.PUBLISHED, at);
         return new Post(id, channelId, assetId, coverAssetId, seriesId, sourcePostId, authorId, next.status, title,

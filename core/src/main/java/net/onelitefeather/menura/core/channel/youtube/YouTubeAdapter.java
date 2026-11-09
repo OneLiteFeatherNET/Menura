@@ -8,6 +8,7 @@ import net.onelitefeather.menura.core.channel.PlatformCapabilities;
 import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.PlatformFeature;
 import net.onelitefeather.menura.core.channel.StepwisePublisher;
+import net.onelitefeather.menura.core.channel.UploadSessionExpired;
 import net.onelitefeather.menura.core.problem.ProblemException;
 
 import java.io.IOException;
@@ -267,7 +268,7 @@ public final class YouTubeAdapter implements PlatformAdapter, StepwisePublisher 
 
     /**
      * Asks the platform how many bytes it holds of the session, without sending any. Quota: none.
-     * An expired session answers 404 and is reported as {@link YouTubeUploadSessionExpired}.
+     * An expired session answers 404 and is reported as {@link UploadSessionExpired}.
      */
     @Override
     public UploadProgress uploadStatus(String accessToken, String sessionLocation, long total) {
@@ -309,7 +310,7 @@ public final class YouTubeAdapter implements PlatformAdapter, StepwisePublisher 
             Map<?, ?> processing = mapOf(video.get("processingDetails"));
             Boolean madeForKids = status.get("selfDeclaredMadeForKids") instanceof Boolean value ? value : null;
             return new VideoState(visibilityOf(text(status, "privacyStatus")), madeForKids,
-                    instantOf(text(status, "publishAt")), "succeeded".equals(text(processing, "processingStatus")));
+                    instantOf(text(status, "publishAt")), text(processing, "processingStatus"));
         }
         throw new PlatformException(PlatformException.Kind.REJECTED, "YouTube has no such video.", null);
     }
@@ -527,7 +528,7 @@ public final class YouTubeAdapter implements PlatformAdapter, StepwisePublisher 
     /** The progress of an upload from its answer: 308 names the confirmed bytes, 200 or 201 completes it. */
     private static UploadProgress progressOf(HttpTransport.Answer answer, long total, String what) {
         if (answer.status() == 404) {
-            throw new YouTubeUploadSessionExpired();
+            throw new UploadSessionExpired();
         }
         if (answer.status() == 200 || answer.status() == 201) {
             String id = text(parseOrEmpty(answer.body()), "id");

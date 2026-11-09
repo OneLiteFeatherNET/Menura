@@ -7,14 +7,19 @@ import net.onelitefeather.menura.core.channel.ChannelStore;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** The facts the dry run reads for one post, gathered on one connection: the asset kind, the platform rules and the audit. */
 final class PostFacts {
 
     /** The platform rules of this build, by platform identifier. A platform without rules fails the dry run. */
     static final Map<String, PublishRules> RULES = Map.of("youtube", PublishRules.YOUTUBE);
+
+    /** The platforms whose posts need the explicit visibility and made-for-kids declarations (change add-youtube-integration). */
+    static final Set<String> DECLARING = Set.of("youtube");
 
     private PostFacts() {
     }
@@ -32,7 +37,12 @@ final class PostFacts {
                 .map(status -> status.status() == AuditStatus.AUDITED).orElse(false);
         List<Post> sameTime = post.scheduledAt() == null ? List.of()
                 : posts.scheduledOn(connection, channel.id(), post.scheduledAt(), post.scheduledAt().plus(Duration.ofSeconds(1)));
-        return DryRun.check(new DryRun.Input(post, channel.state(), kind, rules, audited, sameTime));
+        List<DryRun.Problem> problems = new ArrayList<>(DryRun.check(new DryRun.Input(post, channel.state(), kind, rules,
+                audited, sameTime)));
+        if (DECLARING.contains(channel.platform())) {
+            problems.addAll(DryRun.declarationProblems(posts.declaration(connection, post.id())));
+        }
+        return List.copyOf(problems);
     }
 
     /** The rules of a platform, or null when this build has none. */

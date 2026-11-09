@@ -7,6 +7,7 @@ import net.onelitefeather.menura.core.channel.StepwisePublisher;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadProgress;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadStart;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.VideoState;
+import net.onelitefeather.menura.core.channel.UploadSessionExpired;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -138,7 +139,7 @@ class YouTubeUploadTest {
         ScriptedHttp http = new ScriptedHttp().call("PUT", "/upload/youtube/v3/videos", new HttpTransport.Answer(404,
                 "{}", Optional.empty(), Optional.empty(), Optional.empty()));
 
-        assertThrows(YouTubeUploadSessionExpired.class, () -> adapter(http).uploadStatus(TOKEN, SESSION, SIZE),
+        assertThrows(UploadSessionExpired.class, () -> adapter(http).uploadStatus(TOKEN, SESSION, SIZE),
                 "an expired session is a distinct failure, not a generic rejection");
     }
 

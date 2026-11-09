@@ -79,6 +79,22 @@ public final class DryRun {
         return List.copyOf(problems);
     }
 
+    /**
+     * The blocking problems of the explicit declarations of a post on a platform that requires them (YouTube, change
+     * add-youtube-integration): the visibility must have been chosen and the made-for-kids answer given. No platform default
+     * is relied on, so a missing answer blocks scheduling.
+     */
+    public static List<Problem> declarationProblems(YouTubeDeclaration declaration) {
+        List<Problem> problems = new ArrayList<>();
+        if (!declaration.visibilityDeclared()) {
+            problems.add(error("visibility_undeclared", "Choose the visibility of this post before it is scheduled."));
+        }
+        if (declaration.madeForKids() == null) {
+            problems.add(error("made_for_kids_missing", "Declare whether this video is made for kids before it is scheduled."));
+        }
+        return List.copyOf(problems);
+    }
+
     /** Whether any problem blocks scheduling or publication. */
     public static boolean blocking(List<Problem> problems) {
         return problems.stream().anyMatch(problem -> ERROR.equals(problem.severity()));

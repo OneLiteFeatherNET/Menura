@@ -119,6 +119,9 @@ public final class PostService {
                     command.sourcePostId(), command.title(), command.description(), command.hashtags(),
                     command.visibility(), command.scheduledAt());
             posts.insert(c, post);
+            if (command.visibility() != null) {
+                declareVisibility(c, post.id());
+            }
             return detail(c, post, true);
         });
     }
@@ -136,8 +139,35 @@ public final class PostService {
             }
             requireCover(c, content.coverAssetId());
             Post changed = post.edited(content, playlist, now);
+            if (content.visibility() != null) {
+                declareVisibility(c, id);
+            }
             return detail(c, posts.update(c, changed), true);
         });
+    }
+
+    /**
+     * Declares the made-for-kids answer of a YouTube post (change add-youtube-integration). The answer is required before
+     * scheduling; no platform default is used. Allowed while the post can still be edited.
+     */
+    public PostDetail declareMadeForKids(PostActor actor, UUID id, boolean madeForKids) throws SQLException {
+        requireEditor(actor);
+        return transactions.inTransaction(c -> {
+            Post post = requirePost(c, id);
+            if (!post.status().editable()) {
+                throw new ProblemException(409, "Conflict", "A post in status " + post.status().value()
+                        + " is not edited; propose a revision instead.");
+            }
+            YouTubeDeclaration current = posts.declaration(c, id);
+            posts.putDeclaration(c, id, new YouTubeDeclaration(current.visibilityDeclared(), madeForKids));
+            return detail(c, post, true);
+        });
+    }
+
+    /** Records that the visibility of a post was chosen by a person, which the platform needs before scheduling. */
+    private void declareVisibility(Connection c, UUID id) throws SQLException {
+        YouTubeDeclaration current = posts.declaration(c, id);
+        posts.putDeclaration(c, id, new YouTubeDeclaration(true, current.madeForKids()));
     }
 
     /** Deletes a draft or a post in review. A post that was approved, scheduled or published is kept. */
@@ -224,6 +254,9 @@ public final class PostService {
                             command.seriesId(), command.sourcePostId(), item.title(), item.description(), item.hashtags(),
                             item.visibility(), item.scheduledAt());
                     posts.insert(c, post);
+                    if (item.visibility() != null) {
+                        declareVisibility(c, post.id());
+                    }
                     created.add(detail(c, post, true));
                 } catch (ProblemException refusal) {
                     refused.add(new Refusal(item.channelId(), refusal.detail()));

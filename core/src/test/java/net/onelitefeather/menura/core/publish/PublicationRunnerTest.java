@@ -252,7 +252,8 @@ class PublicationRunnerTest {
     /** A post approved and scheduled at the given time on the channel. */
     private static UUID scheduled(PublishFixture world, UUID channel, Instant at) throws Exception {
         UUID id = world.service.create(editor(), new DraftCommand(channel, world.finishedVideo(), null, null, null,
-                "Scheduled clip", "Text", List.of(), null, at)).post().id();
+                "Scheduled clip", "Text", List.of(), PlatformAdapter.Visibility.PRIVATE, at)).post().id();
+        world.service.declareMadeForKids(editor(), id, false);
         world.service.submit(editor(), id);
         world.service.approve(publisher(), id);
         world.service.schedule(publisher(), id);
