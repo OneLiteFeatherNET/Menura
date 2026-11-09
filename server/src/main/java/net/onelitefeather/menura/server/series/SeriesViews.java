@@ -82,7 +82,7 @@ public final class SeriesViews {
     }
 
     @Serdeable
-    public record RenderBundleView(UUID channelId, List<BundleSeriesView> series, String callToAction) {
+    public record RenderBundleView(UUID channelId, List<BundleSeriesView> series, Map<String, String> callToAction) {
     }
 
     @Serdeable
@@ -132,7 +132,7 @@ public final class SeriesViews {
         return new RenderBundleView(bundle.channelId(), bundle.series().stream()
                 .map(s -> new BundleSeriesView(s.id(), s.name(), s.badgeText(), s.colourToken(), s.openingFormula(),
                         s.hashtag()))
-                .toList(), bundle.callToAction() == null ? null : bundle.callToAction().text());
+                .toList(), bundle.callToAction() == null ? null : bundle.callToAction().texts());
     }
 
     static EpisodeView episode(SeriesReports.Episode episode, SeriesAssignment assignment) {
