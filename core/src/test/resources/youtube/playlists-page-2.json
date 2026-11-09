@@ -1,0 +1,8 @@
+{
+  "kind": "youtube#playlistListResponse",
+  "etag": "fixture-etag-2",
+  "pageInfo": { "totalResults": 2, "resultsPerPage": 1 },
+  "items": [
+    { "kind": "youtube#playlist", "id": "PL-own-archive", "snippet": { "title": "Archive" } }
+  ]
+}

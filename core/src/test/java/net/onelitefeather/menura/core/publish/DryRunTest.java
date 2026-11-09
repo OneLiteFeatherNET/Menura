@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -104,6 +105,54 @@ class DryRunTest {
                 true, List.of(failed)));
 
         assertTrue(problems.isEmpty(), "a failed post does not collide with a new one");
+    }
+
+    @Test
+    void aPlaylistOfAnotherChannelBlocksSchedulingAndIsNamedAsUnavailable() {
+        List<DryRun.Problem> problems = DryRun.playlistProblems("PL-foreign", Optional.of(Set.of("PL-own")));
+
+        assertEquals("playlist_not_owned", problems.get(0).code(), "the playlist is named as not belonging to the channel");
+        assertEquals(DryRun.ERROR, problems.get(0).severity(), "a foreign playlist blocks the schedule");
+    }
+
+    @Test
+    void aPlaylistOfTheChannelHasNoProblem() {
+        List<DryRun.Problem> problems = DryRun.playlistProblems("PL-own", Optional.of(Set.of("PL-own", "PL-other")));
+
+        assertTrue(problems.isEmpty(), "an owned playlist is clean but found " + problems);
+    }
+
+    @Test
+    void aPlaylistThatCannotBeReadIsUnverifiedAndBlocksSchedulingWithoutBeingCalledForeign() {
+        List<DryRun.Problem> problems = DryRun.playlistProblems("PL-own", Optional.empty());
+
+        assertEquals("playlist_unverified", problems.get(0).code(), "an unreadable playlist list is not called foreign");
+        assertTrue(DryRun.blocking(problems), "an unverified playlist blocks the schedule until it can be checked");
+    }
+
+    @Test
+    void aThumbnailTheChannelMayNotSetIsAWarningThatNamesTheReason() {
+        List<DryRun.Problem> problems = DryRun.thumbnailProblems(true, Optional.of(new DryRun.ThumbnailFact(false,
+                "The platform does not allow custom thumbnails for this channel.")));
+
+        assertEquals("thumbnail_not_allowed", problems.get(0).code(), "the thumbnail is named");
+        assertEquals(DryRun.WARNING, problems.get(0).severity(), "a thumbnail the channel may not set is a warning");
+        assertTrue(problems.get(0).message().contains("does not allow custom thumbnails"), "the reason is named");
+        assertFalse(DryRun.blocking(problems), "a thumbnail warning does not block the schedule");
+    }
+
+    @Test
+    void aThumbnailOnAChannelThatIsAllowedOrUnknownHasNoProblem() {
+        assertTrue(DryRun.thumbnailProblems(true, Optional.of(new DryRun.ThumbnailFact(true, null))).isEmpty(),
+                "an allowed channel shows no thumbnail problem");
+        assertTrue(DryRun.thumbnailProblems(true, Optional.empty()).isEmpty(),
+                "a channel whose eligibility was never learned shows no warning");
+    }
+
+    @Test
+    void noThumbnailMeansNoThumbnailProblemEvenOnAChannelThatMayNotSetOne() {
+        assertTrue(DryRun.thumbnailProblems(false, Optional.of(new DryRun.ThumbnailFact(false, "reason"))).isEmpty(),
+                "a post without a thumbnail has nothing to warn about");
     }
 
     private static List<DryRun.Problem> check(Post post, ConnectionState state, String kind, boolean audited,

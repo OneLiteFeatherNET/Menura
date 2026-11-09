@@ -3,8 +3,11 @@ package net.onelitefeather.menura.core.publish;
 import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.channel.Channel;
 import net.onelitefeather.menura.core.channel.ChannelStore;
+import net.onelitefeather.menura.core.channel.ConnectionService;
 import net.onelitefeather.menura.core.channel.ConnectionState;
+import net.onelitefeather.menura.core.channel.PlatformAdapter;
 import net.onelitefeather.menura.core.channel.PlatformAdapter.Visibility;
+import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
 import net.onelitefeather.menura.core.db.Transactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
@@ -23,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,10 +53,12 @@ public final class PostService {
     private final ChannelStore channels;
     private final SeriesService series;
     private final PlatformRegistry platforms;
+    private final ConnectionService connections;
     private final ZoneId zone;
 
     public PostService(Transactions transactions, Clock clock, IdentifierGenerator identifiers, PostStore posts,
-                       ChannelStore channels, SeriesService series, PlatformRegistry platforms, ZoneId zone) {
+                       ChannelStore channels, SeriesService series, PlatformRegistry platforms,
+                       ConnectionService connections, ZoneId zone) {
         this.transactions = transactions;
         this.clock = clock;
         this.identifiers = identifiers;
@@ -60,6 +66,7 @@ public final class PostService {
         this.channels = channels;
         this.series = series;
         this.platforms = platforms;
+        this.connections = connections;
         this.zone = zone;
     }
 
@@ -224,6 +231,7 @@ public final class PostService {
      */
     public PostDetail schedule(PostActor actor, UUID id) throws SQLException {
         requirePublisher(actor);
+        Optional<Set<String>> owned = ownedPlaylistsOf(id);
         return transactions.inTransaction(c -> {
             Instant now = clock.instant();
             Post post = requirePost(c, id);
@@ -234,7 +242,7 @@ public final class PostService {
                 throw new ProblemException(422, "Unprocessable Entity", "The post needs a scheduled time in the future.");
             }
             Channel channel = requireChannel(c, post.channelId());
-            List<DryRun.Problem> problems = PostFacts.problems(c, posts, channels, post, channel);
+            List<DryRun.Problem> problems = PostFacts.scheduleProblems(c, posts, channels, post, channel, owned);
             if (DryRun.blocking(problems)) {
                 throw new DryRunRefusal(problems);
             }
@@ -475,6 +483,32 @@ public final class PostService {
         return Post.draft(identifiers.next(), actor.personId(), new PostDraft(channelId, assetId, coverAssetId, seriesId,
                 sourcePostId, resolvedTitle, resolvedDescription, resolvedHashtags, visibility, playlist, scheduledAt),
                 clock.instant());
+    }
+
+    /**
+     * The playlists the channel of a post owns, read from the platform before the schedule transaction, so that no platform
+     * call runs inside a database transaction. Empty when the post has no playlist, the channel cannot be used, or the
+     * platform cannot list them; the dry run then reports the playlist as unverified.
+     */
+    private Optional<Set<String>> ownedPlaylistsOf(UUID postId) throws SQLException {
+        Optional<Post> post = transactions.inTransaction(c -> posts.find(c, postId));
+        if (post.isEmpty() || post.get().playlistId() == null) {
+            return Optional.empty();
+        }
+        Optional<Channel> channel = transactions.inTransaction(c -> channels.findChannel(c, post.get().channelId()));
+        if (channel.isEmpty() || channel.get().state() != ConnectionState.CONNECTED) {
+            return Optional.empty();
+        }
+        Optional<PlatformAdapter> adapter = platforms.find(channel.get().platform());
+        if (adapter.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            String token = connections.freshGrant(channel.get().id()).accessToken();
+            return Optional.of(adapter.get().ownedPlaylistIds(token));
+        } catch (ProblemException | PlatformException | PlatformAdapter.Unsupported unreadable) {
+            return Optional.empty();
+        }
     }
 
     private String playlistOf(Connection c, UUID seriesId, UUID channelId, PostActor actor) throws SQLException {

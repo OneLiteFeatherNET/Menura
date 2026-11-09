@@ -7,6 +7,7 @@ import net.onelitefeather.menura.core.channel.StepwisePublisher;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadProgress;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadStart;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.VideoState;
+import net.onelitefeather.menura.core.channel.ThumbnailNotAllowed;
 import net.onelitefeather.menura.core.channel.UploadSessionExpired;
 import net.onelitefeather.menura.core.library.ChapterLines;
 import net.onelitefeather.menura.core.library.ChapterMark;
@@ -218,6 +219,19 @@ class YouTubeUploadTest {
         assertTrue(sent.uri().getRawQuery().contains("videoId=vid123"), "the thumbnail names its video");
         assertTrue(sent.uri().getRawQuery().contains("uploadType=media"), "the thumbnail is sent as media");
         assertEquals("image/png", sent.headers().get("Content-Type"), "the image type is sent");
+    }
+
+    @Test
+    void aForbiddenThumbnailAnswerMeansTheChannelMayNotSetThumbnailsAndIsNotRetried() {
+        ScriptedHttp http = new ScriptedHttp().call("POST", "/upload/youtube/v3/thumbnails/set", new HttpTransport.Answer(
+                403, "{\"error\":{\"errors\":[{\"reason\":\"forbidden\"}]}}", Optional.empty(), Optional.empty(),
+                Optional.empty()));
+
+        PlatformException failure = assertThrows(ThumbnailNotAllowed.class,
+                () -> adapter(http).setThumbnail(TOKEN, "vid123", "image/png", new byte[]{1, 2, 3}),
+                "a thumbnail the platform forbids for the channel is reported as not allowed");
+
+        assertEquals(PlatformException.Kind.REJECTED, failure.kind(), "the refusal is final, not retried");
     }
 
     @Test

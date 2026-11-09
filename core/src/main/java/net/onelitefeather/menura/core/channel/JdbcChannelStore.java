@@ -255,6 +255,35 @@ public final class JdbcChannelStore implements ChannelStore {
         }
     }
 
+    @Override
+    public Optional<ThumbnailEligibility> findThumbnailEligibility(Connection connection, UUID channelId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select allowed, reason, decided_at from menura.channel_thumbnail where channel_id = ?")) {
+            statement.setObject(1, channelId);
+            try (ResultSet row = statement.executeQuery()) {
+                if (!row.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new ThumbnailEligibility(channelId, row.getBoolean("allowed"), row.getString("reason"),
+                        instant(row.getTimestamp("decided_at"))));
+            }
+        }
+    }
+
+    @Override
+    public void saveThumbnailEligibility(Connection connection, ThumbnailEligibility eligibility) throws SQLException {
+        String sql = "insert into menura.channel_thumbnail (channel_id, allowed, reason, decided_at) values (?, ?, ?, ?) "
+                + "on conflict (channel_id) do update set allowed = excluded.allowed, reason = excluded.reason, "
+                + "decided_at = excluded.decided_at";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setObject(1, eligibility.channelId());
+            statement.setBoolean(2, eligibility.allowed());
+            statement.setString(3, eligibility.reason());
+            statement.setTimestamp(4, timestamp(eligibility.decidedAt()));
+            statement.executeUpdate();
+        }
+    }
+
     // ------------------------------------------------------------ helpers
 
     private Optional<Channel> queryOne(Connection connection, String sql, UUID id) throws SQLException {

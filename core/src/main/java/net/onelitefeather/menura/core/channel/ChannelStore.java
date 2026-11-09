@@ -53,6 +53,16 @@ public interface ChannelStore {
 
     void saveAuditStatus(Connection connection, PlatformAuditStatus status) throws SQLException;
 
+    /** What the platform answered about custom thumbnails of a channel, if it was ever asked. */
+    Optional<ThumbnailEligibility> findThumbnailEligibility(Connection connection, UUID channelId) throws SQLException;
+
+    /** Replaces the recorded eligibility of a channel. */
+    void saveThumbnailEligibility(Connection connection, ThumbnailEligibility eligibility) throws SQLException;
+
+    /** Whether the platform allows a custom thumbnail on this channel, with the platform's reason when it does not. */
+    record ThumbnailEligibility(UUID channelId, boolean allowed, String reason, Instant decidedAt) {
+    }
+
     /** A consent in progress. The state is stored only as its digest; the PKCE verifier lives until the flow ends. */
     record ConnectionFlow(byte[] stateHash, UUID personId, String platform, Set<String> features, UUID channelId,
                           String codeVerifier, Instant expiresAt) {

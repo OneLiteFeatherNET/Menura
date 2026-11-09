@@ -8,6 +8,7 @@ import net.onelitefeather.menura.core.channel.PlatformAdapter.PublicationStatus;
 import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
 import net.onelitefeather.menura.core.channel.StepwisePublisher;
+import net.onelitefeather.menura.core.channel.ThumbnailNotAllowed;
 import net.onelitefeather.menura.core.channel.UploadSessionExpired;
 import net.onelitefeather.menura.core.channel.youtube.YouTubeAdapter;
 import net.onelitefeather.menura.core.db.Transactions;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -694,12 +696,29 @@ public final class PublicationRunner {
             platform.setThumbnail(token, post.externalId(), type, image);
         } catch (IOException unreadable) {
             throw new StepStop(new Stop(PostStep.THUMBNAIL, "The thumbnail could not be read.", true, null));
+        } catch (ThumbnailNotAllowed refusal) {
+            // The video is already on the platform, so the post stays published; only the thumbnail step is shown as not set.
+            recordThumbnailEligibility(post.channelId(), false, refusal.getMessage(), now);
+            transactions.inTransaction(c -> {
+                writeStep(c, post.id(), PostStep.THUMBNAIL, StepState.FAILED, now, refusal.getMessage());
+                return null;
+            });
+            return true;
         } catch (PlatformException failure) {
             throw new StepStop(new Stop(PostStep.THUMBNAIL, reasonOf(failure), failure.kind() != PlatformException.Kind.REJECTED,
                     null));
         }
+        recordThumbnailEligibility(post.channelId(), true, null, now);
         writeDone(post.id(), PostStep.THUMBNAIL, now);
         return true;
+    }
+
+    /** Records what the platform answered about custom thumbnails of the channel, so the dry run can warn before scheduling. */
+    private void recordThumbnailEligibility(UUID channelId, boolean allowed, String reason, Instant now) throws SQLException {
+        transactions.inTransaction(c -> {
+            channels.saveThumbnailEligibility(c, new ChannelStore.ThumbnailEligibility(channelId, allowed, reason, now));
+            return null;
+        });
     }
 
     /**

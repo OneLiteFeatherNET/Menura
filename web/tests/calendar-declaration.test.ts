@@ -9,7 +9,16 @@ import {
 
 describe('YouTube declaration and dry-run texts', () => {
   it('gives every YouTube dry-run code a German text, never the server message', () => {
-    const codes = ['visibility_undeclared', 'made_for_kids_missing', 'short_not_vertical', 'short_too_long', 'short_unverified'];
+    const codes = [
+      'visibility_undeclared',
+      'made_for_kids_missing',
+      'short_not_vertical',
+      'short_too_long',
+      'short_unverified',
+      'playlist_not_owned',
+      'playlist_unverified',
+      'thumbnail_not_allowed',
+    ];
 
     for (const code of codes) {
       const text = problemText({ code, severity: 'error', message: 'English server text', action: null });

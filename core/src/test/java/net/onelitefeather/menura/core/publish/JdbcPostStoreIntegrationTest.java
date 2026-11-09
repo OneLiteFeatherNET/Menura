@@ -159,7 +159,7 @@ class JdbcPostStoreIntegrationTest {
         final SeriesService series = new SeriesService(clock, identifiers, new JdbcSeriesStore(), new JdbcExternalPostStore(),
                 channels, NO_BRAND_KIT, JoinDomain.NONE);
         final PostService service = new PostService(transactions, clock, identifiers, posts, channels, series, registry,
-                ZoneId.of("Europe/Berlin"));
+                connections, ZoneId.of("Europe/Berlin"));
         final PublicationRunner runner = new PublicationRunner(transactions, clock, identifiers, posts, channels, connections,
                 registry, new JdbcExternalPostStore(), series, PublishSettings.from(java.util.Map.of()));
 

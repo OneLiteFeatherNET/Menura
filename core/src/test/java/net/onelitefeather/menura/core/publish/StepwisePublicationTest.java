@@ -1,7 +1,9 @@
 package net.onelitefeather.menura.core.publish;
 
 import net.onelitefeather.menura.core.channel.PlatformAdapter.Visibility;
+import net.onelitefeather.menura.core.channel.ChannelStore;
 import net.onelitefeather.menura.core.channel.PlatformException;
+import net.onelitefeather.menura.core.channel.ThumbnailNotAllowed;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadStart;
 import net.onelitefeather.menura.core.library.ChapterMark;
 import net.onelitefeather.menura.core.publish.PostService.DraftCommand;
@@ -20,6 +22,7 @@ import java.util.UUID;
 import static net.onelitefeather.menura.core.publish.support.PublishFixture.editor;
 import static net.onelitefeather.menura.core.publish.support.PublishFixture.publisher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -119,6 +122,35 @@ class StepwisePublicationTest {
         world.clock.advance(Duration.ofMinutes(1));
         assertEquals(1, world.runner.runOnce().published(), "the post is published once the thumbnail is set");
         assertEquals(List.of("image/jpeg:200000"), world.stepwise.thumbnails(), "the cover is set as the thumbnail");
+    }
+
+    @Test
+    void aChannelThatMayNotSetThumbnailsKeepsThePostPublishedAndTheThumbnailStepFailed() throws Exception {
+        PublishFixture world = new PublishFixture(false, PublishSettings.from(Map.of()), true);
+        world.stepwise.failNextThumbnail(new ThumbnailNotAllowed("The platform does not allow custom thumbnails for this channel."));
+        UUID channel = world.connectChannel("main");
+        UUID post = planned(world, channel, world.storedVideo(MIB), world.storedCover(), Visibility.PRIVATE, SLOT);
+        world.clock.advance(Duration.between(PublishFixture.NOW, SLOT));
+
+        assertEquals(1, world.runner.runOnce().published(), "the video is published without its thumbnail");
+        StepRecord thumbnail = world.posts.steps(null, post).stream().filter(step -> step.step() == PostStep.THUMBNAIL)
+                .findFirst().orElseThrow();
+        assertEquals(StepState.FAILED, thumbnail.state(), "the thumbnail is shown as not set");
+        assertTrue(thumbnail.reason().contains("does not allow"), "the step names the reason the platform gave");
+        ChannelStore.ThumbnailEligibility eligibility = world.channels.findThumbnailEligibility(null, channel).orElseThrow();
+        assertFalse(eligibility.allowed(), "the refusal is recorded on the channel, so later posts warn before they go out");
+    }
+
+    @Test
+    void aThumbnailThatIsSetRecordsTheChannelAsAllowed() throws Exception {
+        PublishFixture world = new PublishFixture(false, PublishSettings.from(Map.of()), true);
+        UUID channel = world.connectChannel("main");
+        planned(world, channel, world.storedVideo(MIB), world.storedCover(), Visibility.PRIVATE, SLOT);
+        world.clock.advance(Duration.between(PublishFixture.NOW, SLOT));
+
+        assertEquals(1, world.runner.runOnce().published(), "the video is published with its thumbnail");
+        assertTrue(world.channels.findThumbnailEligibility(null, channel).orElseThrow().allowed(),
+                "a thumbnail the platform accepted records the channel as allowed");
     }
 
     @Test
