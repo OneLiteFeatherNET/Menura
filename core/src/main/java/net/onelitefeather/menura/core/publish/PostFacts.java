@@ -32,7 +32,8 @@ final class PostFacts {
             return List.of(new DryRun.Problem("platform_unsupported", DryRun.ERROR,
                     "The platform of this channel is not supported in this build.", null));
         }
-        String kind = posts.finishedAssetKind(connection, post.assetId()).orElse(null);
+        FinishedAsset asset = posts.finishedAsset(connection, post.assetId()).orElse(null);
+        String kind = asset == null ? null : asset.kind();
         boolean audited = channels.findAuditStatus(connection, channel.platform())
                 .map(status -> status.status() == AuditStatus.AUDITED).orElse(false);
         List<Post> sameTime = post.scheduledAt() == null ? List.of()
@@ -40,7 +41,10 @@ final class PostFacts {
         List<DryRun.Problem> problems = new ArrayList<>(DryRun.check(new DryRun.Input(post, channel.state(), kind, rules,
                 audited, sameTime)));
         if (DECLARING.contains(channel.platform())) {
-            problems.addAll(DryRun.declarationProblems(posts.declaration(connection, post.id())));
+            YouTubeDeclaration declaration = posts.declaration(connection, post.id());
+            problems.addAll(DryRun.declarationProblems(declaration));
+            problems.addAll(DryRun.shortProblems(declaration.plannedShort(), asset == null ? null : asset.width(),
+                    asset == null ? null : asset.height(), asset == null ? null : asset.durationSeconds()));
         }
         return List.copyOf(problems);
     }

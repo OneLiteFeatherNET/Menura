@@ -6046,9 +6046,13 @@ components:
             $ref: "#/components/schemas/JoinSeriesEstimate"
     YouTubeMadeForKids:
       type: object
-      description: The made-for-kids declaration of a YouTube video (status.selfDeclaredMadeForKids).
+      description: The made-for-kids declaration of a YouTube video (status.selfDeclaredMadeForKids), and whether the post is
+        planned as a Short (vertical or square, at most three minutes; checked by the dry run).
       required:
         - madeForKids
       properties:
         madeForKids:
           type: boolean
+        planShort:
+          type: boolean
+          description: Omitted or null keeps the current answer.

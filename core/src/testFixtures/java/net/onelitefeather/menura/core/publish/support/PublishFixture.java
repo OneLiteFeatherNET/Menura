@@ -145,6 +145,15 @@ public final class PublishFixture {
         return id;
     }
 
+    /** A finished video of the given size with its recorded width, height and duration, for the Short format rule. */
+    public UUID storedVideo(long sizeBytes, int width, int height, int durationSeconds) {
+        UUID id = identifiers.next();
+        String key = "assets/" + id;
+        posts.registerStoredAsset(id, new FinishedAsset("video", "mp4", key, sizeBytes, width, height, durationSeconds));
+        media.put(key, sizeBytes);
+        return id;
+    }
+
     /** A finished JPEG cover in the test storage. */
     public UUID storedCover() {
         UUID id = identifiers.next();

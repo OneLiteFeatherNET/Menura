@@ -95,6 +95,34 @@ public final class DryRun {
         return List.copyOf(problems);
     }
 
+    /** The longest Short of YouTube in seconds; the same limit as YouTubeFormat.SHORT_LIMIT in the youtube package. */
+    public static final int SHORT_MAX_SECONDS = 180;
+
+    /**
+     * The problems of a post planned as a YouTube Short (change add-youtube-integration, task 4.7). A Short is vertical or
+     * square and at most three minutes long. The checks use the size and duration recorded at upload; where the asset records
+     * neither, the post gets a warning and the metadata is not guessed. A post not planned as a Short has no problem here.
+     */
+    public static List<Problem> shortProblems(boolean plannedShort, Integer width, Integer height, Integer durationSeconds) {
+        if (!plannedShort) {
+            return List.of();
+        }
+        if (width == null || height == null || durationSeconds == null) {
+            return List.of(new Problem("short_unverified", WARNING,
+                    "The asset does not record its size or duration, so Menura cannot check that it is a Short.", null));
+        }
+        List<Problem> problems = new ArrayList<>();
+        if (width > height) {
+            problems.add(error("short_not_vertical", "A Short must be vertical or square; this asset is " + width + "x"
+                    + height + "."));
+        }
+        if (durationSeconds > SHORT_MAX_SECONDS) {
+            problems.add(error("short_too_long", "A Short may be at most " + SHORT_MAX_SECONDS + " seconds; this asset is "
+                    + durationSeconds + " seconds."));
+        }
+        return List.copyOf(problems);
+    }
+
     /** Whether any problem blocks scheduling or publication. */
     public static boolean blocking(List<Problem> problems) {
         return problems.stream().anyMatch(problem -> ERROR.equals(problem.severity()));

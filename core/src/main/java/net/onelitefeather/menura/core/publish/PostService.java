@@ -151,6 +151,14 @@ public final class PostService {
      * scheduling; no platform default is used. Allowed while the post can still be edited.
      */
     public PostDetail declareMadeForKids(PostActor actor, UUID id, boolean madeForKids) throws SQLException {
+        return declareYouTube(actor, id, madeForKids, null);
+    }
+
+    /**
+     * Declares the YouTube answers of a post: the made-for-kids answer and, when given, whether the post is planned as a Short
+     * (a null {@code planShort} keeps the current answer). Allowed while the post can still be edited.
+     */
+    public PostDetail declareYouTube(PostActor actor, UUID id, boolean madeForKids, Boolean planShort) throws SQLException {
         requireEditor(actor);
         return transactions.inTransaction(c -> {
             Post post = requirePost(c, id);
@@ -159,7 +167,8 @@ public final class PostService {
                         + " is not edited; propose a revision instead.");
             }
             YouTubeDeclaration current = posts.declaration(c, id);
-            posts.putDeclaration(c, id, new YouTubeDeclaration(current.visibilityDeclared(), madeForKids));
+            posts.putDeclaration(c, id, new YouTubeDeclaration(current.visibilityDeclared(), madeForKids,
+                    planShort == null ? current.plannedShort() : planShort));
             return detail(c, post, true);
         });
     }
@@ -167,7 +176,7 @@ public final class PostService {
     /** Records that the visibility of a post was chosen by a person, which the platform needs before scheduling. */
     private void declareVisibility(Connection c, UUID id) throws SQLException {
         YouTubeDeclaration current = posts.declaration(c, id);
-        posts.putDeclaration(c, id, new YouTubeDeclaration(true, current.madeForKids()));
+        posts.putDeclaration(c, id, new YouTubeDeclaration(true, current.madeForKids(), current.plannedShort()));
     }
 
     /** Deletes a draft or a post in review. A post that was approved, scheduled or published is kept. */

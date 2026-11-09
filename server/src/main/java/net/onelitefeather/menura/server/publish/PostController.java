@@ -103,7 +103,7 @@ public class PostController {
     @ExecuteOn(TaskExecutors.BLOCKING)
     PostView declareMadeForKids(HttpRequest<?> request, @PathVariable UUID id, @Body MadeForKidsBody body)
             throws SQLException {
-        return PostViews.post(posts.declareMadeForKids(PostActors.of(request), id, body.madeForKids()));
+        return PostViews.post(posts.declareYouTube(PostActors.of(request), id, body.madeForKids(), body.planShort()));
     }
 
     @Get("/{id}/revisions")
@@ -166,7 +166,7 @@ public class PostController {
 
     /** The body of an edit: only the fields given change. */
     @Serdeable
-    public record MadeForKidsBody(boolean madeForKids) {
+    public record MadeForKidsBody(boolean madeForKids, Boolean planShort) {
     }
 
     public record PatchBody(UUID channelId, UUID coverAssetId, String title, String description, List<String> hashtags,

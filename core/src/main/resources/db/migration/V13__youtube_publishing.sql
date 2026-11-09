@@ -12,7 +12,8 @@ ALTER TABLE menura.post_step ADD CONSTRAINT post_step_step_check
 CREATE TABLE menura.youtube_post_declaration (
     post_id              uuid    PRIMARY KEY REFERENCES menura.post (id) ON DELETE CASCADE,
     visibility_declared  boolean NOT NULL DEFAULT false,
-    made_for_kids        boolean
+    made_for_kids        boolean,
+    planned_short        boolean NOT NULL DEFAULT false
 );
 
 -- The resumable upload of a post. The session location is sealed with the token key (it lets anyone add bytes), the

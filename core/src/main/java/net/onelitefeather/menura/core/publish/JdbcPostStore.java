@@ -132,27 +132,36 @@ public final class JdbcPostStore implements PostStore {
 
     @Override
     public Optional<FinishedAsset> finishedAsset(Connection connection, UUID assetId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(
-                "select kind, format, storage_key, size_bytes from menura.asset where id = ? and kind in ('video', 'image')")) {
+        try (PreparedStatement statement = connection.prepareStatement("select kind, format, storage_key, size_bytes, "
+                + "width, height, duration_seconds from menura.asset where id = ? and kind in ('video', 'image')")) {
             statement.setObject(1, assetId);
             try (ResultSet rs = statement.executeQuery()) {
-                return rs.next() ? Optional.of(new FinishedAsset(rs.getString(1), rs.getString(2), rs.getString(3),
-                        rs.getLong(4))) : Optional.empty();
+                if (!rs.next()) {
+                    return Optional.empty();
+                }
+                int width = rs.getInt(5);
+                boolean noWidth = rs.wasNull();
+                int height = rs.getInt(6);
+                boolean noHeight = rs.wasNull();
+                int duration = rs.getInt(7);
+                boolean noDuration = rs.wasNull();
+                return Optional.of(new FinishedAsset(rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4),
+                        noWidth ? null : width, noHeight ? null : height, noDuration ? null : duration));
             }
         }
     }
 
     @Override
     public YouTubeDeclaration declaration(Connection connection, UUID postId) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement("select visibility_declared, made_for_kids "
-                + "from menura.youtube_post_declaration where post_id = ?")) {
+        try (PreparedStatement statement = connection.prepareStatement("select visibility_declared, made_for_kids, "
+                + "planned_short from menura.youtube_post_declaration where post_id = ?")) {
             statement.setObject(1, postId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
                     return YouTubeDeclaration.none();
                 }
                 boolean madeForKids = rs.getBoolean(2);
-                return new YouTubeDeclaration(rs.getBoolean(1), rs.wasNull() ? null : madeForKids);
+                return new YouTubeDeclaration(rs.getBoolean(1), rs.wasNull() ? null : madeForKids, rs.getBoolean(3));
             }
         }
     }
@@ -160,8 +169,9 @@ public final class JdbcPostStore implements PostStore {
     @Override
     public void putDeclaration(Connection connection, UUID postId, YouTubeDeclaration declaration) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("insert into menura.youtube_post_declaration "
-                + "(post_id, visibility_declared, made_for_kids) values (?, ?, ?) on conflict (post_id) do update set "
-                + "visibility_declared = excluded.visibility_declared, made_for_kids = excluded.made_for_kids")) {
+                + "(post_id, visibility_declared, made_for_kids, planned_short) values (?, ?, ?, ?) on conflict (post_id) "
+                + "do update set visibility_declared = excluded.visibility_declared, made_for_kids = excluded.made_for_kids, "
+                + "planned_short = excluded.planned_short")) {
             statement.setObject(1, postId);
             statement.setBoolean(2, declaration.visibilityDeclared());
             if (declaration.madeForKids() == null) {
@@ -169,6 +179,7 @@ public final class JdbcPostStore implements PostStore {
             } else {
                 statement.setBoolean(3, declaration.madeForKids());
             }
+            statement.setBoolean(4, declaration.plannedShort());
             statement.executeUpdate();
         }
     }
