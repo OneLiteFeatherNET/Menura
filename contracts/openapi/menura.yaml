@@ -5361,6 +5361,7 @@ components:
             - string
             - "null"
           format: uuid
+          description: The post this one recycles. Its asset must be the same asset; the source is not changed.
         authorId:
           $ref: "#/components/schemas/Identifier"
         status:
@@ -5746,6 +5747,7 @@ components:
             - string
             - "null"
           format: uuid
+          description: The post this one recycles. Its asset must be the same asset; the source is not changed.
         authorId:
           $ref: "#/components/schemas/Identifier"
         status:
