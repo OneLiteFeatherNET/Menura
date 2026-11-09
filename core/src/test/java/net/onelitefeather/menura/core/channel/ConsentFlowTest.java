@@ -23,6 +23,7 @@ class ConsentFlowTest {
 
     private static final String READONLY = ChannelFixture.YOUTUBE_READONLY;
     private static final String UPLOAD = ChannelFixture.YOUTUBE_UPLOAD;
+    private static final String FORCE_SSL = "https://www.googleapis.com/auth/youtube.force-ssl";
 
     @Test
     void successfulConsentCreatesAConnectedChannelWithTheGrantedScopes() throws Exception {
@@ -171,7 +172,7 @@ class ConsentFlowTest {
 
         ChannelSnapshot snapshot = world.service.snapshot(channelId);
 
-        assertEquals(Set.of(UPLOAD), snapshot.missingScopes(), "the missing scope for an enabled feature is flagged");
+        assertEquals(Set.of(UPLOAD, FORCE_SSL), snapshot.missingScopes(), "the missing scopes for an enabled feature are flagged");
         assertEquals(ConnectionState.CONNECTED, snapshot.channel().state(), "a missing scope does not disconnect");
     }
 

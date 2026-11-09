@@ -83,6 +83,7 @@ class JdbcPostStoreIntegrationTest {
 
         UUID post = world.service.create(editor(), new DraftCommand(main, clip, null, null, null, "Launch clip", "Text",
                 List.of("#launch"), Visibility.PRIVATE, SLOT)).post().id();
+        world.service.declareMadeForKids(editor(), post, false);
         world.service.submit(editor(), post);
         world.service.approve(publisher(), post);
         world.service.schedule(publisher(), post);
@@ -123,7 +124,8 @@ class JdbcPostStoreIntegrationTest {
         World world = new World();
         UUID channel = world.connectedChannel("round-trip");
         UUID post = world.service.create(editor(), new DraftCommand(channel, world.finishedVideo(), null, null, null,
-                "Round trip", "Text", List.of("#a"), null, SLOT)).post().id();
+                "Round trip", "Text", List.of("#a"), Visibility.PRIVATE, SLOT)).post().id();
+        world.service.declareMadeForKids(editor(), post, false);
         world.service.submit(editor(), post);
         world.service.approve(publisher(), post);
         world.service.schedule(publisher(), post);
