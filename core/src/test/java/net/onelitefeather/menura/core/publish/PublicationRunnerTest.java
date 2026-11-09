@@ -247,7 +247,32 @@ class PublicationRunnerTest {
         assertNull(world.youtube.requests().get(0).publishAt(), "the job publishes now, at the planned time");
     }
 
+    @Test
+    void aPostInReviewIsNeitherClaimedNorHandedOverToTheNativeSchedule() throws Exception {
+        PublishFixture world = new PublishFixture(true);
+        UUID post = inReview(world, world.connectChannel("main"), SLOT);
+        world.clock.advance(Duration.between(PublishFixture.NOW, SLOT.minus(Duration.ofHours(24)).plusSeconds(60)));
+
+        Report report = world.runner.runOnce();
+
+        assertEquals(0, report.claimed(), "a post in review is not claimed by the publication job");
+        assertEquals(0, report.handedOver(), "a post in review is not handed over to the platform");
+        assertTrue(world.youtube.requests().isEmpty(), "the platform is not called for a post in review");
+        Post stored = world.posts.stored(post).orElseThrow();
+        assertEquals(PostStatus.IN_REVIEW, stored.status(), "the post stays in review");
+        assertNull(stored.leaseOwner(), "the post is not leased by the job");
+    }
+
     // ----------------------------------------------------------------- helpers
+
+    /** A post submitted for review at the given time on the channel, not yet approved. */
+    private static UUID inReview(PublishFixture world, UUID channel, Instant at) throws Exception {
+        UUID id = world.service.create(editor(), new DraftCommand(channel, world.finishedVideo(), null, null, null,
+                "Review clip", "Text", List.of(), PlatformAdapter.Visibility.PRIVATE, at)).post().id();
+        world.service.declareMadeForKids(editor(), id, false);
+        world.service.submit(editor(), id);
+        return id;
+    }
 
     /** A post approved and scheduled at the given time on the channel. */
     private static UUID scheduled(PublishFixture world, UUID channel, Instant at) throws Exception {
