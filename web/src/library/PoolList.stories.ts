@@ -17,6 +17,7 @@ const RAW: PoolItem = {
   usage: null,
   personTags: [],
   freeTags: ['coop'],
+  publishedOn: [],
   createdAt: '2026-11-01T20:00:00Z',
 };
 
@@ -32,6 +33,16 @@ const CLIP: PoolItem = {
   endSeconds: 180,
   usage: 'never_used',
   freeTags: ['speedrun'],
+};
+
+const PUBLISHED: PoolItem = {
+  ...CLIP,
+  id: '6b7c8d9e-0f1a-4b2c-8d3e-4f5a6b7c8d9e',
+  stage: 'rendered',
+  status: 'active',
+  title: 'Boss-Kampf Short',
+  usage: 'published',
+  publishedOn: [{ channelId: '7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f', channelName: 'Twitch Hauptkanal' }],
 };
 
 const meta = {
@@ -59,6 +70,16 @@ export const Items: Story = {
     expect(canvas.getByText('Nie verwendet')).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Mehr laden' }));
     expect(args.onMore).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const PublishedOnChannel: Story = {
+  args: { items: [PUBLISHED] },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByText('Boss-Kampf Short')).toBeVisible();
+    expect(canvas.getByText('Veröffentlicht auf Twitch Hauptkanal')).toBeVisible();
+    expect(canvas.queryByText('Nie verwendet')).toBeNull();
   },
 };
 

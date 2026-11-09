@@ -24,6 +24,7 @@ const usageOptions = [
   { value: ALL, label: 'Alle' },
   { value: 'used', label: 'Verwendet' },
   { value: 'never_used', label: 'Nie verwendet' },
+  { value: 'published', label: 'Veröffentlicht' },
 ];
 
 function update(patch: Partial<PoolFilters>) {
