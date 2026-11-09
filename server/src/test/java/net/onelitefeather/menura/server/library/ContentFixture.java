@@ -1,11 +1,14 @@
 package net.onelitefeather.menura.server.library;
 
 import net.onelitefeather.menura.core.asset.AssetDeclaration;
+import net.onelitefeather.menura.core.brand.BrandKit;
+import net.onelitefeather.menura.core.brand.InitialBrandKit;
 import net.onelitefeather.menura.server.library.ContentRepository.RawItem;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Wires the content services to the in-memory collaborators of {@link LibraryFixture}, with a clock the test moves by
@@ -16,6 +19,9 @@ final class ContentFixture {
     static final long TRANSCRIPT_LIMIT = 10L * 1024 * 1024;
     static final UUID PERSON_A = UUID.fromString("3d4e5f6a-7b8c-4d9e-8f0a-2b3c4d5e6f70");
     static final UUID PERSON_B = UUID.fromString("4e5f6a7b-8c9d-4e0f-9a1b-3c4d5e6f7081");
+    /** The templates of the initial brand kit, the ones a timeline may refer to. */
+    static final LayoutTemplates BRAND_KIT_TEMPLATES = () -> InitialBrandKit.create().templates().stream()
+            .map(BrandKit.Template::format).collect(Collectors.toUnmodifiableSet());
 
     final LibraryFixture base = new LibraryFixture();
     final InMemoryContentRepository content = new InMemoryContentRepository();
@@ -24,7 +30,7 @@ final class ContentFixture {
     final Transcripts transcripts = new Transcripts(base.transactions, base.clock, content, base.auditLog,
             TRANSCRIPT_LIMIT);
     final Timelines timelines = new Timelines(base.transactions, base.clock, base.identifiers, content, base.assets,
-            base.auditLog);
+            base.auditLog, BRAND_KIT_TEMPLATES);
 
     /** A raw item of the given duration, uploaded by the person, recorded on the given stream date. */
     ContentFixture() {

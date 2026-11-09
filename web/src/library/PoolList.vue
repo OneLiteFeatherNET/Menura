@@ -28,7 +28,7 @@ const columns: { key: string; label: string }[] = [
 
 const KIND_LABELS: Record<string, string> = { raw: 'Rohmaterial', clip: 'Clip' };
 const STAGE_LABELS: Record<string, string> = { raw: 'Roh', cut: 'Geschnitten', rendered: 'Gerendert' };
-const USAGE_LABELS: Record<string, string> = { used: 'Verwendet', never_used: 'Nie verwendet' };
+const USAGE_LABELS: Record<string, string> = { used: 'Verwendet', never_used: 'Nie verwendet', published: 'Veröffentlicht' };
 
 // Rows are plain records for the table; the detail of each item stays in the item itself.
 const rows = () =>
@@ -39,6 +39,7 @@ const rows = () =>
     stage: item.stage,
     status: item.status,
     usage: item.usage,
+    channels: item.publishedOn.map((channel) => channel.channelName),
     uploader: item.uploaderId.slice(0, 8),
     tags: [...item.personTags.map((person) => `@${person.slice(0, 8)}`), ...item.freeTags],
   }));
@@ -63,7 +64,8 @@ function stageTone(stage: string): 'neutral' | 'info' | 'success' {
           <span v-else>Aktiv</span>
         </template>
         <template #cell-usage="{ row }">
-          <span v-if="row.usage">{{ USAGE_LABELS[row.usage as string] }}</span>
+          <span v-if="row.usage === 'published'">Veröffentlicht auf {{ (row.channels as string[]).join(', ') }}</span>
+          <span v-else-if="row.usage">{{ USAGE_LABELS[row.usage as string] }}</span>
         </template>
         <template #cell-tags="{ row }">
           <TagChips :tags="(row.tags as string[])" empty-text="Keine Tags" />

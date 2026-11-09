@@ -35,8 +35,40 @@ public class JdbcContentRepository implements ContentRepository {
     private static final String CLIP_COLUMNS = "id, raw_item_id, uploader_id, title, start_seconds, end_seconds, status, "
             + "stage, created_at, updated_at";
 
-    private static final String POOL = """
-            with pool as (
+    /**
+     * The finished assets made from each item (a raw item, a clip, or a registered asset itself), and the channels those
+     * assets were published on through the external posts of their Menura posts. Shared by the pool, search and the
+     * channel lookup, so that "published" means the same everywhere.
+     */
+    private static final String PUBLICATIONS = """
+            with item_asset as (
+              select r.asset_id as item_id, r.asset_id as asset_id
+                from menura.registered_asset r
+              union
+              select c.id, e2.child_id
+                from menura.clip c
+                join menura.lineage_edge e1 on e1.child_kind = 'timeline' and e1.parent_kind = 'clip' and e1.parent_id = c.id
+                join menura.lineage_edge e2 on e2.child_kind = 'asset' and e2.parent_kind = 'timeline'
+                                           and e2.parent_id = e1.child_id
+              union
+              select c.raw_item_id, e2.child_id
+                from menura.clip c
+                join menura.lineage_edge e1 on e1.child_kind = 'timeline' and e1.parent_kind = 'clip' and e1.parent_id = c.id
+                join menura.lineage_edge e2 on e2.child_kind = 'asset' and e2.parent_kind = 'timeline'
+                                           and e2.parent_id = e1.child_id
+            ),
+            item_publication as (
+              select distinct ia.item_id, ch.id as channel_id, ch.display_name as channel_name
+                from item_asset ia
+                join menura.post po on po.asset_id = ia.asset_id and po.status = 'published'
+                join menura.external_post_origin o on o.post_id = po.id
+                join menura.external_post ep on ep.id = o.external_post_id
+                join menura.channel ch on ch.id = ep.channel_id
+            )
+            """;
+
+    private static final String POOL = PUBLICATIONS + """
+            , pool as (
               select a.id, 'raw' as kind, 'raw' as stage, 'active' as status, a.uploader_id, a.stream_title as title,
                      cast(null as uuid) as raw_item_id, cast(null as uuid) as asset_id,
                      cast(null as integer) as start_seconds, cast(null as integer) as end_seconds,
@@ -66,7 +98,10 @@ public class JdbcContentRepository implements ContentRepository {
                and (cast(? as text) is null or exists (select 1 from menura.item_tag t
                                                         where t.item_id = p.id and t.tag = cast(? as text)))
                and (cast(? as text) is null or p.stage = cast(? as text))
-               and (cast(? as text) is null or p.used = (cast(? as text) = 'used'))
+               and (cast(? as text) is null
+                    or (cast(? as text) = 'published' and exists (select 1 from item_publication ip where ip.item_id = p.id))
+                    or (cast(? as text) = 'used' and p.used)
+                    or (cast(? as text) = 'never_used' and not p.used))
                and (cast(? as date) is null or cast(p.created_at at time zone 'UTC' as date) >= cast(? as date))
                and (cast(? as date) is null or cast(p.created_at at time zone 'UTC' as date) <= cast(? as date))
                and (cast(? as timestamptz) is null or (p.created_at, p.id) < (cast(? as timestamptz), cast(? as uuid)))
@@ -74,7 +109,7 @@ public class JdbcContentRepository implements ContentRepository {
              limit ?
             """;
 
-    private static final String SEARCH = """
+    private static final String SEARCH = PUBLICATIONS + """
             select s.raw_item_id, a.stream_title, a.stream_date, a.uploader_id, s.start_ms, s.end_ms, s.speaker, s.text
               from menura.transcript_segment s
               join menura.asset a on a.id = s.raw_item_id
@@ -88,10 +123,16 @@ public class JdbcContentRepository implements ContentRepository {
                                                         where c.raw_item_id = a.id and c.stage = cast(? as text)))
                and (cast(? as date) is null or a.stream_date >= cast(? as date))
                and (cast(? as date) is null or a.stream_date <= cast(? as date))
-               and (cast(? as text) is null or exists (select 1 from menura.clip c
+               and (cast(? as text) is null
+                    or (cast(? as text) = 'published' and exists (select 1 from item_publication ip where ip.item_id = a.id))
+                    or (cast(? as text) = 'used' and exists (select 1 from menura.clip c
                                                         join menura.lineage_edge e
                                                           on e.parent_kind = 'clip' and e.parent_id = c.id
-                                                       where c.raw_item_id = a.id) = (cast(? as text) = 'used'))
+                                                       where c.raw_item_id = a.id))
+                    or (cast(? as text) = 'never_used' and not exists (select 1 from menura.clip c
+                                                        join menura.lineage_edge e
+                                                          on e.parent_kind = 'clip' and e.parent_id = c.id
+                                                       where c.raw_item_id = a.id)))
              order by a.stream_date desc nulls last, s.start_ms
              limit ?
             """;
@@ -266,7 +307,7 @@ public class JdbcContentRepository implements ContentRepository {
             at = bindUuid(statement, at, filter.personId(), 2);
             at = bindText(statement, at, filter.tag(), 2);
             at = bindText(statement, at, filter.stage() == null ? null : filter.stage().value(), 2);
-            at = bindText(statement, at, filter.usage(), 2);
+            at = bindText(statement, at, filter.usage(), 4);
             at = bindDate(statement, at, filter.from(), 2);
             at = bindDate(statement, at, filter.to(), 2);
             Timestamp after = afterCreatedAt == null ? null : Timestamp.from(afterCreatedAt);
@@ -282,6 +323,28 @@ public class JdbcContentRepository implements ContentRepository {
             }
             return rows;
         }
+    }
+
+    @Override
+    public Map<UUID, List<ChannelRef>> publishedOn(Connection connection, Collection<UUID> items) throws SQLException {
+        Map<UUID, List<ChannelRef>> channels = new HashMap<>();
+        if (items.isEmpty()) {
+            return channels;
+        }
+        try (PreparedStatement statement = connection.prepareStatement(PUBLICATIONS + """
+                select ip.item_id, ip.channel_id, ip.channel_name from item_publication ip
+                 where ip.item_id = any(?)
+                 order by ip.channel_name, ip.channel_id
+                """)) {
+            statement.setArray(1, connection.createArrayOf("uuid", items.toArray()));
+            try (ResultSet row = statement.executeQuery()) {
+                while (row.next()) {
+                    channels.computeIfAbsent(row.getObject("item_id", UUID.class), id -> new ArrayList<>())
+                            .add(new ChannelRef(row.getObject("channel_id", UUID.class), row.getString("channel_name")));
+                }
+            }
+        }
+        return channels;
     }
 
     @Override
@@ -344,7 +407,7 @@ public class JdbcContentRepository implements ContentRepository {
             at = bindText(statement, at, stage, 3);
             at = bindDate(statement, at, filter.from(), 2);
             at = bindDate(statement, at, filter.to(), 2);
-            at = bindText(statement, at, filter.usage(), 2);
+            at = bindText(statement, at, filter.usage(), 4);
             statement.setInt(at, limit);
             List<SearchHit> hits = new ArrayList<>();
             try (ResultSet row = statement.executeQuery()) {

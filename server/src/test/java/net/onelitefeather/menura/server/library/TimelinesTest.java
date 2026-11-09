@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,7 +20,7 @@ class TimelinesTest {
     private static final LocalDate STREAM = LocalDate.parse("2026-11-01");
 
     private static TimelineDocument document(List<UUID> clips, List<TimelineDocument.Chapter> chapters) {
-        return new TimelineDocument("vertical-9x16", clips, List.of(Map.of("text", "Subscribe")),
+        return new TimelineDocument("short-9x16", clips, List.of(Map.of("text", "Subscribe")),
                 List.of(Map.of("text", "Caption")), chapters);
     }
 
@@ -40,11 +41,66 @@ class TimelinesTest {
         ContentViews.TimelineView read = f.timelines.get(LibraryFixture.viewer(), id);
 
         assertEquals(List.of(first, second), read.document().sourceClipIds(), "the ordered source ranges are kept");
-        assertEquals("vertical-9x16", read.document().layoutTemplate(), "the layout template reference is kept");
+        assertEquals("short-9x16", read.document().layoutTemplate(), "the layout template reference is kept");
         assertEquals(1, read.document().overlays().size(), "the overlays are kept");
         assertEquals(1, read.document().captions().size(), "the captions are kept");
         assertEquals(List.of(new TimelineDocument.Chapter(0, "Intro")), read.document().chapters(), "the chapters are kept");
         assertEquals(LibraryFixture.EDITOR, read.uploaderId(), "the uploader of the timeline is recorded");
+    }
+
+    @Test
+    void layoutTemplateThatTheBrandKitDoesNotDefineIsRefusedNamingIt() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);
+        UUID first = clip(f, raw, 10);
+        TimelineDocument unknown = new TimelineDocument("vertical-9x16", List.of(first), List.of(), List.of(), List.of());
+
+        ProblemException refused = assertThrows(ProblemException.class,
+                () -> f.timelines.store(LibraryFixture.editor(), "Unknown layout", unknown, "req-tl"));
+
+        assertEquals(400, refused.status(), "a template the brand kit does not define is a validation error");
+        assertTrue(refused.detail().contains("vertical-9x16"), "the problem names the template: " + refused.detail());
+    }
+
+    @Test
+    void layoutTemplateOfTheBrandKitIsAccepted() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);
+        UUID first = clip(f, raw, 10);
+
+        UUID id = f.timelines.store(LibraryFixture.editor(), "Known layout", document(List.of(first), List.of()), "req-tl").id();
+
+        assertEquals("short-9x16", f.timelines.get(LibraryFixture.viewer(), id).document().layoutTemplate(),
+                "a template of the brand kit is stored");
+    }
+
+    @Test
+    void timelineWithoutALayoutTemplateIsAccepted() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);
+        UUID first = clip(f, raw, 10);
+        TimelineDocument none = new TimelineDocument(null, List.of(first), List.of(), List.of(), List.of());
+
+        UUID id = f.timelines.store(LibraryFixture.editor(), "No layout", none, "req-tl").id();
+
+        assertNull(f.timelines.get(LibraryFixture.viewer(), id).document().layoutTemplate(),
+                "the layout template is optional, as the contract describes it");
+    }
+
+    @Test
+    void reCuttingAClipKeepsTheLineageEdgesOfItsTimeline() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);
+        UUID first = clip(f, raw, 10);
+        UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short", document(List.of(first), List.of()), "req-tl")
+                .id();
+        Set<UUID> before = f.content.clipsOf(null, timeline);
+
+        clip(f, raw, 12);
+        f.library.renameClip(LibraryFixture.editor(), first, "Recut", "req-r");
+
+        assertEquals(before, f.content.clipsOf(null, timeline), "the clips of the timeline are the same after a re-cut");
+        assertEquals(Set.of(first), f.content.clipsOf(null, timeline), "the timeline still uses the cut it was made from");
     }
 
     @Test

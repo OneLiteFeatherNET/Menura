@@ -159,7 +159,7 @@ public class LibraryController {
 
     @RequiresRole(Role.EDITOR)
     @Put("/raw-items/{id}/transcript")
-    @Consumes({"text/vtt", "application/x-subrip", "text/plain"})
+    @Consumes({"text/vtt", "application/x-subrip", "application/json", "text/plain"})
     public HttpResponse<ContentViews.TranscriptView> transcript(@PathVariable String id, @Body String file,
                                                                 HttpRequest<?> request) throws SQLException {
         return HttpResponse.ok(transcripts.upload(person(request), itemId(id), file, RequestIds.from(request, identifiers)))

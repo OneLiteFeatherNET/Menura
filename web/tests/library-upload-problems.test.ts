@@ -41,15 +41,17 @@ describe('problem details', () => {
 });
 
 describe('transcript file', () => {
-  it('recognises WebVTT and SRT files by their extension, in any case', () => {
+  it('recognises WebVTT, SRT and JSON files by their extension, in any case', () => {
     expect(transcriptFormatOf('captions.vtt')).toBe('webvtt');
     expect(transcriptFormatOf('subs.SRT')).toBe('srt');
+    expect(transcriptFormatOf('segments.json')).toBe('json');
     expect(transcriptFormatOf('notes.txt')).toBeNull();
   });
 
   it('sends each format with its media type', () => {
     expect(transcriptContentType('webvtt')).toBe('text/vtt');
     expect(transcriptContentType('srt')).toBe('application/x-subrip');
+    expect(transcriptContentType('json')).toBe('application/json');
   });
 
   it('reads the line number from a parse error', () => {

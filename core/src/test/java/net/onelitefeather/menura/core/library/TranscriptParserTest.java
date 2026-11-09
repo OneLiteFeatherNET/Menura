@@ -93,6 +93,54 @@ class TranscriptParserTest {
                 "a transcript without any cue is refused");
     }
 
+    private static final String JSON = """
+            [
+              {"start": 1.0, "end": 3.5, "speaker": "Alice", "text": "Hello chat"},
+              {"start": 62.25, "end": 65, "speaker": "Bob", "text": "Second cue"}
+            ]
+            """;
+
+    @Test
+    void jsonSegmentsStoreTheSpeakerOfEachSegment() {
+        List<TranscriptSegment> segments = TranscriptParser.parse(JSON, LIMIT);
+
+        assertEquals("Alice", segments.get(0).speaker(), "the speaker of the first segment is kept");
+        assertEquals("Bob", segments.get(1).speaker(), "the speaker of the second segment is kept");
+    }
+
+    @Test
+    void jsonSegmentsParseSecondsIntoMilliseconds() {
+        List<TranscriptSegment> segments = TranscriptParser.parse(JSON, LIMIT);
+
+        assertEquals(1_000, segments.get(0).startMillis(), "a start of 1.0 seconds is 1000 milliseconds");
+        assertEquals(3_500, segments.get(0).endMillis(), "an end of 3.5 seconds is 3500 milliseconds");
+        assertEquals(62_250, segments.get(1).startMillis(), "fractional starts are kept to the millisecond");
+        assertEquals("Second cue", segments.get(1).text(), "the text of the segment is kept");
+    }
+
+    @Test
+    void jsonSegmentWithoutSpeakerHasNoSpeaker() {
+        List<TranscriptSegment> segments = TranscriptParser.parse(
+                "[{\"start\": 1, \"end\": 2, \"text\": \"Alone\"}]", LIMIT);
+
+        assertNull(segments.get(0).speaker(), "a segment without a speaker field has none");
+    }
+
+    @Test
+    void jsonSegmentThatEndsBeforeItStartsIsRefusedNamingItsPosition() {
+        ProblemException refused = assertThrows(ProblemException.class, () -> TranscriptParser.parse(
+                "[{\"start\": 1, \"end\": 2, \"text\": \"Fine\"}, {\"start\": 5, \"end\": 4, \"text\": \"Broken\"}]",
+                LIMIT));
+
+        assertEquals(400, refused.status(), "a malformed JSON transcript is a client error");
+        assertTrue(refused.detail().contains("Segment 2"), "the problem names the failing segment: " + refused.detail());
+    }
+
+    @Test
+    void jsonFormatIsDetectedFromTheArray() {
+        assertEquals(TranscriptFormat.JSON, TranscriptFormat.detect(JSON), "a JSON array selects the JSON format");
+    }
+
     @Test
     void formatIsDetectedFromTheHeader() {
         assertEquals(TranscriptFormat.WEBVTT, TranscriptFormat.detect(WEBVTT), "a WEBVTT header selects WebVTT");

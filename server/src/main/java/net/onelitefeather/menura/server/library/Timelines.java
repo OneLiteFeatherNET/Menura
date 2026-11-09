@@ -42,15 +42,17 @@ public class Timelines {
     private final ContentRepository content;
     private final AssetRepository assets;
     private final AuditLog auditLog;
+    private final LayoutTemplates layoutTemplates;
 
     public Timelines(Transactions transactions, Clock clock, IdentifierGenerator identifiers, ContentRepository content,
-                     AssetRepository assets, AuditLog auditLog) {
+                     AssetRepository assets, AuditLog auditLog, LayoutTemplates layoutTemplates) {
         this.transactions = transactions;
         this.clock = clock;
         this.identifiers = identifiers;
         this.content = content;
         this.assets = assets;
         this.auditLog = auditLog;
+        this.layoutTemplates = layoutTemplates;
     }
 
     /** Stores a timeline after checking its clips and chapter marks. The document is returned unchanged by {@link #get}. */
@@ -61,6 +63,7 @@ public class Timelines {
         if (document == null || document.sourceClipIds().isEmpty()) {
             throw new ProblemException(400, "Invalid timeline", "A timeline needs at least one source range.");
         }
+        requireLayoutTemplate(document.layoutTemplate());
         List<ChapterMark> marks = document.chapters().stream()
                 .map(chapter -> new ChapterMark(chapter.seconds(), chapter.title())).toList();
         ChapterMarks.validate(marks);
@@ -129,6 +132,20 @@ public class Timelines {
             }
             return new ContentViews.RegisteredAssetView(assetId, checkedTitle, asset.uploaderId(), timelineId, now);
         });
+    }
+
+    /**
+     * A layout template, when the timeline names one, must be a template of the brand kit; an unknown one is named in the
+     * problem. The field stays optional, as the contract describes it.
+     */
+    private void requireLayoutTemplate(String layoutTemplate) throws SQLException {
+        if (layoutTemplate == null) {
+            return;
+        }
+        if (!layoutTemplates.formats().contains(layoutTemplate)) {
+            throw new ProblemException(400, "Invalid timeline", "The layout template '" + layoutTemplate
+                    + "' is not a template of the brand kit.");
+        }
     }
 
     private static ProblemException timelineNotFound() {

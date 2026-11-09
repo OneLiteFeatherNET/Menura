@@ -26,13 +26,22 @@ public final class ContentViews {
 
     /**
      * One item of the pool. {@code kind} is {@code raw} for a stream recording and {@code clip} otherwise; a registered
-     * finished asset is a clip at stage rendered with its {@code assetId} set. {@code usage} is set for clips only.
+     * finished asset is a clip at stage rendered with its {@code assetId} set. {@code usage} is {@code never_used},
+     * {@code used} (a timeline uses it) or {@code published} (used, and published on at least one channel); it is set
+     * for clips and raw items. {@code publishedOn} lists the channels the item was published on, empty when none.
      */
     @Serdeable
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record PoolItemView(UUID id, String kind, String stage, String status, UUID uploaderId, String title,
                                UUID rawItemId, UUID assetId, Integer startSeconds, Integer endSeconds, String usage,
-                               List<UUID> personTags, List<String> freeTags, Instant createdAt) {
+                               List<UUID> personTags, List<String> freeTags, List<PublicationView> publishedOn,
+                               Instant createdAt) {
+    }
+
+    /** A channel an item was published on, by its identifier and display name. */
+    @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record PublicationView(UUID channelId, String channelName) {
     }
 
     /** One cursor page of the pool; {@code nextCursor} is null on the last page. */

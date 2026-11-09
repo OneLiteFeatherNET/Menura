@@ -29,7 +29,7 @@ class PoolResponseContractTest {
     void aPoolItemWithoutTagsCarriesEmptyTagListsAsTheContractRequires() throws Exception {
         ContentViews.PoolItemView untagged = new ContentViews.PoolItemView(UUID.randomUUID(), "clip", "rendered", "active",
                 UUID.randomUUID(), "Ohne Tags", null, UUID.randomUUID(), null, null, "never_used", List.of(), List.of(),
-                Instant.parse("2026-11-01T10:00:00Z"));
+                List.of(), Instant.parse("2026-11-01T10:00:00Z"));
         JsonNode item = new ObjectMapper().readTree(
                 serializer.writeValueAsString(new ContentViews.PoolPageView(List.of(untagged), null)))
                 .get("items").get(0);
@@ -39,5 +39,7 @@ class PoolResponseContractTest {
         assertTrue(item.has("freeTags") && item.get("freeTags").isArray(),
                 "the contract requires freeTags as an array, even when it is empty");
         assertEquals(0, item.get("freeTags").size(), "an untagged item has no free tags");
+        assertTrue(item.has("publishedOn") && item.get("publishedOn").isArray(),
+                "the contract requires publishedOn as an array, even when no channel is named");
     }
 }

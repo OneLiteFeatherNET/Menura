@@ -158,6 +158,40 @@ class ContentLibraryIntegrationTest {
     }
 
     @Test
+    void publishedFinishedAssetMarksTheItemsItWasMadeFromWithTheirChannel() throws Exception {
+        Fixture f = fixture();
+        UUID uploader = f.person("uploader");
+        UUID raw = f.raw(uploader, "Stream", CREATED, "2026-11-01", "available");
+        UUID clip = f.clip(uploader, raw, "Schnitt");
+        UUID timeline = f.timelines.store(f.editor(uploader), "Kurz", document(clip), "req-tl").id();
+        UUID video = f.finishedVideo(uploader, "Kurz 9x16");
+        f.timelines.register(f.editor(uploader), video, timeline, "Kurz 9x16", "req-reg");
+        UUID channel = UUID.randomUUID();
+        UUID post = UUID.randomUUID();
+        UUID external = UUID.randomUUID();
+        java.sql.Timestamp stamp = java.sql.Timestamp.from(CREATED);
+        f.execute("insert into menura.channel (id, platform, platform_account_id, display_name, state, created_at, updated_at) "
+                + "values (?, 'youtube', ?, 'YouTube Hauptkanal', 'connected', ?, ?)", channel, "channel-" + channel, stamp, stamp);
+        f.execute("insert into menura.post (id, channel_id, asset_id, author_id, status, title, external_id, published_at, "
+                + "created_at, updated_at) values (?, ?, ?, ?, 'published', 'Kurz', 'yt-1', ?, ?, ?)", post, channel, video,
+                uploader, stamp, stamp, stamp);
+        f.execute("insert into menura.external_post (id, channel_id, platform, platform_item_id, url, title, format, "
+                + "published_at, created_at, updated_at) values (?, ?, 'youtube', 'yt-1', 'https://example.invalid/yt-1', "
+                + "'Kurz', 'short', ?, ?, ?)", external, channel, stamp, stamp, stamp);
+        f.execute("insert into menura.external_post_origin (external_post_id, post_id) values (?, ?)", external, post);
+
+        List<ContentViews.PoolItemView> published = f.library.pool(f.viewer(uploader),
+                new ContentLibrary.PoolQuery(false, uploader, null, null, null, "published", null, null), null, 50).items();
+
+        assertEquals(Set.of(raw, clip, video), published.stream().map(ContentViews.PoolItemView::id)
+                .collect(java.util.stream.Collectors.toSet()), "the raw item, its clip and the finished asset are published");
+        ContentViews.PoolItemView rawItem = published.stream().filter(item -> raw.equals(item.id())).findFirst().orElseThrow();
+        assertEquals("published", rawItem.usage(), "the raw item reports the published usage");
+        assertEquals(List.of("YouTube Hauptkanal"), rawItem.publishedOn().stream()
+                .map(ContentViews.PublicationView::channelName).toList(), "the raw item names the channel it was published on");
+    }
+
+    @Test
     void timelineRegistrationMovesClipsToRenderedAndRecordsLineage() throws Exception {
         Fixture f = fixture();
         UUID uploader = f.person("uploader");
@@ -273,7 +307,7 @@ class ContentLibraryIntegrationTest {
     }
 
     private static TimelineDocument document(UUID... clips) {
-        return new TimelineDocument(null, List.of(clips), List.of(), List.of(), List.of());
+        return new TimelineDocument("short-9x16", List.of(clips), List.of(), List.of(), List.of());
     }
 
     /** One fixture per test: the services over the real PostgreSQL store, and the seeding helpers. */
@@ -287,7 +321,8 @@ class ContentLibraryIntegrationTest {
         final AuditLog audit = new AuditLog(tx, clock, identifiers, new JdbcAuditRepository());
         final ContentLibrary library = new ContentLibrary(tx, clock, identifiers, content, audit);
         final Transcripts transcripts = new Transcripts(tx, clock, content, audit, 10 * MIB);
-        final Timelines timelines = new Timelines(tx, clock, identifiers, content, new JdbcAssetRepository(), audit);
+        final Timelines timelines = new Timelines(tx, clock, identifiers, content, new JdbcAssetRepository(), audit,
+                ContentFixture.BRAND_KIT_TEMPLATES);
         final FakeObjectStorage storage = FakeObjectStorage.withClock(clock);
         final RawMedia rawMedia = new RawMedia(tx, content, storage, audit);
 

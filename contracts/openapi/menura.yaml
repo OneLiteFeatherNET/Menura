@@ -1205,8 +1205,9 @@ paths:
         or suggested) and registered finished assets (kind clip, stage rendered, assetId set). Every person with a Menura
         role sees every item. Filters combine with AND: mine selects the caller's own items, uploader a named member,
         person an item tagged with that person, tag a free tag, stage one stage, and usage applies to every item
-        (used when a timeline uses the item or one of its clips, never_used otherwise). Each item names its uploaderId, personTags
-        and freeTags.
+        (used when a timeline uses the item or one of its clips, never_used otherwise, published when the finished asset
+        made from it was published on a channel). Each item names its uploaderId, personTags, freeTags and the channels it
+        was published on (publishedOn).
       security:
         - sessionCookie: []
       parameters:
@@ -1427,10 +1428,12 @@ paths:
       operationId: uploadTranscript
       summary: Attach or replace the transcript of a raw item.
       description: |
-        The body is a WebVTT (text/vtt) or SRT (application/x-subrip) file of at most the configured transcript size
-        (10 MB by default). It is parsed into timed segments; a malformed cue is refused with a problem that names its
-        line. Replacing a transcript replaces all its segments and writes one audit entry. Menura never transcribes:
-        the transcript comes from the editing PC.
+        The body is a WebVTT (text/vtt) or SRT (application/x-subrip) file, or a JSON array (application/json) of
+        segments {start, end, speaker, text} with start and end in seconds and an optional speaker, of at most the
+        configured transcript size (10 MB by default). It is parsed into timed segments; a malformed cue is refused with
+        a problem that names its line, a malformed JSON segment with the number of its segment. A speaker is stored
+        only for JSON segments that name one. Replacing a transcript replaces all its segments and writes one audit
+        entry. Menura never transcribes: the transcript comes from the editing PC.
       security:
         - sessionCookie: []
       requestBody:
@@ -1440,6 +1443,9 @@ paths:
             schema:
               type: string
           application/x-subrip:
+            schema:
+              type: string
+          application/json:
             schema:
               type: string
           text/plain:
@@ -2797,13 +2803,14 @@ components:
     Usage:
       name: usage
       in: query
-      description: used when a timeline uses the item or one of its clips, never_used otherwise. Finished assets are never used in phase 1.
+      description: used when a timeline uses the item or one of its clips, never_used otherwise. published selects the items published on at least one channel; every published item is also used, so used keeps them too. Finished assets are never used in phase 1.
       required: false
       schema:
         type: string
         enum:
           - used
           - never_used
+          - published
     From:
       name: from
       in: query
@@ -3983,6 +3990,7 @@ components:
         - uploaderId
         - personTags
         - freeTags
+        - publishedOn
         - createdAt
       properties:
         id:
@@ -4037,8 +4045,9 @@ components:
           enum:
             - used
             - never_used
+            - published
             - null
-          description: Set for every item. used when a timeline uses the item or one of its clips; finished assets are never used.
+          description: Set for every item. published when the item was published on at least one channel (then it is also used); used when a timeline uses the item or one of its clips; finished assets are never used.
         personTags:
           type: array
           description: The hub people who appear in the item.
@@ -4048,6 +4057,19 @@ components:
           type: array
           items:
             type: string
+        publishedOn:
+          type: array
+          description: The channels the item was published on through a finished asset made from it; empty when none.
+          items:
+            type: object
+            required:
+              - channelId
+              - channelName
+            properties:
+              channelId:
+                $ref: "#/components/schemas/Identifier"
+              channelName:
+                type: string
         createdAt:
           type: string
           format: date-time
@@ -4234,6 +4256,7 @@ components:
           enum:
             - webvtt
             - srt
+            - json
         segmentCount:
           type: integer
         replaced:
@@ -4266,7 +4289,8 @@ components:
           type:
             - string
             - "null"
-          description: Reference to a layout template of the brand kit.
+          description: The format of a layout template of the newest brand kit version, for example short-9x16. A timeline
+            with an unknown or missing template is refused with a problem that names the template.
         sourceClipIds:
           type: array
           minItems: 1

@@ -279,7 +279,7 @@ class ContentLibraryTest {
         UUID clip = f.library.createClip(LibraryFixture.editor(),
                 new ContentLibrary.ClipRequest(used, 10, 20, "Cut", Set.of(), null), "req-1").id();
         f.timelines.store(LibraryFixture.editor(), "Short",
-                new TimelineDocument(null, List.of(clip), List.of(), List.of(), List.of()), "req-2");
+                new TimelineDocument("short-9x16", List.of(clip), List.of(), List.of(), List.of()), "req-2");
 
         ContentViews.PoolPageView usedPage = f.library.pool(LibraryFixture.viewer(),
                 new ContentLibrary.PoolQuery(false, null, null, null, null, "used", null, null), null, 50);
@@ -301,7 +301,7 @@ class ContentLibraryTest {
         UUID clip = f.library.createClip(LibraryFixture.editor(),
                 new ContentLibrary.ClipRequest(raw, 10, 20, "Cut", Set.of(), null), "req-1").id();
         UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short",
-                new TimelineDocument(null, List.of(clip), List.of(), List.of(), List.of()), "req-2").id();
+                new TimelineDocument("short-9x16", List.of(clip), List.of(), List.of(), List.of()), "req-2").id();
         f.timelines.register(LibraryFixture.editor(), f.finishedVideo(LibraryFixture.EDITOR), timeline, "Short 9x16", "req-3");
 
         ContentViews.PoolPageView page = f.library.pool(LibraryFixture.viewer(), ContentLibrary.PoolQuery.NONE, null, 50);
@@ -325,5 +325,102 @@ class ContentLibraryTest {
         assertEquals(List.of(theirs), hits.stream().map(ContentViews.SearchHitView::rawItemId).toList(),
                 "the uploader filter restricts the hits");
         assertEquals(LibraryFixture.OTHER_EDITOR, hits.get(0).uploaderId(), "the hit names its uploader");
+    }
+
+    private static final UUID TWITCH = UUID.fromString("5f6a7b8c-9d0e-4f1a-8b2c-4d5e6f708192");
+    private static final UUID YOUTUBE = UUID.fromString("6a7b8c9d-0e1f-4a2b-9c3d-5e6f708192a3");
+
+    /** Cuts a clip of the raw item, makes a short from it, registers the short and publishes it on the channel. */
+    private static void publishShort(ContentFixture f, UUID raw, int start, UUID channel, String channelName) throws Exception {
+        UUID clip = f.library.createClip(LibraryFixture.editor(),
+                new ContentLibrary.ClipRequest(raw, start, start + 10, "Cut " + start, Set.of(), null), "req-c" + start).id();
+        UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short",
+                new TimelineDocument("short-9x16", List.of(clip), List.of(), List.of(), List.of()), "req-t" + start).id();
+        UUID video = f.finishedVideo(LibraryFixture.EDITOR);
+        f.timelines.register(LibraryFixture.editor(), video, timeline, "Short " + start, "req-r" + start);
+        f.content.publishFinishedAsset(video, channel, channelName);
+    }
+
+    private static List<ContentViews.PoolItemView> pool(ContentFixture f, String usage) throws Exception {
+        return f.library.pool(LibraryFixture.viewer(), new ContentLibrary.PoolQuery(false, null, null, null, null, usage, null,
+                null), null, 50).items();
+    }
+
+    private static ContentViews.PoolItemView rawRow(List<ContentViews.PoolItemView> items, String title) {
+        return items.stream().filter(item -> "raw".equals(item.kind()) && title.equals(item.title())).findFirst().orElseThrow();
+    }
+
+    @Test
+    void rawItemWhoseClipWasPublishedReportsUsagePublishedAndTheChannel() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Published raw", STREAM, 3600);
+        publishShort(f, raw, 10, TWITCH, "Twitch main");
+
+        ContentViews.PoolItemView item = rawRow(pool(f, null), "Published raw");
+
+        assertEquals("published", item.usage(), "an item published on a channel reports the published usage");
+        assertEquals(List.of("Twitch main"), item.publishedOn().stream().map(ContentViews.PublicationView::channelName).toList(),
+                "the item names every channel it was published on");
+    }
+
+    @Test
+    void usedRawItemWithoutPublicationReportsUsedAndNoChannel() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Used raw", STREAM, 3600);
+        UUID clip = f.library.createClip(LibraryFixture.editor(),
+                new ContentLibrary.ClipRequest(raw, 10, 20, "Cut", Set.of(), null), "req-1").id();
+        f.timelines.store(LibraryFixture.editor(), "Short",
+                new TimelineDocument("short-9x16", List.of(clip), List.of(), List.of(), List.of()), "req-2");
+
+        ContentViews.PoolItemView item = rawRow(pool(f, null), "Used raw");
+
+        assertEquals("used", item.usage(), "a raw item in a timeline that is not published is used");
+        assertTrue(item.publishedOn().isEmpty(), "no channel is named for an item that was not published");
+    }
+
+    @Test
+    void publishedFilterKeepsOnlyItemsPublishedOnAChannel() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID published = f.rawItem(LibraryFixture.EDITOR, "Published raw", STREAM, 3600);
+        UUID used = f.rawItem(LibraryFixture.EDITOR, "Used raw", STREAM, 3600);
+        publishShort(f, published, 10, TWITCH, "Twitch main");
+        UUID clip = f.library.createClip(LibraryFixture.editor(),
+                new ContentLibrary.ClipRequest(used, 10, 20, "Cut", Set.of(), null), "req-1").id();
+        f.timelines.store(LibraryFixture.editor(), "Other",
+                new TimelineDocument("short-9x16", List.of(clip), List.of(), List.of(), List.of()), "req-2");
+
+        List<String> titles = pool(f, "published").stream().filter(item -> "raw".equals(item.kind()))
+                .map(ContentViews.PoolItemView::title).toList();
+
+        assertEquals(List.of("Published raw"), titles, "only the raw item published on a channel passes the filter");
+    }
+
+    @Test
+    void usedFilterStillMatchesItemsPublishedOnAChannel() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Published raw", STREAM, 3600);
+        publishShort(f, raw, 10, TWITCH, "Twitch main");
+
+        List<String> titles = pool(f, "used").stream().filter(item -> "raw".equals(item.kind()))
+                .map(ContentViews.PoolItemView::title).toList();
+
+        assertEquals(List.of("Published raw"), titles, "a published item is also used: the used filter keeps it");
+    }
+
+    @Test
+    void searchWithPublishedFilterKeepsOnlyHitsFromPublishedRawItems() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID published = f.rawItem(LibraryFixture.EDITOR, "Published raw", STREAM, 3600);
+        UUID unpublished = f.rawItem(LibraryFixture.EDITOR, "Unpublished raw", STREAM, 3600);
+        String vtt = "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nspeedrun\n";
+        f.transcripts.upload(LibraryFixture.editor(), published, vtt, "req-1");
+        f.transcripts.upload(LibraryFixture.editor(), unpublished, vtt, "req-2");
+        publishShort(f, published, 10, YOUTUBE, "YouTube main");
+
+        List<ContentViews.SearchHitView> hits = f.library.search(LibraryFixture.viewer(), "speedrun",
+                new ContentLibrary.PoolQuery(false, null, null, null, null, "published", null, null), 20);
+
+        assertEquals(List.of(published), hits.stream().map(ContentViews.SearchHitView::rawItemId).toList(),
+                "the published filter keeps the hits of the raw item published on a channel");
     }
 }

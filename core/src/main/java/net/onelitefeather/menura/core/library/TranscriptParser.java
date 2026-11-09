@@ -1,16 +1,20 @@
 package net.onelitefeather.menura.core.library;
 
+import com.nimbusds.jose.util.JSONArrayUtils;
 import net.onelitefeather.menura.core.problem.ProblemException;
 
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parses a WebVTT or SRT transcript into timed segments. The hub never transcribes: it only reads the file the editing
- * PC uploaded. A malformed cue is refused with a Problem Details response that names its line.
+ * Parses a WebVTT, SRT or JSON transcript into timed segments. The hub never transcribes: it only reads the file the
+ * editing PC uploaded. A malformed cue is refused with a Problem Details response that names its line; a malformed JSON
+ * segment is refused with the number of its segment.
  */
 public final class TranscriptParser {
 
@@ -29,6 +33,9 @@ public final class TranscriptParser {
         if (content.getBytes(StandardCharsets.UTF_8).length > maxBytes) {
             throw new ProblemException(413, "Transcript Too Large", "The transcript is larger than the limit of "
                     + maxBytes + " bytes.");
+        }
+        if (TranscriptFormat.detect(content) == TranscriptFormat.JSON) {
+            return parseJson(content);
         }
         boolean webVtt = TranscriptFormat.detect(content) == TranscriptFormat.WEBVTT;
         String text = content.startsWith("﻿") ? content.substring(1) : content;
@@ -60,6 +67,48 @@ public final class TranscriptParser {
             throw new ProblemException(400, "Invalid transcript", "The file contains no cue with a timing line.");
         }
         return segments;
+    }
+
+    /**
+     * Reads a JSON array of segments: {@code {"start": seconds, "end": seconds, "speaker": "...", "text": "..."}}. The
+     * speaker is optional; every other field is required, and a segment must end after it starts.
+     */
+    private static List<TranscriptSegment> parseJson(String content) {
+        List<?> cues;
+        try {
+            cues = JSONArrayUtils.parse(content.startsWith("﻿") ? content.substring(1).stripLeading() : content.stripLeading());
+        } catch (ParseException malformed) {
+            throw new ProblemException(400, "Invalid transcript", "The JSON transcript is not an array of segments.");
+        }
+        if (cues.isEmpty()) {
+            throw new ProblemException(400, "Invalid transcript", "The file contains no segment.");
+        }
+        List<TranscriptSegment> segments = new ArrayList<>();
+        for (int index = 0; index < cues.size(); index++) {
+            segments.add(jsonSegment(cues.get(index), index + 1));
+        }
+        return segments;
+    }
+
+    private static TranscriptSegment jsonSegment(Object value, int number) {
+        if (!(value instanceof Map<?, ?> cue)) {
+            throw new ProblemException(400, "Invalid transcript", "Segment " + number + " is not an object.");
+        }
+        if (!(cue.get("start") instanceof Number start) || !(cue.get("end") instanceof Number end)) {
+            throw new ProblemException(400, "Invalid transcript", "Segment " + number + " needs a numeric start and end.");
+        }
+        if (!(cue.get("text") instanceof String text) || text.isBlank()) {
+            throw new ProblemException(400, "Invalid transcript", "Segment " + number + " has no text.");
+        }
+        if (cue.get("speaker") != null && !(cue.get("speaker") instanceof String)) {
+            throw new ProblemException(400, "Invalid transcript", "Segment " + number + " names a speaker that is not text.");
+        }
+        long startMillis = Math.round(start.doubleValue() * 1000);
+        long endMillis = Math.round(end.doubleValue() * 1000);
+        if (startMillis < 0 || endMillis <= startMillis) {
+            throw new ProblemException(400, "Invalid transcript", "Segment " + number + " must end after it starts.");
+        }
+        return new TranscriptSegment(startMillis, endMillis, (String) cue.get("speaker"), text.trim());
     }
 
     /** NOTE, STYLE and REGION blocks of WebVTT carry no speech. */

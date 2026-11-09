@@ -4,7 +4,8 @@
 import { apiBase, type Fetcher } from '../auth/session';
 
 export type PoolStage = 'raw' | 'cut' | 'rendered';
-export type PoolUsage = 'used' | 'never_used';
+/** published is used and published on at least one channel; the used filter keeps those items too. */
+export type PoolUsage = 'used' | 'never_used' | 'published';
 
 export interface PoolFilters {
   mine: boolean;
@@ -30,7 +31,14 @@ export interface PoolItem {
   usage: PoolUsage | null;
   personTags: string[];
   freeTags: string[];
+  publishedOn: PublishedOn[];
   createdAt: string;
+}
+
+/** A channel an item was published on. */
+export interface PublishedOn {
+  channelId: string;
+  channelName: string;
 }
 
 export interface PoolPage {
