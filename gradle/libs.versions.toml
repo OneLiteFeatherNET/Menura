@@ -9,6 +9,8 @@ swagger-parser = "2.1.48"
 # AWS SDK v2 for the S3 API of the OLF Ceph object storage (presigned multipart uploads, change add-asset-upload).
 awssdk = "2.57.3"
 nimbus = "10.9"
+# RFC 5545 validator for the iCalendar feed tests only (change add-content-distribution, task 9.3).
+ical4j = "4.4.0"
 
 [libraries]
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
@@ -21,6 +23,7 @@ testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
 nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus" }
+ical4j = { module = "org.mnode.ical4j:ical4j", version.ref = "ical4j" }
 swagger-parser = { module = "io.swagger.parser.v3:swagger-parser", version.ref = "swagger-parser" }
 awssdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "awssdk" }
 awssdk-s3 = { module = "software.amazon.awssdk:s3" }

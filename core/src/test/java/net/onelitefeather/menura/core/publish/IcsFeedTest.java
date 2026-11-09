@@ -1,7 +1,12 @@
 package net.onelitefeather.menura.core.publish;
 
+import net.fortuna.ical4j.data.CalendarBuilder;
+import net.fortuna.ical4j.model.Calendar;
+import net.fortuna.ical4j.model.Component;
+import net.fortuna.ical4j.validate.ValidationResult;
 import org.junit.jupiter.api.Test;
 
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -13,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The feed against the structural rules of RFC 5545: CRLF line ends, a line of at most 75 octets, balanced components,
- * the required properties of every event, and escaped text. No external validator is on the build path, so the rules
- * the RFC states are checked here.
+ * the required properties of every event, and escaped text. The last test hands the whole feed to the RFC 5545 validator of
+ * ical4j, a test-scope dependency.
  */
 class IcsFeedTest {
 
@@ -74,6 +79,19 @@ class IcsFeedTest {
         String feed = IcsFeed.render(NOW, List.of(event));
 
         assertTrue(feed.contains("SEQUENCE:4"), "the revision marker is the sequence number");
+    }
+
+    @Test
+    void theFeedPassesTheRfc5545ValidatorOfIcal4j() throws Exception {
+        String feed = IcsFeed.render(NOW, List.of(
+                event("post-7", "Stream clip, part 1; a\\b", NOW.plusSeconds(3600)),
+                new IcsFeed.Event("post-8", "Clip", "Line one\nLine two", NOW, 2, NOW)));
+
+        Calendar calendar = new CalendarBuilder().build(new StringReader(feed));
+        ValidationResult result = calendar.validate(true);
+
+        assertFalse(result.hasErrors(), "the feed has no RFC 5545 violation: " + result);
+        assertEquals(2, calendar.getComponents(Component.VEVENT).size(), "both events are read back");
     }
 
     private static IcsFeed.Event event(String uid, String summary, Instant start) {
