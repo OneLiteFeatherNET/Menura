@@ -209,6 +209,49 @@ export const DeclarationProblemsInGerman: Story = {
   },
 };
 
+export const ThumbnailWarningOnThePost: Story = {
+  args: {
+    item: sampleItem({
+      status: 'approved',
+      platform: 'youtube',
+      problems: [
+        {
+          code: 'thumbnail_not_allowed',
+          severity: 'warning',
+          message: 'The thumbnail will not be applied. The platform does not allow custom thumbnails for this channel.',
+          action: null,
+        },
+      ],
+    }),
+    actions: { submit: false, approve: false, schedule: true, decideRevisions: false },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByText('Die Plattform erlaubt für diesen Kanal kein eigenes Vorschaubild. Das Vorschaubild wird daher nicht gesetzt.'))
+      .toBeVisible();
+    expect(canvas.queryByText(/does not allow custom thumbnails/), 'the server text is not shown').toBeNull();
+    expect(canvas.getByRole('button', { name: 'Einplanen' })).toBeEnabled();
+  },
+};
+
+export const ForeignPlaylistRefused: Story = {
+  args: {
+    item: sampleItem({ status: 'approved', platform: 'youtube', problems: [] }),
+    actions: { submit: false, approve: false, schedule: true, decideRevisions: false },
+    refusal: {
+      message: 'Die Prüfung hat Probleme gefunden. Der Beitrag wurde nicht eingeplant.',
+      problems: [{ code: 'playlist_not_owned', severity: 'error', message: 'The playlist is not owned', action: null }],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByRole('alert')).toHaveTextContent('Der Beitrag wurde nicht eingeplant.');
+    expect(canvas.getByText('Die Playlist dieses Beitrags gehört nicht zu diesem Kanal und ist daher nicht verfügbar.', { exact: false }))
+      .toBeVisible();
+    expect(canvas.queryByText('The playlist is not owned')).toBeNull();
+  },
+};
+
 export const ViewerReadsOnly: Story = {
   args: { actions: NONE },
   play: async ({ canvasElement }) => {

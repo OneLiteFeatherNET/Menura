@@ -8,6 +8,7 @@ import net.onelitefeather.menura.core.channel.PlatformCapabilities;
 import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.PlatformFeature;
 import net.onelitefeather.menura.core.channel.StepwisePublisher;
+import net.onelitefeather.menura.core.channel.ThumbnailNotAllowed;
 import net.onelitefeather.menura.core.channel.UploadSessionExpired;
 import net.onelitefeather.menura.core.problem.ProblemException;
 
@@ -52,6 +53,7 @@ public final class YouTubeAdapter implements PlatformAdapter, StepwisePublisher 
     static final String REVOCATION_ENDPOINT = "https://oauth2.googleapis.com/revoke";
     static final String CHANNELS_ENDPOINT = "https://www.googleapis.com/youtube/v3/channels";
     static final String PLAYLIST_ITEMS_ENDPOINT = "https://www.googleapis.com/youtube/v3/playlistItems";
+    static final String PLAYLISTS_ENDPOINT = "https://www.googleapis.com/youtube/v3/playlists";
     static final String VIDEOS_ENDPOINT = "https://www.googleapis.com/youtube/v3/videos";
     static final String ANALYTICS_ENDPOINT = "https://youtubeanalytics.googleapis.com/v2/reports";
     static final Set<String> HOSTS = Set.of("accounts.google.com", "oauth2.googleapis.com", "www.googleapis.com",
@@ -318,14 +320,47 @@ public final class YouTubeAdapter implements PlatformAdapter, StepwisePublisher 
     /**
      * Sets the custom thumbnail of a processed video (thumbnails.set, uploadType=media). Quota: 50 units, charged by the
      * caller. Thumbnails must be JPEG or PNG and at most 50 MB (checked 2026-11-08).
+     *
+     * <p>A 403 that is neither a quota, a rate limit nor a missing scope is read as the platform refusing custom thumbnails
+     * for the channel (a channel that is not verified or not eligible). The rule is an assumption until the test upload of
+     * task 1.3 or 7.1 confirms the reason the platform gives.
      */
     @Override
     public void setThumbnail(String accessToken, String platformItemId, String contentType, byte[] image) {
         HttpTransport.Answer answer = raw("POST", endpoint(THUMBNAIL_ENDPOINT, "videoId", platformItemId,
                 "uploadType", "media"), accessToken, Map.of("Content-Type", contentType), image, "the thumbnail");
-        if (answer.status() / 100 != 2) {
-            throw failureOf(answer, "the thumbnail");
+        if (answer.status() / 100 == 2) {
+            return;
         }
+        String body = answer.body() == null ? "" : answer.body();
+        if (answer.status() == 403 && !body.contains("quotaExceeded") && !body.contains("rateLimitExceeded")
+                && !body.contains("insufficientPermissions")) {
+            throw new ThumbnailNotAllowed("The platform does not allow custom thumbnails for this channel.");
+        }
+        throw failureOf(answer, "the thumbnail");
+    }
+
+    /**
+     * The playlists of the channel of the token (playlists.list with mine=true), read from every page. Quota: one playlists.list
+     * call (1 unit) per page of 50 playlists. The read needs the read-only scope that the account feature already requests.
+     */
+    @Override
+    public Set<String> ownedPlaylistIds(String accessToken) {
+        Set<String> owned = new HashSet<>();
+        String pageToken = null;
+        do {
+            Map<String, Object> page = parse(send("GET", endpoint(PLAYLISTS_ENDPOINT,
+                    "part", "id", "mine", "true", "maxResults", "50", "pageToken", pageToken), null, accessToken,
+                    "the playlist list"));
+            for (Map<?, ?> item : objects(page.get("items"))) {
+                String playlistId = text(item, "id");
+                if (!playlistId.isBlank()) {
+                    owned.add(playlistId);
+                }
+            }
+            pageToken = nextPageToken(page);
+        } while (pageToken != null);
+        return Set.copyOf(owned);
     }
 
     @Override

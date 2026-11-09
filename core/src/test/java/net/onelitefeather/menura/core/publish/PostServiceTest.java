@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.core.publish;
 
+import net.onelitefeather.menura.core.channel.ChannelStore;
 import net.onelitefeather.menura.core.channel.PlatformAdapter.Visibility;
 import net.onelitefeather.menura.core.problem.ProblemException;
 import net.onelitefeather.menura.core.series.Audience;
@@ -387,6 +388,80 @@ class PostServiceTest {
         UUID channel = world.connectChannel("review");
         return world.service.submit(editor(), world.service.create(editor(), draft(channel, world.finishedVideo(), "Review"))
                 .post().id()).post().id();
+    }
+
+    @Test
+    void aScheduleIsRefusedWhenTheSeriesPlaylistBelongsToAnotherChannel() throws Exception {
+        PublishFixture world = new PublishFixture(false);
+        UUID channel = world.connectChannel("main");
+        world.youtube.ownsPlaylists("PL-own-only");
+        UUID series = world.seriesWithPlaylist("Borrowed", channel, "PL-someone-else");
+        UUID id = approvedAt(world, world.service.create(editor(), new DraftCommand(channel, world.finishedVideo(), null,
+                series, null, null, null, null, Visibility.PRIVATE, MONDAY_NEXT_WEEK)).post().id());
+
+        DryRunRefusal refused = assertThrows(DryRunRefusal.class, () -> world.service.schedule(publisher(), id),
+                "a playlist the channel does not own refuses the schedule");
+
+        assertTrue(refused.problems().stream().anyMatch(problem -> "playlist_not_owned".equals(problem.code())),
+                "the playlist is named as not belonging to the channel");
+        assertEquals(PostStatus.APPROVED, world.service.get(id).post().status(), "a refused schedule changes nothing");
+    }
+
+    @Test
+    void aScheduleIsAcceptedWhenTheSeriesPlaylistIsOwnedByTheChannel() throws Exception {
+        PublishFixture world = new PublishFixture(false);
+        UUID channel = world.connectChannel("main");
+        UUID series = world.series("Owned", channel);
+        UUID id = approvedAt(world, world.service.create(editor(), new DraftCommand(channel, world.finishedVideo(), null,
+                series, null, null, null, null, Visibility.PRIVATE, MONDAY_NEXT_WEEK)).post().id());
+
+        PostDetail scheduled = world.service.schedule(publisher(), id);
+
+        assertEquals(PostStatus.SCHEDULED, scheduled.post().status(), "a playlist of the channel does not block the schedule");
+    }
+
+    @Test
+    void aScheduleIsRefusedWhileThePlaylistListOfTheChannelCannotBeRead() throws Exception {
+        PublishFixture world = new PublishFixture(false);
+        UUID channel = world.connectChannel("main");
+        UUID series = world.seriesWithPlaylist("Unread", channel, "PL-unread");
+        UUID id = approvedAt(world, world.service.create(editor(), new DraftCommand(channel, world.finishedVideo(), null,
+                series, null, null, null, null, Visibility.PRIVATE, MONDAY_NEXT_WEEK)).post().id());
+
+        DryRunRefusal refused = assertThrows(DryRunRefusal.class, () -> world.service.schedule(publisher(), id),
+                "a playlist that cannot be checked is not scheduled");
+
+        assertTrue(refused.problems().stream().anyMatch(problem -> "playlist_unverified".equals(problem.code())),
+                "the playlist is named as unverified, not as foreign");
+    }
+
+    @Test
+    void aChannelThatMayNotSetThumbnailsShowsAWarningOnItsPostsWithAThumbnail() throws Exception {
+        PublishFixture world = new PublishFixture(false);
+        UUID channel = world.connectChannel("main");
+        world.channels.saveThumbnailEligibility(null, new ChannelStore.ThumbnailEligibility(channel, false,
+                "The platform does not allow custom thumbnails for this channel.", PublishFixture.NOW));
+        UUID withThumbnail = world.service.create(editor(), new DraftCommand(channel, world.finishedVideo(),
+                world.storedCover(), null, null, "With", "Text", List.of(), Visibility.PRIVATE, MONDAY_NEXT_WEEK)).post().id();
+        UUID without = world.service.create(editor(), new DraftCommand(channel, world.finishedVideo(), null, null, null,
+                "Without", "Text", List.of(), Visibility.PRIVATE, MONDAY_NEXT_WEEK)).post().id();
+
+        PostDetail warned = world.service.get(withThumbnail);
+
+        assertTrue(warned.problems().stream().anyMatch(problem -> "thumbnail_not_allowed".equals(problem.code())
+                && DryRun.WARNING.equals(problem.severity())), "the post with a thumbnail carries the warning");
+        assertTrue(warned.problems().stream().anyMatch(problem -> problem.message().contains("does not allow")),
+                "the warning names the reason the platform gave");
+        assertFalse(world.service.get(without).problems().stream().anyMatch(problem -> "thumbnail_not_allowed".equals(problem.code())),
+                "a post without a thumbnail has nothing to warn about");
+    }
+
+    /** A post with the made-for-kids answer given, submitted and approved, ready to schedule. */
+    private static UUID approvedAt(PublishFixture world, UUID id) throws Exception {
+        world.service.declareMadeForKids(editor(), id, false);
+        world.service.submit(editor(), id);
+        world.service.approve(publisher(), id);
+        return id;
     }
 
     /** A post approved and scheduled at the given time. */

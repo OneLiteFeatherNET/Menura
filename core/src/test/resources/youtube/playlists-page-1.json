@@ -1,0 +1,9 @@
+{
+  "kind": "youtube#playlistListResponse",
+  "etag": "fixture-etag-1",
+  "nextPageToken": "PAGE2",
+  "pageInfo": { "totalResults": 2, "resultsPerPage": 1 },
+  "items": [
+    { "kind": "youtube#playlist", "id": "PL-own-series", "snippet": { "title": "Own series" } }
+  ]
+}

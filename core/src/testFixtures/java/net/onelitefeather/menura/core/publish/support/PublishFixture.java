@@ -98,7 +98,8 @@ public final class PublishFixture {
         this.settings = settings;
         this.connections = new ConnectionService(new DirectTransactions(), clock, identifiers,
                 new SecretGenerator(new DeterministicRandom(9L)), channels, audit, platforms, Duration.ofMinutes(10), 0.8);
-        this.service = new PostService(new DirectTransactions(), clock, identifiers, posts, channels, series, platforms, BERLIN);
+        this.service = new PostService(new DirectTransactions(), clock, identifiers, posts, channels, series, platforms,
+                connections, BERLIN);
         PublicationRunner.Stepwise steps = stepwise
                 ? new PublicationRunner.Stepwise(TokenCipher.of(Base64.getEncoder().encodeToString(
                 "0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.US_ASCII)), null, new SecureRandom()),
@@ -172,11 +173,20 @@ public final class PublishFixture {
         return id;
     }
 
-    /** A series that airs on Mondays at 18 o'clock (Berlin) on the given channel with a playlist. */
+    /**
+     * A series that airs on Mondays at 18 o'clock (Berlin) on the given channel with a playlist. The playlist is one the
+     * channel owns on the platform, so a schedule of its posts passes the ownership check.
+     */
     public UUID series(String name, UUID channelId) throws java.sql.SQLException {
+        youtube.ownsPlaylists("PL-" + name);
+        return seriesWithPlaylist(name, channelId, "PL-" + name);
+    }
+
+    /** A series that airs on Mondays at 18 o'clock (Berlin) on the given channel, with the given playlist identifier. */
+    public UUID seriesWithPlaylist(String name, UUID channelId, String playlistId) throws java.sql.SQLException {
         SeriesDraft draft = new SeriesDraft(name, Map.of("de", "Kurz erklärt"), "primary", "on-primary", "Kurz erklärt:",
                 "short-9x16", "#" + name.toLowerCase().replace(" ", ""), Audience.DEVELOPERS.value(), 1, 18, true,
-                Map.of(channelId, new net.onelitefeather.menura.core.series.SeriesPlaylist("PL-" + name, "Playlist " + name)));
+                Map.of(channelId, new net.onelitefeather.menura.core.series.SeriesPlaylist(playlistId, "Playlist " + name)));
         return series.create(null, draft).id();
     }
 

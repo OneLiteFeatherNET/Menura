@@ -24,6 +24,7 @@ public final class ScriptedAdapter implements PlatformAdapter {
 
     private final boolean nativeScheduling;
     private StepwisePublisher stepwise;
+    private Set<String> owned;
     private final Deque<Object> publishOutcomes = new ArrayDeque<>();
     private final Deque<PublicationStatus> statusOutcomes = new ArrayDeque<>();
     private final List<PublishRequest> requests = new ArrayList<>();
@@ -76,6 +77,23 @@ public final class ScriptedAdapter implements PlatformAdapter {
     @Override
     public String platform() {
         return "youtube";
+    }
+
+    /** Declares playlists as owned by the channel. Until one is declared the adapter cannot list the channel's playlists. */
+    public ScriptedAdapter ownsPlaylists(String... playlistIds) {
+        if (owned == null) {
+            owned = new java.util.HashSet<>();
+        }
+        owned.addAll(List.of(playlistIds));
+        return this;
+    }
+
+    @Override
+    public Set<String> ownedPlaylistIds(String accessToken) {
+        if (owned == null) {
+            throw new Unsupported("listing the playlists of a channel");
+        }
+        return Set.copyOf(owned);
     }
 
     @Override

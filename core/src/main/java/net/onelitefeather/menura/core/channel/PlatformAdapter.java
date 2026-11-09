@@ -82,6 +82,15 @@ public interface PlatformAdapter {
     }
 
     /**
+     * The playlists the channel of the access token owns, by platform identifier (change add-youtube-integration, task 3.2).
+     * A playlist outside this set may not be used for a post of the channel. An adapter whose build cannot list them throws
+     * {@link Unsupported}; the schedule then treats the playlist as unverified.
+     */
+    default Set<String> ownedPlaylistIds(String accessToken) {
+        throw new Unsupported("listing the playlists of a channel");
+    }
+
+    /**
      * The most items one {@link #readMetrics} call may request: the platform's own batch limit, for example 50 items per
      * videos.list call. An adapter that reads one item per call keeps the default of one.
      */

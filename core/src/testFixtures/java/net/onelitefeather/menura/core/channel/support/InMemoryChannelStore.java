@@ -23,6 +23,7 @@ public final class InMemoryChannelStore implements ChannelStore {
     private final Map<String, ConnectionFlow> flows = new HashMap<>();
     private final Map<UUID, QuotaState> quotas = new HashMap<>();
     private final Map<String, PlatformAuditStatus> audits = new HashMap<>();
+    private final Map<UUID, ThumbnailEligibility> thumbnails = new HashMap<>();
 
     @Override
     public Optional<Channel> findChannel(Connection connection, UUID id) {
@@ -113,6 +114,16 @@ public final class InMemoryChannelStore implements ChannelStore {
         audits.put(status.platform(), status);
     }
 
+    @Override
+    public Optional<ThumbnailEligibility> findThumbnailEligibility(Connection connection, UUID channelId) {
+        return Optional.ofNullable(thumbnails.get(channelId));
+    }
+
+    @Override
+    public void saveThumbnailEligibility(Connection connection, ThumbnailEligibility eligibility) {
+        thumbnails.put(eligibility.channelId(), eligibility);
+    }
+
     /** Forgets every row. A test that shares a store clears it first, so no test depends on another. */
     public void clear() {
         channels.clear();
@@ -120,6 +131,7 @@ public final class InMemoryChannelStore implements ChannelStore {
         flows.clear();
         quotas.clear();
         audits.clear();
+        thumbnails.clear();
     }
 
     /** The grant as stored, for asserting that a disconnect or a refusal left it alone or removed it. */

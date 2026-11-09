@@ -5,6 +5,7 @@ import net.onelitefeather.menura.core.channel.PlatformAdapter.Visibility;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -121,6 +122,45 @@ public final class DryRun {
                     + durationSeconds + " seconds."));
         }
         return List.copyOf(problems);
+    }
+
+    /** What is known about custom thumbnails on a channel: whether the platform allows them, and why not. */
+    public record ThumbnailFact(boolean allowed, String reason) {
+    }
+
+    /**
+     * The blocking problem of the playlist of a post (change add-youtube-integration, task 3.2): a playlist the channel does
+     * not own is refused, and a playlist whose channel playlists could not be read is unverified, never called foreign. A
+     * post without a playlist has no problem here.
+     *
+     * @param ownedPlaylists the playlists the channel owns, or empty when they could not be read
+     */
+    public static List<Problem> playlistProblems(String playlistId, Optional<Set<String>> ownedPlaylists) {
+        if (playlistId == null) {
+            return List.of();
+        }
+        if (ownedPlaylists.isEmpty()) {
+            return List.of(error("playlist_unverified", "The playlist of this post could not be checked against the channel, "
+                    + "so the post is not scheduled. Try again later."));
+        }
+        if (!ownedPlaylists.get().contains(playlistId)) {
+            return List.of(error("playlist_not_owned", "The playlist of this post does not belong to this channel, so it is "
+                    + "unavailable. Choose a playlist of this channel in the series."));
+        }
+        return List.of();
+    }
+
+    /**
+     * The warning of a post with a thumbnail on a channel that may not set custom thumbnails (change add-youtube-integration,
+     * task 4.6). It names the reason the platform gave. A channel whose eligibility was never learned gets no warning.
+     */
+    public static List<Problem> thumbnailProblems(boolean hasThumbnail, Optional<ThumbnailFact> fact) {
+        if (!hasThumbnail || fact.isEmpty() || fact.get().allowed()) {
+            return List.of();
+        }
+        String reason = fact.get().reason() == null || fact.get().reason().isBlank()
+                ? "The platform does not allow custom thumbnails for this channel." : fact.get().reason();
+        return List.of(new Problem("thumbnail_not_allowed", WARNING, "The thumbnail will not be applied. " + reason, null));
     }
 
     /** Whether any problem blocks scheduling or publication. */

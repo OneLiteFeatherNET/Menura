@@ -3,6 +3,7 @@ package net.onelitefeather.menura.server.publish;
 import io.micronaut.context.annotation.Factory;
 import jakarta.inject.Singleton;
 import net.onelitefeather.menura.core.channel.ChannelStore;
+import net.onelitefeather.menura.core.channel.ConnectionService;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
 import net.onelitefeather.menura.core.db.Transactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
@@ -50,7 +51,8 @@ public class PublishBeans {
     @Singleton
     PostService postService(Transactions transactions, Clock clock, IdentifierGenerator identifiers, PostStore posts,
                             ChannelStore channels, SeriesService series, PlatformRegistry platforms,
-                            PublishSettings settings) {
-        return new PostService(transactions, clock, identifiers, posts, channels, series, platforms, settings.zone());
+                            ConnectionService connections, PublishSettings settings) {
+        return new PostService(transactions, clock, identifiers, posts, channels, series, platforms, connections,
+                settings.zone());
     }
 }

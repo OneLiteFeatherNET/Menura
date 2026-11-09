@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /** The facts the dry run reads for one post, gathered on one connection: the asset kind, the platform rules and the audit. */
@@ -45,6 +46,23 @@ final class PostFacts {
             problems.addAll(DryRun.declarationProblems(declaration));
             problems.addAll(DryRun.shortProblems(declaration.plannedShort(), asset == null ? null : asset.width(),
                     asset == null ? null : asset.height(), asset == null ? null : asset.durationSeconds()));
+            Optional<ChannelStore.ThumbnailEligibility> eligibility = channels.findThumbnailEligibility(connection, channel.id());
+            problems.addAll(DryRun.thumbnailProblems(post.coverAssetId() != null,
+                    eligibility.map(known -> new DryRun.ThumbnailFact(known.allowed(), known.reason()))));
+        }
+        return List.copyOf(problems);
+    }
+
+    /**
+     * The problems of a post at scheduling: {@link #problems} plus the playlist check (change add-youtube-integration, task 3.2).
+     * {@code ownedPlaylists} holds the playlists the channel owns, or is empty when they could not be read; the check runs only
+     * on platforms that declare their posts.
+     */
+    static List<DryRun.Problem> scheduleProblems(Connection connection, PostStore posts, ChannelStore channels, Post post,
+                                                 Channel channel, Optional<Set<String>> ownedPlaylists) throws SQLException {
+        List<DryRun.Problem> problems = new ArrayList<>(problems(connection, posts, channels, post, channel));
+        if (DECLARING.contains(channel.platform())) {
+            problems.addAll(DryRun.playlistProblems(post.playlistId(), ownedPlaylists));
         }
         return List.copyOf(problems);
     }

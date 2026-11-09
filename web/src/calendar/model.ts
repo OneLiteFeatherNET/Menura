@@ -404,6 +404,12 @@ export const PROBLEM_TEXTS: Record<string, string> = {
   short_not_vertical: 'Ein Short muss hochkant oder quadratisch sein.',
   short_too_long: 'Ein Short darf höchstens drei Minuten lang sein.',
   short_unverified: 'Die Größe oder Dauer des Clips ist nicht erfasst, daher lässt sich nicht prüfen, ob er ein Short ist.',
+  playlist_not_owned:
+    'Die Playlist dieses Beitrags gehört nicht zu diesem Kanal und ist daher nicht verfügbar. Wählen Sie in der Serie eine Playlist dieses Kanals.',
+  playlist_unverified:
+    'Die Playlist dieses Beitrags konnte nicht gegen den Kanal geprüft werden, daher wird er nicht eingeplant. Versuchen Sie es später erneut.',
+  thumbnail_not_allowed:
+    'Die Plattform erlaubt für diesen Kanal kein eigenes Vorschaubild. Das Vorschaubild wird daher nicht gesetzt.',
 };
 
 /** The German text of one dry-run problem; a code without a German text keeps the server's message. */
