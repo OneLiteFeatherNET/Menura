@@ -12,7 +12,9 @@ micronaut:
             - ${MENURA_WEB_ORIGIN:`https://menura.onelitefeather.net`}
           allow-credentials: true
           allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          allowed-headers: [Content-Type, Accept, If-Match]
+          # allowed-headers is left at its default (any header). A configured list refuses every preflight that carries no
+          # Access-Control-Request-Headers, which a browser omits for a DELETE, PUT or PATCH with safelisted headers only.
+          # Micronaut recognises only its own default as "any", so a configured wildcard does not work.
           exposed-headers: [ETag, Location, Retry-After]
           max-age: 600
 

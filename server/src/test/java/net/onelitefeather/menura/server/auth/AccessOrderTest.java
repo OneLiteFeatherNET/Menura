@@ -1,6 +1,8 @@
 package net.onelitefeather.menura.server.auth;
 
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -57,6 +59,21 @@ class AccessOrderTest {
 
         assertEquals(401, refused.getStatus().getCode());
         assertEquals(List.of(), calls.calls());
+    }
+
+    @Test
+    void aCorsPreflightForDeleteWithoutRequestHeadersIsAnsweredWithTheCorsHeaders() {
+        // A browser sends a DELETE preflight without Access-Control-Request-Headers (only safelisted headers are used).
+        // Without the wildcard header list the preflight is refused with a bare 403 and the real request never leaves.
+        HttpResponse<?> preflight = client.toBlocking().exchange(HttpRequest.OPTIONS("/test-auth/write")
+                .header(HttpHeaders.ORIGIN, "https://menura.onelitefeather.net")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "DELETE"));
+
+        assertEquals(200, preflight.getStatus().getCode(), "the preflight is answered, not refused with 403");
+        assertEquals("https://menura.onelitefeather.net",
+                preflight.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN),
+                "the preflight carries the allowed origin");
+        assertEquals(List.of(), calls.calls(), "a preflight reaches no handler");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package net.onelitefeather.menura.server.auth;
 
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import jakarta.inject.Singleton;
@@ -31,6 +32,13 @@ class ProtectedProbeController {
     String write() {
         calls.record("write");
         return "write";
+    }
+
+    @Delete("/write")
+    @RequiresRole({Role.EDITOR, Role.ADMIN})
+    String remove() {
+        calls.record("remove");
+        return "remove";
     }
 
     @Get("/signed-in")
