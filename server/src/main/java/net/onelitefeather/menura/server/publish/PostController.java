@@ -169,6 +169,7 @@ public class PostController {
     public record MadeForKidsBody(boolean madeForKids, Boolean planShort) {
     }
 
+    @Serdeable
     public record PatchBody(UUID channelId, UUID coverAssetId, String title, String description, List<String> hashtags,
                             String visibility, Instant scheduledAt) {
 
