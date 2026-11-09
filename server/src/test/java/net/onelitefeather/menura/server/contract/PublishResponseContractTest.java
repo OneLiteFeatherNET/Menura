@@ -99,6 +99,29 @@ class PublishResponseContractTest {
     }
 
     @Test
+    void aPatchThatSetsOnlyTheVisibilityIsAnsweredWithThePostAndDeclaresIt() throws Exception {
+        JsonNode created = send(HttpRequest.POST("/posts", Map.of("channelId", CHANNEL.toString(), "assetId",
+                VIDEO.toString(), "title", "Visible later")));
+
+        JsonNode edited = send(HttpRequest.PATCH("/posts/" + created.get("id").asText(), Map.of("visibility", "public")));
+
+        assertConforms("Post", edited);
+        assertEquals("public", edited.get("visibility").asText(), "the visibility given by the patch is stored");
+        assertEquals(true, edited.get("visibilityDeclared").asBoolean(), "a visibility given by a person is declared");
+    }
+
+    @Test
+    void aBareDraftSendsEveryDeclarationMemberEvenWhenItIsEmpty() throws Exception {
+        JsonNode created = send(HttpRequest.POST("/posts", Map.of("channelId", CHANNEL.toString(), "assetId",
+                VIDEO.toString(), "title", "Nothing declared")));
+
+        for (String member : List.of("madeForKids", "appliedVisibility", "visibilityProblem")) {
+            assertEquals(true, created.has(member) && created.get(member).isNull(),
+                    member + " is sent as null, not left out, because the contract requires it");
+        }
+    }
+
+    @Test
     void theRemainingDailyQuotaOfAYouTubeChannelConformsToTheContract() throws Exception {
         JsonNode quota = send(HttpRequest.GET("/channels/" + CHANNEL + "/quota"));
 
