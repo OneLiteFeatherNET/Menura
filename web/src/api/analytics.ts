@@ -41,11 +41,24 @@ export interface AnalyticsOverview {
   collections: ChannelCollection[];
 }
 
+/**
+ * One metric of a registered internal source (for example first joins). An estimate is shown as one and never as a
+ * measured value; a null value means no value was stored.
+ */
+export interface InternalMetric {
+  source: string;
+  metric: string;
+  estimate: boolean;
+  value: number | null;
+  values: number;
+}
+
 export interface SeriesWeek {
   isoWeek: string;
   weekStart: string;
   posts: number;
   metrics: Metric[];
+  internal: InternalMetric[];
 }
 
 /** A series, or the posts that are in no series (seriesId and label null). */
@@ -55,6 +68,7 @@ export interface SeriesAnalytics {
   posts: number;
   metrics: Metric[];
   weeks: SeriesWeek[];
+  internal: InternalMetric[];
 }
 
 export interface AnalyticsSeries {

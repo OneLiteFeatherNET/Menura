@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { expect, fn, within } from 'storybook/test';
-import { sampleSeries, sampleSeriesWithoutEngagement } from '../../analytics/samples';
+import { sampleSeries, sampleSeriesWithInternal, sampleSeriesWithoutEngagement } from '../../analytics/samples';
 import AnalyticsSeriesPanel from './AnalyticsSeriesPanel.vue';
 
 const meta = {
@@ -33,6 +33,18 @@ export const WithoutEngagement: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     expect(canvas.getAllByText('nicht verfügbar'), 'engaged views and average are not available').toHaveLength(2);
+  },
+};
+
+export const WithInternalEstimate: Story = {
+  args: { series: sampleSeriesWithInternal().series },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const row = canvas.getAllByRole('row')[1];
+    expect(row, 'the estimate is shown with its mark').toHaveTextContent('Erste Beitritte: 12 (geschätzt)');
+    expect(row, 'a value that was never stored is not available, not zero').toHaveTextContent(
+      'Erste Beitritte: nicht verfügbar',
+    );
   },
 };
 

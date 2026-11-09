@@ -341,6 +341,26 @@ if [[ "$metric_schedule" != "$(yq -r '.jobs.metricCollection.schedule' "$chart/v
   report "the metric collection CronJob must take its schedule from jobs.metricCollection.schedule"
 fi
 
+# The metric rollup CronJob (change add-content-analytics) runs 'jobs run metric-rollup' on its schedule, with the database
+# and the analytics time zone only: the rollups come from the stored points, so it reads no channel or storage secret.
+rollup_selector='select(.kind == "CronJob" and (.metadata.name | test("-metric-rollup$")))'
+rollup_command="$(yq -N "$rollup_selector | .spec.jobTemplate.spec.template.spec.containers[0].command | join(\" \")" "$rendered")"
+if [[ "$rollup_command" != "jobs run metric-rollup" ]]; then
+  report "the metric rollup CronJob must run 'jobs run metric-rollup' (found '$rollup_command')"
+fi
+rollup_schedule="$(yq -N "$rollup_selector | .spec.schedule" "$rendered")"
+if [[ "$rollup_schedule" != "$(yq -r '.jobs.metricRollup.schedule' "$chart/values.yaml")" ]]; then
+  report "the metric rollup CronJob must take its schedule from jobs.metricRollup.schedule"
+fi
+rollup_secrets="$(yq -N "$rollup_selector | .spec.jobTemplate.spec.template.spec.containers[0].envFrom[]?.secretRef.name" "$rendered")"
+if [[ -n "$rollup_secrets" ]]; then
+  report "the metric rollup CronJob must not read any Secret (found '$rollup_secrets')"
+fi
+rollup_zone="$(yq -N "$rollup_selector | .spec.jobTemplate.spec.template.spec.containers[0].env[] | select(.name == \"MENURA_ANALYTICS_TIME_ZONE\") | .value" "$rendered")"
+if [[ "$rollup_zone" != "$analytics_zone" ]]; then
+  report "the metric rollup CronJob must get MENURA_ANALYTICS_TIME_ZONE=$analytics_zone from analytics.timeZone (found '$rollup_zone')"
+fi
+
 # The retention CronJob (change add-content-library) is off by default: the default render has no retention CronJob.
 if [[ -n "$(yq -N 'select(.kind == "CronJob") | select(.metadata.name | test("retention$")) | .metadata.name' "$rendered")" ]]; then
   report "the retention CronJob must not be rendered by default"

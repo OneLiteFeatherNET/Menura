@@ -48,12 +48,20 @@ public final class AnalyticsViews {
 
     @Serdeable
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record WeekView(String isoWeek, LocalDate weekStart, int posts, List<TotalView> metrics) {
+    public record WeekView(String isoWeek, LocalDate weekStart, int posts, List<TotalView> metrics,
+                           List<InternalMetricView> internal) {
+    }
+
+    /** One metric of a registered internal source: its sum, its count of values and its estimate flag. */
+    @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record InternalMetricView(String source, String metric, boolean estimate, Double value, int values) {
     }
 
     @Serdeable
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record SeriesRowView(UUID seriesId, String label, int posts, List<TotalView> metrics, List<WeekView> weeks) {
+    public record SeriesRowView(UUID seriesId, String label, int posts, List<TotalView> metrics, List<WeekView> weeks,
+                                List<InternalMetricView> internal) {
     }
 
     @Serdeable
@@ -111,10 +119,10 @@ public final class AnalyticsViews {
             List<WeekView> weeks = new ArrayList<>();
             for (AnalyticsReader.WeekRow week : row.weeks()) {
                 weeks.add(new WeekView(week.isoWeek(), week.weekStart(), week.group().posts(),
-                        totals(week.group().metrics())));
+                        totals(week.group().metrics()), internal(week.internal())));
             }
             rows.add(new SeriesRowView(row.seriesId(), row.label(), row.group().posts(),
-                    totals(row.group().metrics()), weeks));
+                    totals(row.group().metrics()), weeks, internal(row.internal())));
         }
         return new SeriesComparisonView(comparison.from(), comparison.to(), rows);
     }
@@ -145,6 +153,12 @@ public final class AnalyticsViews {
 
     private static AggregateView aggregate(Aggregation.Group group, String label) {
         return new AggregateView(group.key(), label, group.posts(), totals(group.metrics()));
+    }
+
+    private static List<InternalMetricView> internal(List<AnalyticsReader.InternalTotal> totals) {
+        return totals.stream()
+                .map(t -> new InternalMetricView(t.source(), t.metric(), t.estimate(), t.value(), t.values()))
+                .toList();
     }
 
     private static List<TotalView> totals(List<Aggregation.Total> totals) {

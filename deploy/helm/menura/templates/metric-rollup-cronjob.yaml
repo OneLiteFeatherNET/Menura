@@ -1,0 +1,46 @@
+{{- if .Values.jobs.metricRollup.enabled }}
+# Rebuilds the daily, weekly and equal-age rollups of the days the metric collection marked (change add-content-analytics).
+# It needs the database only: the rollups come from the stored points, so it reads no platform secret. It prints counts only.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "menura.fullname" . }}-metric-rollup
+  labels:
+    {{- include "menura.componentLabels" (dict "root" . "component" "jobs") | nindent 4 }}
+spec:
+  schedule: {{ .Values.jobs.metricRollup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "menura.componentLabels" (dict "root" . "component" "jobs") | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- include "menura.podSecurity" . | nindent 10 }}
+          containers:
+            - name: metric-rollup
+              image: {{ include "menura.image" (dict "root" . "component" "jobs") }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - jobs
+                - run
+                - metric-rollup
+              env:
+                {{- include "menura.databaseEnv" . | nindent 16 }}
+                - name: MENURA_ANALYTICS_TIME_ZONE
+                  value: {{ .Values.analytics.timeZone | quote }}
+              {{- include "menura.containerSecurity" . | nindent 14 }}
+              {{- with .Values.jobs.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+{{- end }}

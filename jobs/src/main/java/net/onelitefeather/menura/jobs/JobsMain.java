@@ -21,6 +21,7 @@ public final class JobsMain {
                         ExternalPostSyncJob.intervalFrom(System.getenv())),
                 new MetricCollectionJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC(),
                         AnalyticsSettings.from(System.getenv())),
+                new MetricRollupJob(settings, AnalyticsSettings.from(System.getenv())),
                 new RetentionJob(System.getenv(), Clock.systemUTC()),
                 new PublishDueJob(settings, ChannelSettings.from(System.getenv()), Clock.systemUTC(), System.getenv())));
         System.exit(dispatcher.dispatch(args, System.out, System.err));

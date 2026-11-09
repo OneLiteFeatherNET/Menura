@@ -126,6 +126,13 @@ jobs:
     enabled: true
     schedule: "*/30 * * * *"
 
+  # The metric rollup CronJob (jobs run metric-rollup, change add-content-analytics) rebuilds the daily, weekly and equal-age
+  # rollups of the days the collection and the internal sources marked. It runs every quarter hour and needs the database
+  # only, so the dashboard lags the points by at most one run.
+  metricRollup:
+    enabled: true
+    schedule: "*/15 * * * *"
+
   # The publication CronJob (jobs run publish-due, change add-content-distribution). It claims the due approved posts and
   # publishes them, or hands them to a platform that schedules natively a lead time before their time. It runs every five
   # minutes with concurrency one. Needs channels.existingSecret, like the other job CronJobs.

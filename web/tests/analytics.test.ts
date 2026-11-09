@@ -8,10 +8,13 @@ import {
 } from '../src/api/analytics';
 import {
   DEFAULT_PERIOD_DAYS,
+  NO_INTERNAL_TEXT,
   NOT_AVAILABLE,
   barFraction,
   dateLabel,
   formatMetricValue,
+  internalMetricText,
+  internalMetricsText,
   maxValue,
   metricOf,
   outcomeLabel,
@@ -104,6 +107,36 @@ describe('series ranking', () => {
     rankSeries(input);
 
     expect(input.map((series) => series.label)).toEqual(['Klein', 'Groß']);
+  });
+});
+
+describe('internal metrics', () => {
+  it('marks an estimate with the word estimated, never as a measured value', () => {
+    const text = internalMetricText({ source: 'joins', metric: 'first_joins', estimate: true, value: 12, values: 3 });
+
+    expect(text).toBe('Erste Beitritte: 12 (geschätzt)');
+  });
+
+  it('shows a measured value without the estimate mark', () => {
+    const text = internalMetricText({ source: 'joins', metric: 'first_joins', estimate: false, value: 7, values: 2 });
+
+    expect(text).toBe('Erste Beitritte: 7');
+  });
+
+  it('shows a value that was never stored as not available, not as zero', () => {
+    const text = internalMetricText({ source: 'joins', metric: 'first_joins', estimate: false, value: null, values: 0 });
+
+    expect(text).toBe(`Erste Beitritte: ${NOT_AVAILABLE}`);
+  });
+
+  it('shows the dash for a series without internal metrics', () => {
+    expect(internalMetricsText([])).toBe(NO_INTERNAL_TEXT);
+  });
+
+  it('keeps the name of an internal metric the client does not know', () => {
+    const text = internalMetricText({ source: 'x', metric: 'new_metric', estimate: false, value: 1, values: 1 });
+
+    expect(text).toBe('new_metric: 1');
   });
 });
 

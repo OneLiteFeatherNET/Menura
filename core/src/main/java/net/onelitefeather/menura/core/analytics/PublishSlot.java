@@ -35,6 +35,11 @@ public final class PublishSlot {
         return publishedAt.atZone(zone).getDayOfWeek().getValue();
     }
 
+    /** The calendar day of the instant in the zone: the day a value belongs to in the daily rollup. */
+    public LocalDate day(Instant publishedAt) {
+        return publishedAt.atZone(zone).toLocalDate();
+    }
+
     /** The Monday that starts the week of the instant, in the zone. */
     public LocalDate weekStart(Instant publishedAt) {
         ZonedDateTime local = publishedAt.atZone(zone);

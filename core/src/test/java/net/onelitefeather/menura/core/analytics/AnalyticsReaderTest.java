@@ -5,12 +5,17 @@ import net.onelitefeather.menura.core.analytics.support.AnalyticsFixture;
 import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.problem.ProblemException;
+import net.onelitefeather.menura.core.series.ContentSeries;
+import net.onelitefeather.menura.core.series.SeriesAssignment;
+import net.onelitefeather.menura.core.series.SeriesDraft;
+import net.onelitefeather.menura.core.series.support.SeriesFixture;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +40,7 @@ class AnalyticsReaderTest {
         publishAndReport(world, channel, "b", MONDAY_EVENING, 200L);
         publishAndReport(world, channel, "c", MONDAY_EVENING, 900L);
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.EqualAge comparison = world.reader.equalAge(Metrics.VIEWS, Duration.ofHours(24), By.HOUR, null);
 
@@ -50,6 +56,7 @@ class AnalyticsReaderTest {
         world.channels.clock.advance(Duration.ofHours(10));
         publishAndReport(world, channel, "young", world.channels.clock.instant().minus(Duration.ofHours(10)), 500L);
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.EqualAge comparison = world.reader.equalAge(Metrics.VIEWS, Duration.ofHours(24), By.HOUR, null);
 
@@ -64,6 +71,7 @@ class AnalyticsReaderTest {
         world.channels.clock.advance(Duration.between(world.now(), MONDAY_EVENING.plus(Duration.ofDays(2))));
         publishAndReport(world, channel, "a", MONDAY_EVENING, 100L);
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.EqualAge watch = world.reader.equalAge(Metrics.WATCH_TIME, Duration.ofHours(24), By.HOUR, null);
 
@@ -87,9 +95,11 @@ class AnalyticsReaderTest {
         UUID channel = world.connectedChannel("UC4");
         publishAndReport(world, channel, "a", world.now().minus(Duration.ofHours(5)), 100L);
         world.collector.collect();
+        world.rollUp();
         world.advance(Duration.ofHours(4));
         world.platform.report("a", Map.of(Metrics.VIEWS, 130L));
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.Overview overview = world.reader.overview(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 12, 31),
                 Set.of(Role.VIEWER));
@@ -111,6 +121,7 @@ class AnalyticsReaderTest {
         world.platform.report("a", Map.of(Metrics.VIEWS, 1000L, Metrics.ENGAGED_VIEWS, 10L));
         world.platform.report("b", Map.of(Metrics.VIEWS, 100L, Metrics.ENGAGED_VIEWS, 90L));
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.SeriesComparison comparison = world.reader.series(LocalDate.of(2026, 10, 1),
                 LocalDate.of(2026, 12, 31), Set.of(Role.VIEWER));
@@ -119,11 +130,31 @@ class AnalyticsReaderTest {
     }
 
     @Test
+    void aPostInASeriesTheCallerMayNotSeeAnswersNotFound() throws SQLException {
+        AnalyticsFixture world = new AnalyticsFixture(true);
+        UUID channel = world.connectedChannel("UC6");
+        ExternalPost post = world.publishedPost(channel, "hidden", world.now().minus(Duration.ofHours(5)), "short");
+        UUID seriesId = UUID.nameUUIDFromBytes("series-admins-only".getBytes());
+        SeriesDraft base = SeriesFixture.draft("Admins only", "#admins");
+        SeriesDraft restricted = new SeriesDraft(base.name(), base.badgeText(), base.colourToken(), base.badgeToken(),
+                base.openingFormula(), base.layoutTemplate(), base.hashtag(), base.audience(), base.weekday(),
+                base.postingSlot(), base.active(), Map.of(), List.of("admin"));
+        world.series.insert(null, ContentSeries.of(seriesId, restricted, world.now(), world.now()));
+        world.series.saveAssignment(null, new SeriesAssignment(post.id(), seriesId, false, null, null, null, world.now(),
+                null));
+
+        ProblemException hidden = assertThrows(ProblemException.class,
+                () -> world.reader.post(post.id(), Set.of(Role.VIEWER)));
+
+        assertEquals(404, hidden.status(), "a post in a series the caller may not see is answered like a missing post");
+    }
+
+    @Test
     void theAnalyticsOfAMissingPostAnswerNotFound() {
         AnalyticsFixture world = new AnalyticsFixture(true);
 
         ProblemException missing = assertThrows(ProblemException.class,
-                () -> world.reader.post(UUID.nameUUIDFromBytes("missing".getBytes())));
+                () -> world.reader.post(UUID.nameUUIDFromBytes("missing".getBytes()), Set.of(Role.VIEWER)));
 
         assertEquals(404, missing.status(), "a post that does not exist answers 404");
     }

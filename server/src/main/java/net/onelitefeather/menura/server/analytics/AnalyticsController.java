@@ -28,7 +28,7 @@ import java.util.UUID;
 
 /**
  * Content analytics over REST (change add-content-analytics). Every signed-in role reads them; no endpoint here changes a
- * post, a schedule or an approval. Aggregates come from the stored latest values and snapshots, never from raw points.
+ * post, a schedule or an approval. Aggregates come from the rollups, never from raw points or latest values.
  */
 @Controller("/analytics")
 public class AnalyticsController {
@@ -82,18 +82,19 @@ public class AnalyticsController {
     @Get("/external-posts/{id}")
     @RequiresRole
     @ExecuteOn(TaskExecutors.BLOCKING)
-    PostAnalyticsView post(@PathVariable UUID id) throws SQLException {
-        return AnalyticsViews.of(reader.post(id));
+    PostAnalyticsView post(@PathVariable UUID id, HttpRequest<?> request) throws SQLException {
+        return AnalyticsViews.of(reader.post(id, person(request).roles()));
     }
 
-    /** The raw points of one external post, optionally of one metric, in collection-time order. */
+    /** The raw points of one external post, optionally of one metric, in collection-time order; 404 as above. */
     @Get("/external-posts/{id}/points")
     @RequiresRole
     @ExecuteOn(TaskExecutors.BLOCKING)
     PointsView points(@PathVariable UUID id, @QueryValue Optional<String> metric,
-                      @QueryValue Optional<Integer> limit) throws SQLException {
+                      @QueryValue Optional<Integer> limit, HttpRequest<?> request) throws SQLException {
         String name = metric.orElse(null);
-        return AnalyticsViews.points(id, name, reader.points(id, name, limit.orElse(DEFAULT_POINTS)));
+        return AnalyticsViews.points(id, name, reader.points(id, person(request).roles(), name,
+                limit.orElse(DEFAULT_POINTS)));
     }
 
     /** The period of a request: the last 90 days ending today when no date is given. */

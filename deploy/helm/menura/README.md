@@ -149,6 +149,24 @@ fixed offsets after publication (change `add-content-analytics`). It runs at `jo
 by default), so the +1 hour snapshot is at most half an hour late, and it needs no further key beyond `channels.existingSecret`.
 A platform that does not report metrics is recorded as `not_supported`; nothing is written for it.
 
+The `metric-rollup` CronJob rebuilds the daily, weekly and equal-age rollups of every day the collection marked. It runs at
+`jobs.metricRollup.schedule` (every quarter hour by default), needs the database only, and prints `metric-rollup days=… weeks=…`.
+The dashboard reads the rollups, so it lags the points by at most one run; a day corrected by a platform is rebuilt by the
+next run that finds it marked.
+
+### Content analytics storage (operator notes)
+
+Metric points live in PostgreSQL 17 (the standard image, no extension) in `menura.metric_point`, partitioned by the month of
+collection. The partition of the next month is created before its first point, by the collection. Raw points are kept; no
+retention is defined yet, which is open for the operator. The rollups (`metric_rollup_day`, `metric_rollup_week`) and the
+equal-age groups (`metric_offset_day`) are rebuilt by the rollup job, so the dashboard aggregates over two years answer from
+them within a second without scanning the points.
+
+Decided against, with the reason: ClickHouse (a second stateful system to operate on the cluster, with slower cold-start
+recovery; the rollups meet the speed budget), TimescaleDB (not in the standard OLF PostgreSQL image, so a custom image and
+extension upgrades), and unpartitioned tables (they grow for two years without per-month pruning, and every aggregate scans
+them).
+
 **Check the import.** `kubectl get cronjob menura-external-post-sync` shows the schedule, and a finished run prints
 `external-post-sync checked=… synced=… skipped=… incomplete=… failed=… waiting=…`. Channels that need reconnection are
 counted as `waiting` and are not read.
