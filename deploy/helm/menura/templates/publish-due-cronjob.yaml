@@ -52,6 +52,7 @@ spec:
                   value: {{ .Values.calendar.timeZone | quote }}
                 {{- include "menura.databaseEnv" . | nindent 16 }}
                 {{- include "menura.channelEnv" . | nindent 16 }}
+                {{- include "menura.libraryEnv" . | nindent 16 }}
               {{- include "menura.secretEnvFrom" . | nindent 14 }}
               {{- include "menura.containerSecurity" . | nindent 14 }}
               {{- with .Values.jobs.resources }}

@@ -2619,6 +2619,42 @@ paths:
           $ref: "#/components/responses/Problem"
         "401":
           $ref: "#/components/responses/Problem"
+  /posts/{id}/youtube-declaration:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+    put:
+      tags:
+        - Posts
+      operationId: declarePostMadeForKids
+      summary: Declares whether a YouTube post is made for kids (required before a YouTube post can be scheduled).
+      description: |
+        The editor or publisher role is required, and the post must still be editable. Menura never relies on the platform
+        default: a YouTube post is refused for scheduling until this declaration is given. The visibility is declared by
+        setting it on the post (PATCH or creation).
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YouTubeMadeForKids"
+      responses:
+        "200":
+          description: The post with the declaration applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+
 
 components:
   securitySchemes:
@@ -6008,3 +6044,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/JoinSeriesEstimate"
+    YouTubeMadeForKids:
+      type: object
+      description: The made-for-kids declaration of a YouTube video (status.selfDeclaredMadeForKids).
+      required:
+        - madeForKids
+      properties:
+        madeForKids:
+          type: boolean

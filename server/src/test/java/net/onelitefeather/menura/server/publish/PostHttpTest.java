@@ -95,6 +95,7 @@ class PostHttpTest {
     @Test
     void aPublisherApprovesAndSchedulesInTheWebApplication() throws Exception {
         String post = createDraft();
+        declareMadeForKids(post, false);
         submit(post);
 
         Map<?, ?> approved = body(exchange(post(PUBLISHER, "PUBLISHER", "/posts/" + post + "/approval", Map.of())), 200);
@@ -119,6 +120,22 @@ class PostHttpTest {
         List<?> problems = (List<?>) problem.get("problems");
         assertTrue(problems.stream().anyMatch(item -> "title_too_long".equals(((Map<?, ?>) item).get("code"))),
                 "the title limit is named in the problems");
+    }
+
+    @Test
+    void aPostWithoutItsMadeForKidsDeclarationIsNotScheduled() throws Exception {
+        String post = createDraft();
+        submit(post);
+        exchange(post(PUBLISHER, "PUBLISHER", "/posts/" + post + "/approval", Map.of()));
+
+        HttpClientResponseException failure = assertThrows(HttpClientResponseException.class,
+                () -> exchange(post(PUBLISHER, "PUBLISHER", "/posts/" + post + "/schedule", Map.of())));
+
+        assertEquals(422, failure.getStatus().getCode(), "a schedule without the declaration is 422");
+        Map<?, ?> problem = (Map<?, ?>) failure.getResponse().getBody(Map.class).orElseThrow();
+        List<?> problems = (List<?>) problem.get("problems");
+        assertTrue(problems.stream().anyMatch(item -> "made_for_kids_missing".equals(((Map<?, ?>) item).get("code"))),
+                "the missing made-for-kids answer is named in the problems");
     }
 
     @Test
@@ -212,6 +229,11 @@ class PostHttpTest {
         body(exchange(post(EDITOR, "EDITOR", "/posts", draft("Timed", at))), 201);
     }
 
+    private void declareMadeForKids(String post, boolean madeForKids) throws Exception {
+        body(exchange(withIdentity(HttpRequest.PUT("/posts/" + post + "/youtube-declaration", Map.of("madeForKids", madeForKids)),
+                EDITOR, "EDITOR", "web")), 200);
+    }
+
     private void submit(String post) throws Exception {
         exchange(post(EDITOR, "EDITOR", "/posts/" + post + "/submission", Map.of()));
     }
@@ -222,6 +244,7 @@ class PostHttpTest {
         draft.put("assetId", VIDEO.toString());
         draft.put("title", title);
         draft.put("scheduledAt", scheduledAt == null ? SLOT : scheduledAt);
+        draft.put("visibility", "private");
         return draft;
     }
 
