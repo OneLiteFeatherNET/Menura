@@ -21,6 +21,7 @@ import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.brand.BrandKit.LanguageText;
 import net.onelitefeather.menura.core.brand.BrandKit.Template;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
+import net.onelitefeather.menura.core.series.JoinDomain;
 import net.onelitefeather.menura.core.problem.ProblemException;
 import net.onelitefeather.menura.server.audit.RequestIds;
 import net.onelitefeather.menura.server.auth.CurrentPerson;
@@ -40,11 +41,14 @@ public class BrandKitController {
     private final BrandKits kits;
     private final IdentifierGenerator identifiers;
     private final BrandKitNotifications notifications;
+    private final JoinDomain joinDomain;
 
-    public BrandKitController(BrandKits kits, IdentifierGenerator identifiers, BrandKitNotifications notifications) {
+    public BrandKitController(BrandKits kits, IdentifierGenerator identifiers, BrandKitNotifications notifications,
+                              JoinDomain joinDomain) {
         this.notifications = notifications;
         this.kits = kits;
         this.identifiers = identifiers;
+        this.joinDomain = joinDomain;
     }
 
     @RequiresRole
@@ -66,13 +70,14 @@ public class BrandKitController {
         return HttpResponse.created(BrandKitViews.Version.of(published)).header(HttpHeaders.CACHE_CONTROL, "no-store");
     }
 
-    /** The JSON render bundle an external renderer reads: the version and its whole kit. */
+    /** The JSON render bundle an external renderer reads: the version, its whole kit and the installation join domain. */
     @RequiresRole
     @Get("/render-bundle")
-    public HttpResponse<BrandKitViews.Version> renderBundle(@Nullable @QueryValue Integer version,
-                                                            @Nullable @QueryValue String consumer, HttpRequest<?> request)
+    public HttpResponse<BrandKitViews.RenderBundle> renderBundle(@Nullable @QueryValue Integer version,
+                                                                 @Nullable @QueryValue String consumer, HttpRequest<?> request)
             throws SQLException {
-        return read(kits.resolve(version, consumer));
+        return HttpResponse.ok(BrandKitViews.RenderBundle.of(kits.resolve(version, consumer), joinDomain.joinDomain()))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store");
     }
 
     /** The colour tokens as CSS custom properties, light and dark. */
