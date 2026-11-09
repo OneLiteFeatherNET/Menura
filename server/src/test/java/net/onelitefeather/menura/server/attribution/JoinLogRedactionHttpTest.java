@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -69,6 +70,8 @@ class JoinLogRedactionHttpTest {
         TEST_CLIENT.setLevel(Level.INFO);
         ROOT.setLevel(Level.TRACE);
         logs = new ListAppender<>();
+        // Server threads may still log while a test reads the records, so the list must be safe to iterate concurrently.
+        logs.list = new CopyOnWriteArrayList<>();
         logs.start();
         ROOT.addAppender(logs);
     }
