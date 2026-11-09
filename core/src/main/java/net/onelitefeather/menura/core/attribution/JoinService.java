@@ -114,6 +114,11 @@ public final class JoinService {
         });
     }
 
+    /** Today in the installation's time zone; the default end of a report period. */
+    public LocalDate today() {
+        return clock.instant().atZone(zone).toLocalDate();
+    }
+
     /** The installation's join settings; the defaults until an admin saved them. */
     public JoinSettings settings() throws SQLException {
         return transactions.inTransaction(connection -> store.findSettings(connection).orElse(JoinSettings.unset()));

@@ -31,6 +31,15 @@ public final class InMemoryJoinStore implements JoinStore {
     private final List<AttributablePost> posts = new ArrayList<>();
     private final Map<LocalDate, Map<String, Long>> counts = new HashMap<>();
 
+    /** Forgets everything, so a test that shares the store starts from nothing. */
+    public void clear() {
+        settings = null;
+        events.clear();
+        answers.clear();
+        posts.clear();
+        counts.clear();
+    }
+
     /** Adds a post the attribution reads, with the visibility of its series. */
     public void addPost(AttributablePost post) {
         posts.add(post);
