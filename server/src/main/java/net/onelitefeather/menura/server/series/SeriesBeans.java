@@ -14,8 +14,8 @@ import net.onelitefeather.menura.core.series.SeriesStore;
 import java.time.Clock;
 
 /**
- * Wires the content series (change add-content-series) into the server. The join domain stays unconfigured until the
- * join attribution change provides one; the render bundle then has no call to action, and no error.
+ * Wires the content series (change add-content-series) into the server. The join domain comes from the join attribution
+ * (change add-join-attribution); without one the render bundle has no call to action, and no error.
  */
 @Factory
 public class SeriesBeans {
@@ -27,7 +27,8 @@ public class SeriesBeans {
 
     @Singleton
     SeriesService seriesService(Clock clock, IdentifierGenerator identifiers, SeriesStore series,
-                                ExternalPostStore posts, ChannelStore channels, BrandTokens brand) {
-        return new SeriesService(clock, identifiers, series, posts, channels, brand, JoinDomain.NONE);
+                                ExternalPostStore posts, ChannelStore channels, BrandTokens brand,
+                                JoinDomain joinDomain) {
+        return new SeriesService(clock, identifiers, series, posts, channels, brand, joinDomain);
     }
 }

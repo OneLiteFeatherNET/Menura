@@ -130,6 +130,7 @@ The server's envFrom: the shared Secrets plus, on the server only, the object st
 {{- with .Values.database.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
 {{- with .Values.channels.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
 {{- with .Values.storage.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
+{{- with .Values.joinAttribution.existingSecret -}}{{- $secrets = append $secrets . -}}{{- end -}}
 {{- include "menura.envFromSecrets" $secrets -}}
 {{- end }}
 

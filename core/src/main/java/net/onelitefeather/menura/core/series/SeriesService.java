@@ -298,10 +298,7 @@ public final class SeriesService implements ExternalPostListener {
                 .map(s -> new BundleSeries(s.id(), s.name(), s.badgeText(), s.colourToken(), s.openingFormula(),
                         s.hashtag()))
                 .toList();
-        CallToAction callToAction = joinDomain.joinDomain()
-                .filter(domain -> !domain.isBlank())
-                .map(domain -> new CallToAction("Jetzt mitspielen auf " + domain))
-                .orElse(null);
+        CallToAction callToAction = joinDomain.joinDomain().map(CallToAction::of).orElse(null);
         return new RenderBundle(channelId, active, callToAction);
     }
 

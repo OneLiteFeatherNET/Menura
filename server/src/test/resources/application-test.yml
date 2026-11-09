@@ -10,3 +10,6 @@ menura:
     youtube:
       client-id: test-client-id
       client-secret: test-client-secret
+  # The digest of a fake proxy credential that only the join tests know (sha256 of "test-join-proxy-credential").
+  join:
+    proxy-credential-hash: e5e7cd8bacd0b66b4564fcf31f0f87a1ed1e29f2223e216d51e54d8bff4dff05

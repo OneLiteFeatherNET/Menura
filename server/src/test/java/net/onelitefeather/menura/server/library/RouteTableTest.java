@@ -104,7 +104,14 @@ class RouteTableTest {
             "GET /analytics/series",
             "GET /analytics/equal-age",
             "GET /analytics/external-posts/{id}",
-            "GET /analytics/external-posts/{id}/points");
+            "GET /analytics/external-posts/{id}/points",
+            "POST /join-events",
+            "POST /join-events/{eventId}/source-answer",
+            "GET /join-attribution/settings",
+            "PUT /join-attribution/settings",
+            "GET /join-attribution/new-players",
+            "GET /join-attribution/posts/{id}",
+            "GET /join-attribution/series");
 
     private static final Set<Class<?>> BINARY_BODIES = Set.of(byte[].class, InputStream.class, ByteBuffer.class,
             StreamingFileUpload.class, CompletedFileUpload.class);

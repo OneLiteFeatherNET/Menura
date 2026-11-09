@@ -60,6 +60,12 @@ menura:
     person:
       requests: 600
       window-seconds: 60
+  # Join attribution (change add-join-attribution). The network proxy presents its credential as a bearer secret; this is the
+  # SHA-256 hex digest of that secret, so the server never holds a value it could present. Empty means no proxy is
+  # configured and every join call answers 401. Create the secret with `openssl rand -base64 32` and its digest with
+  # `printf '%s' "$SECRET" | sha256sum`. The secret lives only in the proxy and the digest in the Secret of the server.
+  join:
+    proxy-credential-hash: ${MENURA_JOIN_PROXY_CREDENTIAL_HASH:}
   auth:
     issuer: ${MENURA_AUTH_ISSUER:`https://api-menura.onelitefeather.net`}
     audience: ${MENURA_AUTH_AUDIENCE:`https://api-menura.onelitefeather.net`}

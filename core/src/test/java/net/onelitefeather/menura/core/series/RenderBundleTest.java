@@ -45,7 +45,10 @@ class RenderBundleTest {
 
         RenderBundle bundle = world.service.renderBundle(null, channel);
 
-        assertTrue(bundle.callToAction().text().contains("onelitefeather.net"), "the one call to action names the domain");
+        assertEquals("Spiel mit uns: onelitefeather.net", bundle.callToAction().texts().get("de"),
+                "the German call to action names the domain");
+        assertEquals("Play with us: onelitefeather.net", bundle.callToAction().texts().get("en"),
+                "the English call to action names the domain");
     }
 
     @Test

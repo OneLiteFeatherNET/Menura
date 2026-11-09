@@ -96,6 +96,15 @@ the chart with these keys:
 | `MENURA_YOUTUBE_CLIENT_SECRET`     | for YouTube | OAuth client secret of the YouTube app.                          |
 | `MENURA_TOKEN_ENCRYPTION_KEY_PREVIOUS` | rotation only | The old key, read for decryption only, while a key rotation runs. |
 
+## Join attribution (operator steps)
+
+The network proxy authenticates to `POST /join-events` with its own credential. The server holds only its SHA-256 hex
+digest, read from `joinAttribution.existingSecret` (a Secret created outside the chart) with the key
+`MENURA_JOIN_PROXY_CREDENTIAL_HASH`. Create the credential with `openssl rand -base64 32`, put its digest
+(`printf '%s' "$SECRET" | sha256sum`) into the Secret, and give the secret itself only to the proxy. Until the key is set,
+every join call answers 401. The request budget of the proxy is 600 per minute in the server, and the gateway limits the
+`Authorization` token of the API route as well.
+
 **Create the platform app (YouTube).** In Google Cloud, create an OAuth client of type *Web application*. Register the
 redirect URI `https://api-menura.onelitefeather.net/channel-connections/callback` (it must equal
 `channels.youtube.redirectUri`). Enable the YouTube Data API v3 for the project. Put the client id and secret into the

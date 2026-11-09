@@ -167,6 +167,12 @@ channels:
   # A grant whose access token expires within this margin is refreshed (ISO-8601 duration).
   refreshMargin: PT10M
 
+# Join attribution (change add-join-attribution). The server reads MENURA_JOIN_PROXY_CREDENTIAL_HASH, the SHA-256 hex
+# digest of the network proxy's credential, from an existing Secret created outside this chart. Empty keeps every join
+# call closed (401). The chart holds no secret value. See README.md.
+joinAttribution:
+  existingSecret: ""
+
 # Gateway API routes attach to the shared Envoy Gateway listener (the `eg`
 # Gateway in namespace `envoy` of the cluster repository).
 gateway:

@@ -40,8 +40,19 @@ public final class SeriesReports {
                                String openingFormula, String hashtag) {
     }
 
-    /** The one call-to-action text of a bundle; it names the join domain. */
-    public record CallToAction(String text) {
+    /**
+     * The call-to-action texts of a bundle, one per language; each names the join domain. The languages are German and
+     * English, and the same texts serve all channels.
+     */
+    public record CallToAction(Map<String, String> texts) {
+
+        /** The texts for one join domain, or null when the domain is absent or blank. */
+        public static CallToAction of(String joinDomain) {
+            if (joinDomain == null || joinDomain.isBlank()) {
+                return null;
+            }
+            return new CallToAction(Map.of("de", "Spiel mit uns: " + joinDomain, "en", "Play with us: " + joinDomain));
+        }
     }
 
     /** An episode of a series: its number and the post that holds it. */

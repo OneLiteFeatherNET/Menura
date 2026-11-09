@@ -47,6 +47,11 @@ tags:
       of a series, the status lifecycle (draft, in review, approved, scheduled, published, failed), approval by a
       publisher in the web application only, the schedule dry run, and revisions with their acceptance. No MCP tool
       approves or publishes.
+  - name: Attribution
+    description: >-
+      Join attribution: the network proxy reports each join with a pseudonym and may ask the player once where they found
+      the network (fixed choices). The admin sets the join domain and the attribution window; every signed-in role reads
+      the new-player reports and the estimates per post and series, which are estimates and say so. No player is identified.
 
 paths:
   /health:
@@ -2400,6 +2405,221 @@ paths:
           $ref: "#/components/responses/Problem"
 
 
+  /join-events:
+    post:
+      tags:
+        - Attribution
+      operationId: recordJoinEvent
+      summary: Records a join of a player, as the network proxy reports it.
+      description: |
+        Called by the network proxy only, with its own credential as a bearer secret; a signed-in person answers 403. The
+        body holds the proxy's event id, the first-join flag, the time of the join and a pseudonym that the proxy computes
+        with a keyed hash. Any other field, and any value that carries a player UUID, a name or an IP address, is refused
+        with 422 and nothing is stored. A repeated event id with the same content answers 200 and counts nothing new.
+      security:
+        - joinProxyCredential: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinEventRequest"
+      responses:
+        "200":
+          description: The event was stored already with the same content.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinEventReceipt"
+        "201":
+          description: The event was stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinEventReceipt"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+  /join-events/{eventId}/source-answer:
+    parameters:
+      - $ref: "#/components/parameters/JoinEventId"
+    post:
+      tags:
+        - Attribution
+      operationId: recordJoinSourceAnswer
+      summary: Records where a player says they found the network, for one first join.
+      description: |
+        Called by the network proxy only. Accepted once per first join and up to 24 hours after the join; a repeated answer
+        with the same source answers 200, a different one 409. The body holds exactly one of the fixed choices; free text
+        is refused with 422.
+      security:
+        - joinProxyCredential: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinSourceAnswerRequest"
+      responses:
+        "200":
+          description: The same answer was stored already.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinSourceAnswerReceipt"
+        "201":
+          description: The answer was stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinSourceAnswerReceipt"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+  /join-attribution/settings:
+    get:
+      tags:
+        - Attribution
+      operationId: getJoinSettings
+      summary: The join domain and the attribution window of the installation.
+      description: Readable by the admin role only.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinSettings"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+    put:
+      tags:
+        - Attribution
+      operationId: putJoinSettings
+      summary: Sets the join domain and, optionally, the attribution window of the installation.
+      description: |
+        Only the admin role sets them. The domain must be one lower-case host name; the window is a whole number of hours
+        from 1 to 720 and keeps its value when it is not sent.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinSettingsRequest"
+      responses:
+        "200":
+          description: The saved settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinSettings"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /join-attribution/new-players:
+    get:
+      tags:
+        - Attribution
+      operationId: getNewPlayers
+      summary: New players per day or ISO week, with the stated sources, the unanswered joins and the answer rate.
+      description: |
+        Every figure per stated source is labelled "stated by players" and sits next to the answer rate of its period.
+        Unanswered joins are the total minus the stated sources. No figure is labelled as measured by a platform.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/JoinFrom"
+        - $ref: "#/components/parameters/JoinTo"
+        - $ref: "#/components/parameters/JoinGrouping"
+      responses:
+        "200":
+          description: The report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinNewPlayers"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /join-attribution/posts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The external post identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Attribution
+      operationId: getJoinPostEstimate
+      summary: The estimated first joins that followed one post within the attribution window.
+      description: An estimate, labelled as such. A post the caller may not see answers 404.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The estimate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinPostEstimate"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /join-attribution/series:
+    get:
+      tags:
+        - Attribution
+      operationId: getJoinSeriesEstimates
+      summary: The estimated first joins per series for the joins of a period.
+      description: |
+        Estimates, labelled as such. Posts without a series are summed under "no series", which comes last. Posts of series the
+        caller may not see are left out.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/JoinFrom"
+        - $ref: "#/components/parameters/JoinTo"
+      responses:
+        "200":
+          description: The estimates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinSeriesEstimates"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+
 components:
   securitySchemes:
     sessionCookie:
@@ -2407,6 +2627,10 @@ components:
       in: cookie
       name: __Host-menura-session
       description: The web session cookie set by the sign-in. Its value is an opaque secret, never a token.
+    joinProxyCredential:
+      type: http
+      scheme: bearer
+      description: The network proxy's own credential, sent as a bearer secret. Only its SHA-256 digest is configured in the server.
   parameters:
     Limit:
       name: limit
@@ -2581,6 +2805,41 @@ components:
       description: Only the posts in this status.
       schema:
         $ref: "#/components/schemas/PostStatus"
+
+    JoinEventId:
+      name: eventId
+      in: path
+      required: true
+      description: The event id the network proxy assigned to the join.
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    JoinFrom:
+      name: from
+      in: query
+      required: false
+      description: First day in the installation's time zone, inclusive. Default 29 days before to.
+      schema:
+        type: string
+        format: date
+    JoinTo:
+      name: to
+      in: query
+      required: false
+      description: Last day in the installation's time zone, inclusive. Default today.
+      schema:
+        type: string
+        format: date
+    JoinGrouping:
+      name: grouping
+      in: query
+      required: false
+      description: Whether a period is a calendar day or an ISO week (Monday to Sunday).
+      schema:
+        type: string
+        enum:
+          - day
+          - week
+        default: day
 
   responses:
     Problem:
@@ -4396,10 +4655,15 @@ components:
               hashtag:
                 type: string
         callToAction:
-          type:
-            - string
-            - "null"
-          description: One text for all channels that names the join domain. Null when no join domain is configured.
+          description: One call-to-action text per language (de, en) for all channels, each naming the join domain. Null when no join domain is configured.
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+              required:
+                - de
+                - en
+            - type: "null"
     AnalyticsMetricName:
       type: string
       enum:
@@ -5515,3 +5779,232 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CalendarItem"
+    JoinEventRequest:
+      type: object
+      additionalProperties: false
+      description: One join of a player. The pseudonym is a keyed hash computed at the network proxy; no other field is accepted.
+      required:
+        - eventId
+        - firstJoin
+        - joinedAt
+        - pseudonym
+      properties:
+        eventId:
+          $ref: "#/components/schemas/Identifier"
+        firstJoin:
+          type: boolean
+        joinedAt:
+          type: string
+          format: date-time
+        pseudonym:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+    JoinEventReceipt:
+      type: object
+      required:
+        - eventId
+        - firstJoin
+        - joinedAt
+      properties:
+        eventId:
+          $ref: "#/components/schemas/Identifier"
+        firstJoin:
+          type: boolean
+        joinedAt:
+          type: string
+          format: date-time
+    JoinStatedSource:
+      type: string
+      enum:
+        - youtube
+        - tiktok
+        - instagram
+        - twitch
+        - friends
+        - other
+    JoinSourceAnswerRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - source
+      properties:
+        source:
+          $ref: "#/components/schemas/JoinStatedSource"
+    JoinSourceAnswerReceipt:
+      type: object
+      required:
+        - eventId
+        - source
+        - answeredAt
+      properties:
+        eventId:
+          $ref: "#/components/schemas/Identifier"
+        source:
+          $ref: "#/components/schemas/JoinStatedSource"
+        answeredAt:
+          type: string
+          format: date-time
+    JoinSettingsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - joinDomain
+      properties:
+        joinDomain:
+          type: string
+          maxLength: 253
+          pattern: "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$"
+          description: One lower-case host name, for example onelitefeather.net.
+        attributionWindowHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          description: The window in whole hours; absent keeps the current value.
+    JoinSettings:
+      type: object
+      required:
+        - joinDomain
+        - attributionWindowHours
+        - updatedAt
+      properties:
+        joinDomain:
+          type:
+            - string
+            - "null"
+          description: The join domain, or null when none is configured.
+        attributionWindowHours:
+          type: integer
+          description: The attribution window in hours, 72 by default.
+        updatedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+    JoinStatedFigure:
+      type: object
+      description: The first joins of one period that named this source. The label says what the figure is.
+      required:
+        - source
+        - joins
+        - label
+      properties:
+        source:
+          $ref: "#/components/schemas/JoinStatedSource"
+        joins:
+          type: integer
+        label:
+          type: string
+          enum:
+            - stated by players
+    JoinPeriod:
+      type: object
+      required:
+        - start
+        - end
+        - total
+        - unanswered
+        - answerRate
+        - stated
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        total:
+          type: integer
+          description: All first joins of the period.
+        unanswered:
+          type: integer
+          description: The total minus the stated sources.
+        answerRate:
+          type:
+            - number
+            - "null"
+          description: The answered share in percent, null for a period without first joins.
+        stated:
+          type: array
+          items:
+            $ref: "#/components/schemas/JoinStatedFigure"
+    JoinNewPlayers:
+      type: object
+      required:
+        - grouping
+        - from
+        - to
+        - periods
+      properties:
+        grouping:
+          type: string
+          enum:
+            - day
+            - week
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        periods:
+          type: array
+          items:
+            $ref: "#/components/schemas/JoinPeriod"
+    JoinPostEstimate:
+      type: object
+      description: The estimated first joins of one post. Always an estimate.
+      required:
+        - postId
+        - estimatedFirstJoins
+        - windowHours
+        - label
+      properties:
+        postId:
+          $ref: "#/components/schemas/Identifier"
+        estimatedFirstJoins:
+          type: number
+        windowHours:
+          type: integer
+        label:
+          type: string
+          enum:
+            - estimate
+    JoinSeriesEstimate:
+      type: object
+      required:
+        - seriesId
+        - name
+        - estimatedFirstJoins
+      properties:
+        seriesId:
+          oneOf:
+            - $ref: "#/components/schemas/Identifier"
+            - type: "null"
+          description: The series, or null for the posts without a series.
+        name:
+          type: string
+          description: The name of the series, or "no series".
+        estimatedFirstJoins:
+          type: number
+    JoinSeriesEstimates:
+      type: object
+      required:
+        - from
+        - to
+        - label
+        - series
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        label:
+          type: string
+          enum:
+            - estimate
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/JoinSeriesEstimate"
