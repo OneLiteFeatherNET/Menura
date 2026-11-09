@@ -4,6 +4,7 @@ import net.onelitefeather.menura.core.problem.ProblemException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,6 +30,30 @@ class TranscriptsTest {
         assertEquals("webvtt", view.format(), "the format is the one detected in the file");
         assertEquals(3, view.segmentCount(), "the response reports the stored segment count");
         assertEquals(false, view.replaced(), "a first transcript replaces nothing");
+    }
+
+    @Test
+    void jsonUploadStoresTheSpeakerOfEachSegment() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);
+        String json = "[{\"start\": 1, \"end\": 2, \"speaker\": \"Alice\", \"text\": \"Speaker words\"}]";
+
+        ContentViews.TranscriptView view = f.transcripts.upload(LibraryFixture.editor(), raw, json, "req-j");
+        List<ContentRepository.SearchHit> hits = f.content.search(null, "speaker", ContentRepository.PoolFilter.NONE, 10);
+
+        assertEquals("json", view.format(), "the JSON file is stored in the JSON format");
+        assertEquals("Alice", hits.get(0).segment().speaker(), "the stored segment keeps its speaker");
+    }
+
+    @Test
+    void webVttUploadStoresNoSpeaker() throws Exception {
+        ContentFixture f = new ContentFixture();
+        UUID raw = f.rawItem(LibraryFixture.EDITOR, "Coop night", STREAM, 3600);
+
+        f.transcripts.upload(LibraryFixture.editor(), raw, THREE_CUES, "req-v");
+        List<ContentRepository.SearchHit> hits = f.content.search(null, "two", ContentRepository.PoolFilter.NONE, 10);
+
+        assertEquals(null, hits.get(0).segment().speaker(), "a WebVTT segment stores no speaker");
     }
 
     @Test

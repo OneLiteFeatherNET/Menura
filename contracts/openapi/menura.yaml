@@ -1419,10 +1419,12 @@ paths:
       operationId: uploadTranscript
       summary: Attach or replace the transcript of a raw item.
       description: |
-        The body is a WebVTT (text/vtt) or SRT (application/x-subrip) file of at most the configured transcript size
-        (10 MB by default). It is parsed into timed segments; a malformed cue is refused with a problem that names its
-        line. Replacing a transcript replaces all its segments and writes one audit entry. Menura never transcribes:
-        the transcript comes from the editing PC.
+        The body is a WebVTT (text/vtt) or SRT (application/x-subrip) file, or a JSON array (application/json) of
+        segments {start, end, speaker, text} with start and end in seconds and an optional speaker, of at most the
+        configured transcript size (10 MB by default). It is parsed into timed segments; a malformed cue is refused with
+        a problem that names its line, a malformed JSON segment with the number of its segment. A speaker is stored
+        only for JSON segments that name one. Replacing a transcript replaces all its segments and writes one audit
+        entry. Menura never transcribes: the transcript comes from the editing PC.
       security:
         - sessionCookie: []
       requestBody:
@@ -1432,6 +1434,9 @@ paths:
             schema:
               type: string
           application/x-subrip:
+            schema:
+              type: string
+          application/json:
             schema:
               type: string
           text/plain:
@@ -4226,6 +4231,7 @@ components:
           enum:
             - webvtt
             - srt
+            - json
         segmentCount:
           type: integer
         replaced:
