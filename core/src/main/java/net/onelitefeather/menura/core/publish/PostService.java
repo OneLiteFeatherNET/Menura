@@ -65,7 +65,8 @@ public final class PostService {
 
     /** A post with what its page or calendar item shows: its channel, the asset kind, steps, attempts and problems. */
     public record PostDetail(Post post, Channel channel, String assetKind, List<StepRecord> steps,
-                             List<AttemptRecord> attempts, List<DryRun.Problem> problems) {
+                             List<AttemptRecord> attempts, List<DryRun.Problem> problems, YouTubeDeclaration declaration,
+                             PostUpload upload) {
     }
 
     /** One channel of a multi-channel plan, with its own text and time. */
@@ -545,7 +546,8 @@ public final class PostService {
         List<DryRun.Problem> problems = post.status() == PostStatus.PUBLISHED || post.status() == PostStatus.FAILED
                 ? List.of() : PostFacts.problems(c, posts, channels, post, channel);
         return new PostDetail(post, channel, kind, posts.steps(c, post.id()),
-                withAttempts ? posts.attempts(c, post.id()) : List.of(), problems);
+                withAttempts ? posts.attempts(c, post.id()) : List.of(), problems, posts.declaration(c, post.id()),
+                posts.upload(c, post.id()).orElse(null));
     }
 
     private static void requireEditor(PostActor actor) {

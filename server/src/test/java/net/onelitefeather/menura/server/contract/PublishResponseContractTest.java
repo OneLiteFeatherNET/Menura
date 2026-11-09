@@ -12,6 +12,7 @@ import jakarta.inject.Inject;
 import net.onelitefeather.menura.core.channel.Channel;
 import net.onelitefeather.menura.core.channel.ConnectionState;
 import net.onelitefeather.menura.core.channel.support.InMemoryChannelStore;
+import net.onelitefeather.menura.core.publish.PostUpload;
 import net.onelitefeather.menura.core.publish.support.InMemoryPostStore;
 import net.onelitefeather.menura.server.security.HeaderIdentityFilter;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -74,6 +76,26 @@ class PublishResponseContractTest {
                 "visibility", "unlisted", "scheduledAt", "2027-01-18T17:00:00Z")));
 
         assertConforms("Post", send(HttpRequest.GET("/posts/" + created.get("id").asText())));
+    }
+
+    @Test
+    void aYouTubePostShowsItsDeclarationAndTheAppliedVisibilityAndConforms() throws Exception {
+        JsonNode created = send(HttpRequest.POST("/posts", Map.of("channelId", CHANNEL.toString(), "assetId",
+                VIDEO.toString(), "title", "Declared", "visibility", "unlisted", "scheduledAt", "2027-01-18T17:00:00Z")));
+        String id = created.get("id").asText();
+        send(HttpRequest.PUT("/posts/" + id + "/youtube-declaration", Map.of("madeForKids", false, "planShort", false)));
+        posts.putUpload(null, UUID.fromString(id), new PostUpload(null, 1, 1, "private",
+                "The platform applies private instead of unlisted."), NOW);
+
+        JsonNode shown = send(HttpRequest.GET("/posts/" + id));
+
+        assertConforms("Post", shown);
+        assertEquals(false, shown.get("madeForKids").asBoolean(), "the made-for-kids answer is shown");
+        assertEquals(true, shown.get("visibilityDeclared").asBoolean(), "the chosen visibility is shown as declared");
+        assertEquals(false, shown.get("plannedShort").asBoolean(), "the Short plan is shown");
+        assertEquals("private", shown.get("appliedVisibility").asText(), "the visibility applied by the platform is shown");
+        assertEquals("The platform applies private instead of unlisted.", shown.get("visibilityProblem").asText(),
+                "the mismatch is shown as a problem");
     }
 
     @Test

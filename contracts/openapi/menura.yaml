@@ -5261,7 +5261,38 @@ components:
         - problems
         - createdAt
         - updatedAt
+        - madeForKids
+        - visibilityDeclared
+        - plannedShort
+        - appliedVisibility
+        - visibilityProblem
       properties:
+        madeForKids:
+          description: The YouTube made-for-kids answer, or null when none was given or the platform is not YouTube.
+          type:
+            - boolean
+            - "null"
+        visibilityDeclared:
+          description: Whether a person chose the visibility of the post; YouTube scheduling needs it.
+          type: boolean
+        plannedShort:
+          description: Whether the post is planned as a YouTube Short (checked by the dry run).
+          type: boolean
+        appliedVisibility:
+          description: The visibility the platform applied after upload, read back; null before the upload completed.
+          type:
+            - string
+            - "null"
+          enum:
+            - private
+            - unlisted
+            - public
+            - null
+        visibilityProblem:
+          description: The mismatch between the requested and the applied visibility, shown as a problem; null when they agree.
+          type:
+            - string
+            - "null"
         id:
           $ref: "#/components/schemas/Identifier"
         channelId:
