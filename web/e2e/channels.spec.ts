@@ -1,8 +1,9 @@
-import { APP, expect, signInAs, test } from './fixtures';
+import { APP, SEEDED_CHANNEL, expect, signInAs, test } from './fixtures';
 
-// The consent of a real platform is never reached here: the flow stops at the platform list, the empty channel list
-// and the audit status, which are all answered by the server without an external call.
-test('an administrator sees the platforms and an empty channel list, and records an audit status', async ({ page }) => {
+// The consent of a real platform is never reached here: the flow stops at the platform list, the channel list with the
+// seeded channel (web/e2e/support/seed.sql) and the audit status, which are all answered by the server without an
+// external call.
+test('an administrator sees the platforms and the seeded channel, and records an audit status', async ({ page }) => {
   await signInAs(page, 'admin');
   await expect(page.getByTestId('session-role')).toHaveText('Administration');
 
@@ -11,7 +12,7 @@ test('an administrator sees the platforms and an empty channel list, and records
   await expect(page).toHaveURL(`${APP}channels`);
   await expect(page.getByRole('heading', { level: 1, name: 'Kanäle' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Kanal verbinden' })).toBeEnabled();
-  await expect(page.getByText('Noch kein Kanal verbunden.')).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Verbundene Kanäle' }).getByText(SEEDED_CHANNEL)).toBeVisible();
 
   const platform = page.getByRole('row', { name: /YouTube/ });
   await expect(platform.getByText('Unbekannt')).toBeVisible();
