@@ -943,7 +943,8 @@ paths:
       description: |
         The version named by version, else the version the consumer has pinned, else the newest one. The bundle holds
         every colour token with its light and dark values, every typography role with its font file reference, every
-        mark with its safe area per variant, the per-language texts and hashtags, and the layout templates.
+        mark with its safe area per variant, the per-language texts and hashtags, the layout templates, and the
+        installation join domain (joinDomain, null while none is configured) for the short's join_domain parameter.
       security:
         - sessionCookie: []
       parameters:
@@ -955,7 +956,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BrandKitVersion"
+                $ref: "#/components/schemas/BrandKitRenderBundle"
         "400":
           $ref: "#/components/responses/Problem"
         "401":
@@ -6141,3 +6142,16 @@ components:
         resetsAt:
           type: string
           format: date-time
+    BrandKitRenderBundle:
+      description: >-
+        The render bundle of a version: the version and its whole kit, plus the installation join domain. The join domain
+        is the join_domain parameter of the short's call to action; it is the same for every channel.
+      allOf:
+        - $ref: "#/components/schemas/BrandKitVersion"
+        - type: object
+          properties:
+            joinDomain:
+              type:
+                - string
+                - "null"
+              description: The installation join domain, or null while none is configured.
