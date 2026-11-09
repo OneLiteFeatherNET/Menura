@@ -26,7 +26,7 @@ class RawMediaTest {
         UUID clip = f.library.createClip(LibraryFixture.editor(),
                 new ContentLibrary.ClipRequest(raw, 10, 20, "Cut", Set.of(), null), "req-1").id();
         UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short",
-                new TimelineDocument(null, List.of(clip), List.of(), List.of(), List.of()), "req-2").id();
+                new TimelineDocument("short-9x16", List.of(clip), List.of(), List.of(), List.of()), "req-2").id();
         f.timelines.register(LibraryFixture.editor(), f.finishedVideo(LibraryFixture.EDITOR), timeline, "Short", "req-3");
 
         media(f).removeMedia(LibraryFixture.editor(), raw, "req-4");

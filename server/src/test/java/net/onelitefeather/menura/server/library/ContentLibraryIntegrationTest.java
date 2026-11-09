@@ -273,7 +273,7 @@ class ContentLibraryIntegrationTest {
     }
 
     private static TimelineDocument document(UUID... clips) {
-        return new TimelineDocument(null, List.of(clips), List.of(), List.of(), List.of());
+        return new TimelineDocument("short-9x16", List.of(clips), List.of(), List.of(), List.of());
     }
 
     /** One fixture per test: the services over the real PostgreSQL store, and the seeding helpers. */
@@ -287,7 +287,8 @@ class ContentLibraryIntegrationTest {
         final AuditLog audit = new AuditLog(tx, clock, identifiers, new JdbcAuditRepository());
         final ContentLibrary library = new ContentLibrary(tx, clock, identifiers, content, audit);
         final Transcripts transcripts = new Transcripts(tx, clock, content, audit, 10 * MIB);
-        final Timelines timelines = new Timelines(tx, clock, identifiers, content, new JdbcAssetRepository(), audit);
+        final Timelines timelines = new Timelines(tx, clock, identifiers, content, new JdbcAssetRepository(), audit,
+                ContentFixture.BRAND_KIT_TEMPLATES);
         final FakeObjectStorage storage = FakeObjectStorage.withClock(clock);
         final RawMedia rawMedia = new RawMedia(tx, content, storage, audit);
 

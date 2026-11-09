@@ -279,7 +279,7 @@ class ContentLibraryTest {
         UUID clip = f.library.createClip(LibraryFixture.editor(),
                 new ContentLibrary.ClipRequest(used, 10, 20, "Cut", Set.of(), null), "req-1").id();
         f.timelines.store(LibraryFixture.editor(), "Short",
-                new TimelineDocument(null, List.of(clip), List.of(), List.of(), List.of()), "req-2");
+                new TimelineDocument("short-9x16", List.of(clip), List.of(), List.of(), List.of()), "req-2");
 
         ContentViews.PoolPageView usedPage = f.library.pool(LibraryFixture.viewer(),
                 new ContentLibrary.PoolQuery(false, null, null, null, null, "used", null, null), null, 50);
@@ -301,7 +301,7 @@ class ContentLibraryTest {
         UUID clip = f.library.createClip(LibraryFixture.editor(),
                 new ContentLibrary.ClipRequest(raw, 10, 20, "Cut", Set.of(), null), "req-1").id();
         UUID timeline = f.timelines.store(LibraryFixture.editor(), "Short",
-                new TimelineDocument(null, List.of(clip), List.of(), List.of(), List.of()), "req-2").id();
+                new TimelineDocument("short-9x16", List.of(clip), List.of(), List.of(), List.of()), "req-2").id();
         f.timelines.register(LibraryFixture.editor(), f.finishedVideo(LibraryFixture.EDITOR), timeline, "Short 9x16", "req-3");
 
         ContentViews.PoolPageView page = f.library.pool(LibraryFixture.viewer(), ContentLibrary.PoolQuery.NONE, null, 50);

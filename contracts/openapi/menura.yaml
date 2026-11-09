@@ -4264,7 +4264,8 @@ components:
           type:
             - string
             - "null"
-          description: Reference to a layout template of the brand kit.
+          description: The format of a layout template of the newest brand kit version, for example short-9x16. A timeline
+            with an unknown or missing template is refused with a problem that names the template.
         sourceClipIds:
           type: array
           minItems: 1
