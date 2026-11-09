@@ -1,8 +1,8 @@
 {{- if .Values.jobs.publishDue.enabled }}
 # Publishes the due scheduled posts (change add-content-distribution, jobs run publish-due). Each run claims the due posts
 # with leases, so two runs never publish one post; the CronJob runs one job at a time (parallelism 1, concurrencyPolicy
-# Forbid). The run reads the token keys and the platform apps from channels.existingSecret through envFrom and prints
-# counts only.
+# Forbid). The run reads the token keys and the platform apps from channels.existingSecret, and the finished assets from
+# object storage with the storage credentials (storage.existingSecret), both through envFrom; it prints counts only.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -53,7 +53,7 @@ spec:
                 {{- include "menura.databaseEnv" . | nindent 16 }}
                 {{- include "menura.channelEnv" . | nindent 16 }}
                 {{- include "menura.libraryEnv" . | nindent 16 }}
-              {{- include "menura.secretEnvFrom" . | nindent 14 }}
+              {{- include "menura.publishJobSecretEnvFrom" . | nindent 14 }}
               {{- include "menura.containerSecurity" . | nindent 14 }}
               {{- with .Values.jobs.resources }}
               resources:

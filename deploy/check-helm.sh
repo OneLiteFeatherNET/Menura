@@ -246,7 +246,7 @@ fi
 
 # Object storage of the library (add-asset-upload): with storage.existingSecret set, only the server pods get the S3
 # credentials, the bucket and endpoint come from values, and the part size never exceeds 95 MB (principle 15).
-helm template "$release" "$chart" --set storage.existingSecret=menura-storage >"$rendered_storage"
+helm template "$release" "$chart" --set storage.existingSecret=menura-storage --set jobs.retention.enabled=true >"$rendered_storage"
 server_env() {
   yq -N "select(.kind == \"Deployment\") | select(.metadata.labels.\"app.kubernetes.io/component\" == \"server\") | .spec.template.spec.containers[0].env[] | select(.name == \"$1\") | .value" "$rendered_storage"
 }
@@ -270,6 +270,13 @@ if grep -q 'MENURA_S3_SECRET_ACCESS_KEY' <(yq -N 'select(.kind == "Deployment" o
 fi
 if grep -q 'menura-storage' <(yq -N 'select(.kind == "Deployment" or .kind == "Job") | select(.metadata.labels."app.kubernetes.io/component" != "server")' "$rendered_storage"); then
   report "the jobs and migrate pods must not reference the storage Secret"
+fi
+
+# The publication CronJob streams finished assets from object storage (the YouTube upload), so it reads the storage Secret
+# through envFrom. No other job CronJob reads object storage, so none of them may get it.
+storage_cronjobs="$(yq -N 'select(.kind == "CronJob") | select(.spec.jobTemplate.spec.template.spec.containers[0].envFrom[]?.secretRef.name == "menura-storage") | .metadata.name' "$rendered_storage" | sort)"
+if [[ "$storage_cronjobs" != "$release-publish-due" ]]; then
+  report "only the publication CronJob may read the storage Secret menura-storage (found '$storage_cronjobs')"
 fi
 
 # Channel connections (change add-channel-connections): the token key and the YouTube client secret reach the pods only
