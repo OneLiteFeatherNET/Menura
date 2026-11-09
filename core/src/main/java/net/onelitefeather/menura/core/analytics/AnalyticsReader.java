@@ -3,6 +3,8 @@ package net.onelitefeather.menura.core.analytics;
 import net.onelitefeather.menura.core.analytics.MetricStore.CollectionStatus;
 import net.onelitefeather.menura.core.analytics.MetricStore.PointValue;
 import net.onelitefeather.menura.core.analytics.MetricStore.SnapshotValue;
+import net.onelitefeather.menura.core.analytics.Rollups.OffsetGroup;
+import net.onelitefeather.menura.core.analytics.Rollups.Rollup;
 import net.onelitefeather.menura.core.auth.Role;
 import net.onelitefeather.menura.core.channel.Channel;
 import net.onelitefeather.menura.core.channel.ChannelStore;
@@ -11,13 +13,15 @@ import net.onelitefeather.menura.core.post.ExternalPost;
 import net.onelitefeather.menura.core.post.ExternalPostStore;
 import net.onelitefeather.menura.core.problem.ProblemException;
 import net.onelitefeather.menura.core.series.ContentSeries;
+import net.onelitefeather.menura.core.series.SeriesAssignment;
 import net.onelitefeather.menura.core.series.SeriesStore;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.IsoFields;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -29,14 +33,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
-import java.util.function.ToIntFunction;
 
 /**
  * The read models of content analytics (change add-content-analytics): the overview across channels, per channel and per
  * format, the series comparison per week, the comparison at equal age by publish hour and weekday, and the analytics of
- * one post. Aggregates are computed from the latest values and the snapshots, never from raw points; raw points are read
- * only through {@link #points}.
+ * one post. Every aggregate is read from the rollups (daily, weekly and the equal-age groups), never from the raw points or
+ * the latest values; raw points are read only through {@link #points}.
  */
 public final class AnalyticsReader {
 
@@ -68,7 +72,7 @@ public final class AnalyticsReader {
         this.series = series;
     }
 
-    /** A labelled group of an aggregate: a channel, a format or a series. */
+    /** A labelled group of an aggregate: a channel or a format. */
     public record Row(String key, String label, Aggregation.Group group) {
     }
 
@@ -84,15 +88,26 @@ public final class AnalyticsReader {
                            List<ChannelStatus> collections) {
     }
 
-    /** One week of one series. */
-    public record WeekRow(String isoWeek, LocalDate weekStart, Aggregation.Group group) {
+    /**
+     * One metric of an internal source over a period: the sum of its values and their count, with the estimate flag. A value
+     * is null when no value of the metric was stored.
+     */
+    public record InternalTotal(String source, String metric, boolean estimate, Double value, int values) {
     }
 
-    /** One series of the comparison; {@code seriesId} and {@code label} are null for posts in no series. */
-    public record SeriesRow(UUID seriesId, String label, Aggregation.Group group, List<WeekRow> weeks) {
+    /** One week of one series: the platform aggregate and the internal metrics of the series that week. */
+    public record WeekRow(String isoWeek, LocalDate weekStart, Aggregation.Group group, List<InternalTotal> internal) {
     }
 
-    /** The series comparison, ranked by engaged views. */
+    /**
+     * One series of the comparison; {@code seriesId} and {@code label} are null for posts in no series. The internal metrics
+     * are the series' values of the registered sources over the period.
+     */
+    public record SeriesRow(UUID seriesId, String label, Aggregation.Group group, List<WeekRow> weeks,
+                            List<InternalTotal> internal) {
+    }
+
+    /** The series comparison over the ISO weeks overlapping the period, ranked by engaged views. */
     public record SeriesComparison(LocalDate from, LocalDate to, List<SeriesRow> series) {
     }
 
@@ -140,9 +155,9 @@ public final class AnalyticsReader {
 
     /** The overview of the posts published from {@code from} to {@code to}, both included, in the team's time zone. */
     public Overview overview(LocalDate from, LocalDate to, Set<Role> roles) throws SQLException {
-        Period period = period(from, to);
+        validate(from, to);
         return transactions.inTransaction(c -> {
-            List<Observation> observations = metrics.latest(c, period.start(), period.end(), roleNames(roles));
+            List<Rollup> rows = platformRows(metrics.dailyRows(c, from, to, roleNames(roles)));
             Map<UUID, String> names = new HashMap<>();
             List<ChannelStatus> statuses = new ArrayList<>();
             for (CollectionStatus status : metrics.statuses(c)) {
@@ -153,54 +168,67 @@ public final class AnalyticsReader {
                             channel.get().platform(), status));
                 }
             }
-            for (Observation observation : observations) {
-                if (!names.containsKey(observation.channelId())) {
-                    names.put(observation.channelId(), channels.findChannel(c, observation.channelId())
+            for (Rollup row : rows) {
+                if (row.grain().channelId() != null && !names.containsKey(row.grain().channelId())) {
+                    names.put(row.grain().channelId(), channels.findChannel(c, row.grain().channelId())
                             .map(Channel::displayName).orElse(""));
                 }
             }
-            Aggregation.Group totals = Aggregation.total("all", observations);
-            List<Row> byChannel = labelled(Aggregation.groups(observations, o -> o.channelId().toString()), names);
-            List<Row> byFormat = labelled(Aggregation.groups(observations, Observation::format), Map.of());
+            Aggregation.Group totals = Aggregation.total("all", rows);
+            List<Row> byChannel = labelled(Aggregation.groups(rows, r -> String.valueOf(r.grain().channelId())), names);
+            List<Row> byFormat = labelled(Aggregation.groups(rows, r -> String.valueOf(r.grain().format())), Map.of());
             return new Overview(from, to, totals, byChannel, byFormat, statuses);
         });
     }
 
-    /** The series comparison of the posts published from {@code from} to {@code to}, per series and per ISO week. */
+    /**
+     * The series comparison over the ISO weeks that overlap the period, per series and per week. Internal metrics are shown
+     * for the series they were written for, with their estimate flag.
+     */
     public SeriesComparison series(LocalDate from, LocalDate to, Set<Role> roles) throws SQLException {
-        Period period = period(from, to);
+        validate(from, to);
+        LocalDate firstWeek = MetricRollups.weekStart(from);
         return transactions.inTransaction(c -> {
-            List<Observation> observations = metrics.latest(c, period.start(), period.end(), roleNames(roles));
+            List<Rollup> rows = metrics.weeklyRows(c, firstWeek, to, roleNames(roles));
             Map<UUID, String> names = new HashMap<>();
             for (ContentSeries found : series.list(c)) {
                 names.put(found.id(), found.name());
             }
-            Map<String, List<Observation>> bySeries = new LinkedHashMap<>();
-            for (Observation observation : observations) {
-                String key = observation.seriesId() == null ? "" : observation.seriesId().toString();
-                bySeries.computeIfAbsent(key, k -> new ArrayList<>()).add(observation);
+            Map<String, List<Rollup>> bySeries = new LinkedHashMap<>();
+            for (Rollup row : rows) {
+                bySeries.computeIfAbsent(keyOf(row.grain().seriesId()), k -> new ArrayList<>()).add(row);
             }
-            List<SeriesRow> rows = new ArrayList<>();
-            for (Map.Entry<String, List<Observation>> entry : bySeries.entrySet()) {
-                List<Observation> own = entry.getValue();
+            List<SeriesRow> result = new ArrayList<>();
+            for (Map.Entry<String, List<Rollup>> entry : bySeries.entrySet()) {
                 UUID seriesId = entry.getKey().isEmpty() ? null : UUID.fromString(entry.getKey());
-                String label = seriesId == null ? null : names.getOrDefault(seriesId, "");
+                List<Rollup> own = entry.getValue();
+                // Internal values count for a series only; a channel or installation value is not a series value.
+                List<Rollup> platform = platformRows(own);
+                List<Rollup> internal = seriesId == null ? List.of() : own.stream()
+                        .filter(row -> !row.grain().platformValue()).toList();
+                Map<LocalDate, List<Rollup>> byWeek = new TreeMap<>();
+                for (Rollup row : platform) {
+                    byWeek.computeIfAbsent(row.period(), k -> new ArrayList<>()).add(row);
+                }
+                Map<LocalDate, List<Rollup>> internalByWeek = new TreeMap<>();
+                for (Rollup row : internal) {
+                    internalByWeek.computeIfAbsent(row.period(), k -> new ArrayList<>()).add(row);
+                }
+                TreeSet<LocalDate> weekStarts = new TreeSet<>(byWeek.keySet());
+                weekStarts.addAll(internalByWeek.keySet());
                 List<WeekRow> weeks = new ArrayList<>();
-                Map<String, List<Observation>> byWeek = new TreeMap<>();
-                for (Observation observation : own) {
-                    byWeek.computeIfAbsent(slots.isoWeek(observation.publishedAt()), k -> new ArrayList<>())
-                            .add(observation);
+                for (LocalDate weekStart : weekStarts) {
+                    List<Rollup> weekPlatform = byWeek.getOrDefault(weekStart, List.of());
+                    List<InternalTotal> weekInternal = internalTotals(internalByWeek.getOrDefault(weekStart, List.of()));
+                    weeks.add(new WeekRow(isoWeek(weekStart), weekStart, Aggregation.total(isoWeek(weekStart), weekPlatform),
+                            weekInternal));
                 }
-                for (Map.Entry<String, List<Observation>> week : byWeek.entrySet()) {
-                    Instant anyPublish = week.getValue().get(0).publishedAt();
-                    weeks.add(new WeekRow(week.getKey(), slots.weekStart(anyPublish),
-                            Aggregation.total(week.getKey(), week.getValue())));
-                }
-                rows.add(new SeriesRow(seriesId, label, Aggregation.total(entry.getKey(), own), weeks));
+                result.add(new SeriesRow(seriesId, seriesId == null ? null : names.getOrDefault(seriesId, ""),
+                        Aggregation.total(entry.getKey(), platform), weeks, internalTotals(internal)));
             }
-            rows.sort(Comparator.comparingDouble((SeriesRow row) -> -engagedViews(row.group()))
+            result.sort(Comparator.comparingDouble((SeriesRow row) -> -engagedViews(row.group()))
                     .thenComparing(row -> row.label() == null ? "" : row.label()));
-            return new SeriesComparison(from, to, rows);
+            return new SeriesComparison(from, to, result);
         });
     }
 
@@ -218,33 +246,30 @@ public final class AnalyticsReader {
                             + Offsets.MAX_DAY + ".");
         }
         return transactions.inTransaction(c -> {
-            List<Observation> observations = metrics.snapshots(c, offset, metric, channelId);
-            ToIntFunction<Observation> slot = by == By.HOUR
-                    ? o -> slots.hour(o.publishedAt())
-                    : o -> slots.weekday(o.publishedAt());
-            List<Aggregation.Slot> buckets = Aggregation.medianBySlot(observations, metric, by.first(), by.last(), slot);
-            return new EqualAge(metric, offset, by, channelId, this.slots.zone().getId(), buckets);
+            List<OffsetGroup> groups = metrics.offsetGroups(c, offset, metric, channelId);
+            List<Aggregation.Slot> buckets = by == By.HOUR
+                    ? Aggregation.medianBySlot(groups, metric, by.first(), by.last(), OffsetGroup::publishHour)
+                    : Aggregation.medianBySlot(groups, metric, by.first(), by.last(), OffsetGroup::publishWeekday);
+            return new EqualAge(metric, offset, by, channelId, slots.zone().getId(), buckets);
         });
     }
 
-    /** The analytics of one post; a post that does not exist answers 404. */
-    public PostDetail post(UUID postId) throws SQLException {
+    /** The analytics of one post a caller may see; a post that does not exist, or whose series the roles may not see, is 404. */
+    public PostDetail post(UUID postId, Set<Role> roles) throws SQLException {
         return transactions.inTransaction(c -> {
-            ExternalPost post = posts.find(c, postId).orElseThrow(() -> notFound());
+            ExternalPost post = visible(c, postId, roles);
             return new PostDetail(post, metrics.latestOf(c, postId), metrics.snapshotsOf(c, postId));
         });
     }
 
-    /** The raw points of one post, optionally of one metric, in collection-time order. */
-    public List<PointValue> points(UUID postId, String metric, int limit) throws SQLException {
+    /** The raw points of one post a caller may see, optionally of one metric, in collection-time order. */
+    public List<PointValue> points(UUID postId, Set<Role> roles, String metric, int limit) throws SQLException {
         if (metric != null && !Metrics.isKnown(metric)) {
             throw new ProblemException(400, "Invalid metric", "The metric is not known.");
         }
         int bounded = Math.max(1, Math.min(limit, MAX_POINTS));
         return transactions.inTransaction(c -> {
-            if (posts.find(c, postId).isEmpty()) {
-                throw notFound();
-            }
+            visible(c, postId, roles);
             return metrics.points(c, postId, metric, bounded);
         });
     }
@@ -268,14 +293,63 @@ public final class AnalyticsReader {
         return 0;
     }
 
-    private Period period(LocalDate from, LocalDate to) {
+    /** The post, when its series is visible to the roles; otherwise the same 404 as a post that does not exist. */
+    private ExternalPost visible(Connection c, UUID postId, Set<Role> roles) throws SQLException {
+        ExternalPost post = posts.find(c, postId).orElseThrow(() -> notFound());
+        Optional<SeriesAssignment> assignment = series.findAssignment(c, postId);
+        if (assignment.isPresent() && assignment.get().seriesId() != null) {
+            Optional<ContentSeries> found = series.find(c, assignment.get().seriesId());
+            if (found.isPresent() && !found.get().isVisibleTo(roles)) {
+                throw notFound();
+            }
+        }
+        return post;
+    }
+
+    private static void validate(LocalDate from, LocalDate to) {
         if (from == null || to == null || to.isBefore(from)) {
             throw new ProblemException(400, "Invalid period", "The period must start on or before its end date.");
         }
         if (from.plusDays(MAX_DAYS).isBefore(to)) {
             throw new ProblemException(400, "Invalid period", "The period may cover at most " + MAX_DAYS + " days.");
         }
-        return new Period(slots.startOf(from), slots.startOf(to.plusDays(1)));
+    }
+
+    private static List<Rollup> platformRows(List<Rollup> rows) {
+        return rows.stream().filter(row -> row.grain().platformValue()).toList();
+    }
+
+    /** The internal metrics of rows, summed per source, metric and estimate flag, sorted. */
+    static List<InternalTotal> internalTotals(List<Rollup> rows) {
+        Map<String, Rollup> first = new TreeMap<>();
+        Map<String, long[]> sums = new TreeMap<>();
+        for (Rollup row : rows) {
+            if (row.grain().platformValue()) {
+                continue;
+            }
+            String key = row.grain().source() + "\u0000" + row.metric() + "\u0000" + row.grain().estimate();
+            first.putIfAbsent(key, row);
+            long[] sum = sums.computeIfAbsent(key, k -> new long[2]);
+            sum[0] += row.valuesCount();
+            sum[1] += row.total();
+        }
+        List<InternalTotal> totals = new ArrayList<>();
+        for (Map.Entry<String, Rollup> entry : first.entrySet()) {
+            long[] sum = sums.get(entry.getKey());
+            Rollup row = entry.getValue();
+            totals.add(new InternalTotal(row.grain().source(), row.metric(), row.grain().estimate(),
+                    sum[0] == 0 ? null : (double) sum[1], (int) sum[0]));
+        }
+        return totals;
+    }
+
+    private static String keyOf(UUID seriesId) {
+        return seriesId == null ? "" : seriesId.toString();
+    }
+
+    private static String isoWeek(LocalDate weekStart) {
+        return String.format("%04d-W%02d", weekStart.get(IsoFields.WEEK_BASED_YEAR),
+                weekStart.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
     }
 
     private static Set<String> roleNames(Set<Role> roles) {
@@ -306,8 +380,5 @@ public final class AnalyticsReader {
 
     private static ProblemException notFound() {
         return new ProblemException(404, "Not found", "No external post with this identifier is visible to you.");
-    }
-
-    private record Period(Instant start, Instant end) {
     }
 }

@@ -1,8 +1,11 @@
 package net.onelitefeather.menura.core.analytics;
 
+import net.onelitefeather.menura.core.analytics.Rollups.Grain;
+import net.onelitefeather.menura.core.analytics.Rollups.OffsetGroup;
+import net.onelitefeather.menura.core.analytics.Rollups.Rollup;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -10,13 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/** The aggregation of rollup rows and the median of equal-age groups, without a database. */
 class AggregationTest {
 
-    private static final Instant PUBLISHED = Instant.parse("2026-11-09T17:00:00Z");
+    private static final LocalDate DAY = LocalDate.of(2026, 11, 9);
+    private static final UUID CHANNEL = UUID.nameUUIDFromBytes("channel".getBytes());
 
-    private static Observation view(UUID post, String metric, Long value) {
-        return new Observation(post, UUID.nameUUIDFromBytes("channel".getBytes()), "metrics", "short", null, PUBLISHED,
-                metric, value);
+    private static Rollup row(String format, String metric, int posts, int values, long total) {
+        return new Rollup(DAY, Grain.platform(CHANNEL, format, 18, null, null, null), metric, posts, values, total);
     }
 
     @Test
@@ -36,8 +40,8 @@ class AggregationTest {
 
     @Test
     void aMetricNoPostProvidesIsUnavailableInTheGroupNotZero() {
-        UUID post = UUID.randomUUID();
-        Aggregation.Group group = Aggregation.total("all", List.of(view(post, Metrics.VIEWS, 40L)));
+        Aggregation.Group group = Aggregation.total("all", List.of(row("short", Metrics.VIEWS, 1, 1, 40L),
+                row("short", Metrics.WATCH_TIME, 1, 0, 0L)));
 
         Aggregation.Total watch = total(group, Metrics.WATCH_TIME);
 
@@ -46,21 +50,21 @@ class AggregationTest {
     }
 
     @Test
-    void countsAreSummedOverPosts() {
-        Aggregation.Group group = Aggregation.total("all", List.of(view(UUID.randomUUID(), Metrics.VIEWS, 100L),
-                view(UUID.randomUUID(), Metrics.VIEWS, 50L)));
+    void countsAreSummedOverTheRows() {
+        Aggregation.Group group = Aggregation.total("all", List.of(row("short", Metrics.VIEWS, 1, 1, 100L),
+                row("long", Metrics.VIEWS, 1, 1, 50L)));
 
         Aggregation.Total views = total(group, Metrics.VIEWS);
 
-        assertEquals(150.0, views.value(), "the views of two posts add up");
-        assertEquals(2, views.posts(), "two posts contributed a views value");
+        assertEquals(150.0, views.value(), "the views of two grains add up");
+        assertEquals(2, views.posts(), "two values contributed to the views");
     }
 
     @Test
-    void anAveragePercentageIsAveragedNotSummed() {
+    void anAveragePercentageIsTheSumOverTheValuesNotTheSum() {
         Aggregation.Group group = Aggregation.total("all", List.of(
-                view(UUID.randomUUID(), Metrics.AVERAGE_VIEW_PERCENTAGE, 40L),
-                view(UUID.randomUUID(), Metrics.AVERAGE_VIEW_PERCENTAGE, 60L)));
+                row("short", Metrics.AVERAGE_VIEW_PERCENTAGE, 1, 1, 40L),
+                row("short", Metrics.AVERAGE_VIEW_PERCENTAGE, 1, 1, 60L)));
 
         Aggregation.Total average = total(group, Metrics.AVERAGE_VIEW_PERCENTAGE);
 
@@ -69,33 +73,30 @@ class AggregationTest {
     }
 
     @Test
-    void groupsAreSortedByTheirKeyAndCountDistinctPosts() {
-        UUID first = UUID.randomUUID();
-        List<Observation> observations = List.of(view(first, Metrics.VIEWS, 1L), view(first, Metrics.LIKES, 2L),
-                view(UUID.randomUUID(), Metrics.VIEWS, 3L));
+    void groupsAreSortedByTheirKeyAndCountTheDistinctPostsOfTheViewsRows() {
+        List<Rollup> rows = List.of(
+                new Rollup(DAY, Grain.platform(CHANNEL, "b", 18, null, null, null), Metrics.VIEWS, 2, 2, 3L),
+                new Rollup(DAY, Grain.platform(CHANNEL, "b", 18, null, null, null), Metrics.LIKES, 2, 1, 1L),
+                new Rollup(DAY, Grain.platform(CHANNEL, "a", 18, null, null, null), Metrics.VIEWS, 1, 1, 1L));
 
-        List<Aggregation.Group> groups = Aggregation.groups(observations, o -> o.metric().equals(Metrics.VIEWS) ? "b" : "a");
+        List<Aggregation.Group> groups = Aggregation.groups(rows, Rollup -> Rollup.grain().format());
 
         assertEquals("a", groups.get(0).key(), "the groups come back sorted by key");
-        assertEquals(1, groups.get(0).posts(), "the like of the first post is one post, not two");
-        assertEquals(2, groups.get(1).posts(), "two distinct posts have views in group b");
+        assertEquals(1, groups.get(0).posts(), "one post in group a");
+        assertEquals(2, groups.get(1).posts(), "two posts in group b, counted once each");
     }
 
     @Test
-    void theMedianPerSlotCoversEverySlotAndSkipsAbsentSnapshots() {
-        List<Observation> snapshots = List.of(
-                new Observation(UUID.randomUUID(), null, "metrics", "short", null, PUBLISHED, Metrics.VIEWS, 100L),
-                new Observation(UUID.randomUUID(), null, "metrics", "short", null, PUBLISHED, Metrics.VIEWS, 200L),
-                new Observation(UUID.randomUUID(), null, "metrics", "short", null, PUBLISHED, Metrics.VIEWS, 900L),
-                new Observation(UUID.randomUUID(), null, "metrics", "short", null, PUBLISHED, Metrics.VIEWS, null));
+    void theMedianPerSlotCoversEverySlotAndCountsOnlyTheValuesThatExist() {
+        List<OffsetGroup> groups = List.of(
+                new OffsetGroup(DAY, CHANNEL, 18, 1, 1440, Metrics.VIEWS, List.of(100L, 200L)),
+                new OffsetGroup(DAY, CHANNEL, 18, 1, 1440, Metrics.VIEWS, List.of(900L)));
 
-        List<Aggregation.Slot> slots = Aggregation.medianBySlot(snapshots, Metrics.VIEWS, 0, 23,
-                o -> new PublishSlot(java.time.ZoneId.of("Europe/Berlin")).hour(o.publishedAt()));
+        List<Aggregation.Slot> slots = Aggregation.medianBySlot(groups, Metrics.VIEWS, 0, 23, OffsetGroup::publishHour);
 
         assertEquals(24, slots.size(), "every hour of the day is reported");
-        Aggregation.Slot eighteen = slots.get(18);
-        assertEquals(3, eighteen.posts(), "the absent snapshot is not counted");
-        assertEquals(200.0, eighteen.median(), "the median of 100, 200 and 900 is 200");
+        assertEquals(3, slots.get(18).posts(), "the three values of the hour are used");
+        assertEquals(200.0, slots.get(18).median(), "the median of 100, 200 and 900 is 200");
         assertEquals(0, slots.get(3).posts(), "an hour without posts has no posts");
         assertNull(slots.get(3).median(), "an hour without posts has no median");
     }

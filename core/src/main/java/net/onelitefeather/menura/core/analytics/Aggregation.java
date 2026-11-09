@@ -1,19 +1,19 @@
 package net.onelitefeather.menura.core.analytics;
 
+import net.onelitefeather.menura.core.analytics.Rollups.OffsetGroup;
+import net.onelitefeather.menura.core.analytics.Rollups.Rollup;
+
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
 /**
- * The pure aggregation of observations (change add-content-analytics): sums and averages per group, and the median per
- * publish slot at equal age. No I/O, so the rules are tested without a database.
+ * The aggregation of rollup rows (change add-content-analytics): sums per group, averages for the percentage, and the
+ * median per slot at equal age. No I/O, so the rules are tested without a database.
  *
  * <p>An unavailable metric is never summed as zero: a group with no value for a metric reports it as null with a count of
  * zero, and the count of values used is always reported next to the value.
@@ -23,7 +23,7 @@ public final class Aggregation {
     private Aggregation() {
     }
 
-    /** One metric of a group: its value (null when unavailable), the number of posts that contributed, and its kind. */
+    /** One metric of a group: its value (null when unavailable), the number of values used, and its kind. */
     public record Total(String name, Double value, int posts, boolean average) {
     }
 
@@ -36,65 +36,61 @@ public final class Aggregation {
     }
 
     /**
-     * Groups the observations by key and aggregates every metric of each group: a sum for counts, an average for the
-     * percentage metrics. Groups come back sorted by key.
+     * Groups the rollup rows by key and aggregates every metric of each group. Groups come back sorted by key.
      */
-    public static List<Group> groups(Collection<Observation> observations, Function<Observation, String> keyOf) {
-        Map<String, List<Observation>> byKey = new TreeMap<>();
-        for (Observation observation : observations) {
-            byKey.computeIfAbsent(keyOf.apply(observation), key -> new ArrayList<>()).add(observation);
+    public static List<Group> groups(Collection<Rollup> rows, Function<Rollup, String> keyOf) {
+        Map<String, List<Rollup>> byKey = new TreeMap<>();
+        for (Rollup row : rows) {
+            byKey.computeIfAbsent(keyOf.apply(row), key -> new ArrayList<>()).add(row);
         }
         List<Group> groups = new ArrayList<>();
-        for (Map.Entry<String, List<Observation>> entry : byKey.entrySet()) {
-            groups.add(group(entry.getKey(), entry.getValue()));
+        for (Map.Entry<String, List<Rollup>> entry : byKey.entrySet()) {
+            groups.add(total(entry.getKey(), entry.getValue()));
         }
         return groups;
     }
 
-    /** The aggregate of all observations as one group under the given key. */
-    public static Group total(String key, Collection<Observation> observations) {
-        return group(key, List.copyOf(observations));
-    }
-
-    private static Group group(String key, List<Observation> observations) {
-        Set<UUID> posts = new HashSet<>();
-        for (Observation observation : observations) {
-            posts.add(observation.postId());
-        }
+    /**
+     * The aggregate of rollup rows as one group. The post count is the number of distinct posts of the platform views
+     * rows, which carry every post of their grain once.
+     */
+    public static Group total(String key, Collection<Rollup> rows) {
+        int posts = 0;
         List<Total> totals = new ArrayList<>();
+        for (Rollup row : rows) {
+            if (Metrics.VIEWS.equals(row.metric()) && row.grain().platformValue()) {
+                posts += row.posts();
+            }
+        }
         for (String metric : Metrics.ALL) {
-            List<Long> values = new ArrayList<>();
-            for (Observation observation : observations) {
-                if (metric.equals(observation.metric()) && observation.value() != null) {
-                    values.add(observation.value());
+            long values = 0;
+            long sum = 0;
+            for (Rollup row : rows) {
+                if (metric.equals(row.metric())) {
+                    values += row.valuesCount();
+                    sum += row.total();
                 }
             }
             boolean average = Metrics.isAverage(metric);
             Double value = null;
-            if (!values.isEmpty()) {
-                double sum = 0;
-                for (long v : values) {
-                    sum += v;
-                }
-                value = average ? sum / values.size() : sum;
+            if (values > 0) {
+                value = average ? (double) sum / values : (double) sum;
             }
-            totals.add(new Total(metric, value, values.size(), average));
+            totals.add(new Total(metric, value, (int) values, average));
         }
-        return new Group(key, posts.size(), totals);
+        return new Group(key, posts, totals);
     }
 
     /**
      * The median of one metric per slot at equal age. Every slot from {@code first} to {@code last} is reported, with a
-     * count of zero and a null median when no post of the slot has a value. Observations are expected to be snapshots at
-     * one offset, already limited to posts old enough to have reached it.
+     * count of zero and a null median when no post of the slot has a value.
      */
-    public static List<Slot> medianBySlot(Collection<Observation> observations, String metric, int first, int last,
-                                          ToIntFunction<Observation> slotOf) {
+    public static List<Slot> medianBySlot(Collection<OffsetGroup> groups, String metric, int first, int last,
+                                          ToIntFunction<OffsetGroup> slotOf) {
         Map<Integer, List<Long>> bySlot = new TreeMap<>();
-        for (Observation observation : observations) {
-            if (metric.equals(observation.metric()) && observation.value() != null) {
-                bySlot.computeIfAbsent(slotOf.applyAsInt(observation), slot -> new ArrayList<>())
-                        .add(observation.value());
+        for (OffsetGroup group : groups) {
+            if (metric.equals(group.metric())) {
+                bySlot.computeIfAbsent(slotOf.applyAsInt(group), slot -> new ArrayList<>()).addAll(group.values());
             }
         }
         List<Slot> slots = new ArrayList<>();

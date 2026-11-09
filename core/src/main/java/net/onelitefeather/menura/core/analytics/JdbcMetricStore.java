@@ -1,9 +1,15 @@
 package net.onelitefeather.menura.core.analytics;
 
 import net.onelitefeather.menura.core.analytics.MetricStore.CollectionStatus;
+import net.onelitefeather.menura.core.analytics.MetricStore.InternalPoint;
 import net.onelitefeather.menura.core.analytics.MetricStore.PointValue;
 import net.onelitefeather.menura.core.analytics.MetricStore.Reading;
 import net.onelitefeather.menura.core.analytics.MetricStore.SnapshotValue;
+import net.onelitefeather.menura.core.analytics.Rollups.Grain;
+import net.onelitefeather.menura.core.analytics.Rollups.Input;
+import net.onelitefeather.menura.core.analytics.Rollups.OffsetGroup;
+import net.onelitefeather.menura.core.analytics.Rollups.Rollup;
+import net.onelitefeather.menura.core.analytics.Rollups.SnapshotInput;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
 
 import java.sql.Connection;
@@ -14,6 +20,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -25,10 +32,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-/** PostgreSQL implementation of {@link MetricStore} over the tables of migration V10. */
+/** PostgreSQL implementation of {@link MetricStore} over the tables of migrations V10 and V15. */
 public final class JdbcMetricStore implements MetricStore {
 
-    private static final String OBSERVATION_COLUMNS = "m.channel_id, m.platform, m.format, m.series_id, m.published_at";
+    /** The stand-in of a null scope id in the distinct-on key of the internal points; no row has it. */
+    private static final String NO_ID = "00000000-0000-0000-0000-000000000000";
 
     private final IdentifierGenerator identifiers;
     private final PublishSlot slots;
@@ -113,12 +121,12 @@ public final class JdbcMetricStore implements MetricStore {
         }
         try (PreparedStatement points = connection.prepareStatement(
                 "insert into menura.metric_point (id, external_post_id, channel_id, platform, format, publish_hour, "
-                        + "publish_weekday, series_id, metric, value, collected_at) "
-                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        + "publish_weekday, series_id, layout_template, brand_kit_version, metric, value, collected_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
              PreparedStatement latest = connection.prepareStatement(
                      "insert into menura.metric_latest (external_post_id, metric, channel_id, platform, format, "
-                             + "published_at, publish_hour, publish_weekday, series_id, value, collected_at) "
-                             + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                             + "published_at, publish_hour, publish_weekday, series_id, layout_template, brand_kit_version, "
+                             + "value, collected_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             for (Map.Entry<String, Long> entry : reading.values().entrySet()) {
                 if (!Metrics.isKnown(entry.getKey()) || entry.getValue() == null) {
                     continue;
@@ -132,6 +140,8 @@ public final class JdbcMetricStore implements MetricStore {
                 points.setInt(index++, hour);
                 points.setInt(index++, weekday);
                 points.setObject(index++, reading.seriesId());
+                points.setString(index++, reading.layoutTemplate());
+                setNullableInt(points, index++, reading.brandKitVersion());
                 points.setString(index++, entry.getKey());
                 points.setLong(index++, entry.getValue());
                 points.setTimestamp(index, Timestamp.from(reading.collectedAt()));
@@ -147,6 +157,8 @@ public final class JdbcMetricStore implements MetricStore {
                 latest.setInt(index++, hour);
                 latest.setInt(index++, weekday);
                 latest.setObject(index++, reading.seriesId());
+                latest.setString(index++, reading.layoutTemplate());
+                setNullableInt(latest, index++, reading.brandKitVersion());
                 latest.setLong(index++, entry.getValue());
                 latest.setTimestamp(index, Timestamp.from(reading.collectedAt()));
                 latest.addBatch();
@@ -154,6 +166,27 @@ public final class JdbcMetricStore implements MetricStore {
             points.executeBatch();
             latest.executeBatch();
         }
+        markDirty(connection, slots.day(reading.post().publishedAt()));
+    }
+
+    @Override
+    public void storeInternal(Connection connection, InternalPoint point, Instant collectedAt) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "insert into menura.metric_point (id, external_post_id, channel_id, series_id, metric, value, collected_at, "
+                        + "source, estimate, day) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+            statement.setObject(1, identifiers.next());
+            statement.setObject(2, point.postId());
+            statement.setObject(3, point.channelId());
+            statement.setObject(4, point.seriesId());
+            statement.setString(5, point.metric());
+            statement.setLong(6, point.value());
+            statement.setTimestamp(7, Timestamp.from(collectedAt));
+            statement.setString(8, point.source());
+            statement.setBoolean(9, point.estimate());
+            statement.setObject(10, point.day());
+            statement.executeUpdate();
+        }
+        markDirty(connection, point.day());
     }
 
     @Override
@@ -209,32 +242,165 @@ public final class JdbcMetricStore implements MetricStore {
     }
 
     @Override
-    public List<Observation> latest(Connection connection, Instant from, Instant to, Set<String> roles)
-            throws SQLException {
-        String sql = "select m.external_post_id, m.metric, m.value, " + OBSERVATION_COLUMNS + " from menura.metric_latest m "
-                + "left join menura.content_series cs on cs.id = m.series_id "
-                + "where m.published_at >= ? and m.published_at < ? and (cs.id is null or cs.visible_to && ?)";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setTimestamp(1, Timestamp.from(from));
-            statement.setTimestamp(2, Timestamp.from(to));
-            statement.setArray(3, connection.createArrayOf("text", roles.stream().sorted().toArray()));
+    public List<LocalDate> dirtyDays(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select day from menura.metric_rollup_dirty order by day");
+             ResultSet row = statement.executeQuery()) {
+            List<LocalDate> days = new ArrayList<>();
+            while (row.next()) {
+                days.add(row.getObject(1, LocalDate.class));
+            }
+            return days;
+        }
+    }
+
+    @Override
+    public boolean lockDirtyDay(Connection connection, LocalDate day) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select day from menura.metric_rollup_dirty where day = ? for update")) {
+            statement.setObject(1, day);
             try (ResultSet row = statement.executeQuery()) {
-                List<Observation> observations = new ArrayList<>();
-                while (row.next()) {
-                    observations.add(observation(row));
-                }
-                return observations;
+                return row.next();
             }
         }
     }
 
     @Override
-    public List<Observation> snapshots(Connection connection, Duration offset, String metric, UUID channelId)
+    public void clearDirtyDay(Connection connection, LocalDate day) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "delete from menura.metric_rollup_dirty where day = ?")) {
+            statement.setObject(1, day);
+            statement.executeUpdate();
+        }
+    }
+
+    @Override
+    public List<Input> platformInputs(Connection connection, LocalDate day) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select external_post_id, channel_id, format, publish_hour, series_id, layout_template, brand_kit_version, "
+                        + "metric, value from menura.metric_latest where published_at >= ? and published_at < ?")) {
+            statement.setTimestamp(1, Timestamp.from(slots.startOf(day)));
+            statement.setTimestamp(2, Timestamp.from(slots.startOf(day.plusDays(1))));
+            try (ResultSet row = statement.executeQuery()) {
+                List<Input> inputs = new ArrayList<>();
+                while (row.next()) {
+                    Grain grain = Grain.platform(row.getObject(2, UUID.class), row.getString(3), row.getInt(4),
+                            row.getObject(5, UUID.class), row.getString(6), nullableInt(row, 7));
+                    inputs.add(new Input(row.getObject(1, UUID.class), grain, row.getString(8), row.getLong(9)));
+                }
+                return inputs;
+            }
+        }
+    }
+
+    @Override
+    public List<Input> internalInputs(Connection connection, LocalDate day) throws SQLException {
+        // The current point of each internal value: the latest collected point per source, metric, scope and estimate flag.
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select distinct on (source, metric, coalesce(channel_id, '" + NO_ID + "'), "
+                        + "coalesce(external_post_id, '" + NO_ID + "'), coalesce(series_id, '" + NO_ID + "'), estimate) "
+                        + "source, metric, channel_id, external_post_id, series_id, estimate, value "
+                        + "from menura.metric_point where source <> 'platform' and day = ? "
+                        + "order by source, metric, coalesce(channel_id, '" + NO_ID + "'), "
+                        + "coalesce(external_post_id, '" + NO_ID + "'), coalesce(series_id, '" + NO_ID + "'), estimate, "
+                        + "collected_at desc, id desc")) {
+            statement.setObject(1, day);
+            try (ResultSet row = statement.executeQuery()) {
+                List<Input> inputs = new ArrayList<>();
+                while (row.next()) {
+                    Grain grain = new Grain(row.getObject(3, UUID.class), null, null, row.getObject(5, UUID.class), null,
+                            null, row.getString(1), row.getBoolean(6));
+                    inputs.add(new Input(row.getObject(4, UUID.class), grain, row.getString(2), row.getLong(7)));
+                }
+                return inputs;
+            }
+        }
+    }
+
+    @Override
+    public List<SnapshotInput> snapshotInputs(Connection connection, LocalDate day) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select s.external_post_id, p.channel_id, p.published_at, s.offset_minutes, s.metric, s.value "
+                        + "from menura.metric_snapshot s join menura.external_post p on p.id = s.external_post_id "
+                        + "where p.published_at >= ? and p.published_at < ?")) {
+            statement.setTimestamp(1, Timestamp.from(slots.startOf(day)));
+            statement.setTimestamp(2, Timestamp.from(slots.startOf(day.plusDays(1))));
+            try (ResultSet row = statement.executeQuery()) {
+                List<SnapshotInput> inputs = new ArrayList<>();
+                while (row.next()) {
+                    Instant publishedAt = row.getTimestamp(3).toInstant();
+                    inputs.add(new SnapshotInput(row.getObject(1, UUID.class), row.getObject(2, UUID.class),
+                            slots.hour(publishedAt), slots.weekday(publishedAt), row.getInt(4), row.getString(5),
+                            nullableLong(row, 6)));
+                }
+                return inputs;
+            }
+        }
+    }
+
+    @Override
+    public void replaceDay(Connection connection, LocalDate day, List<Rollup> rows) throws SQLException {
+        try (PreparedStatement delete = connection.prepareStatement("delete from menura.metric_rollup_day where day = ?")) {
+            delete.setObject(1, day);
+            delete.executeUpdate();
+        }
+        insertRollups(connection, "menura.metric_rollup_day", "day", rows);
+    }
+
+    @Override
+    public void replaceWeek(Connection connection, LocalDate weekStart, List<Rollup> rows) throws SQLException {
+        try (PreparedStatement delete = connection.prepareStatement(
+                "delete from menura.metric_rollup_week where week_start = ?")) {
+            delete.setObject(1, weekStart);
+            delete.executeUpdate();
+        }
+        insertRollups(connection, "menura.metric_rollup_week", "week_start", rows);
+    }
+
+    @Override
+    public void replaceOffsets(Connection connection, LocalDate day, List<OffsetGroup> groups) throws SQLException {
+        try (PreparedStatement delete = connection.prepareStatement("delete from menura.metric_offset_day where day = ?")) {
+            delete.setObject(1, day);
+            delete.executeUpdate();
+        }
+        if (groups.isEmpty()) {
+            return;
+        }
+        try (PreparedStatement insert = connection.prepareStatement(
+                "insert into menura.metric_offset_day (day, channel_id, publish_hour, publish_weekday, offset_minutes, "
+                        + "metric, snapshot_values) values (?, ?, ?, ?, ?, ?, ?)")) {
+            for (OffsetGroup group : groups) {
+                insert.setObject(1, group.day());
+                insert.setObject(2, group.channelId());
+                insert.setInt(3, group.publishHour());
+                insert.setInt(4, group.publishWeekday());
+                insert.setInt(5, group.offsetMinutes());
+                insert.setString(6, group.metric());
+                insert.setArray(7, connection.createArrayOf("bigint", group.values().toArray()));
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
+    @Override
+    public List<Rollup> dailyRows(Connection connection, LocalDate from, LocalDate to, Set<String> roles)
             throws SQLException {
-        String sql = "select s.external_post_id, s.metric, s.value, p.channel_id, p.platform, p.format, p.published_at, "
-                + "null::uuid as series_id from menura.metric_snapshot s "
-                + "join menura.external_post p on p.id = s.external_post_id "
-                + "where s.offset_minutes = ? and s.metric = ?" + (channelId == null ? "" : " and p.channel_id = ?");
+        return rollupRows(connection, "menura.metric_rollup_day", "day", from, to, roles);
+    }
+
+    @Override
+    public List<Rollup> weeklyRows(Connection connection, LocalDate from, LocalDate to, Set<String> roles)
+            throws SQLException {
+        return rollupRows(connection, "menura.metric_rollup_week", "week_start", from, to, roles);
+    }
+
+    @Override
+    public List<OffsetGroup> offsetGroups(Connection connection, Duration offset, String metric, UUID channelId)
+            throws SQLException {
+        String sql = "select day, channel_id, publish_hour, publish_weekday, offset_minutes, metric, snapshot_values "
+                + "from menura.metric_offset_day where offset_minutes = ? and metric = ?"
+                + (channelId == null ? "" : " and channel_id = ?");
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, (int) offset.toMinutes());
             statement.setString(2, metric);
@@ -242,13 +408,16 @@ public final class JdbcMetricStore implements MetricStore {
                 statement.setObject(3, channelId);
             }
             try (ResultSet row = statement.executeQuery()) {
-                List<Observation> observations = new ArrayList<>();
+                List<OffsetGroup> groups = new ArrayList<>();
                 while (row.next()) {
-                    observations.add(new Observation(row.getObject(1, UUID.class), row.getObject(4, UUID.class),
-                            row.getString(5), row.getString(6), null, row.getTimestamp(7).toInstant(),
-                            row.getString(2), nullableLong(row, 3)));
+                    List<Long> values = new ArrayList<>();
+                    for (Object value : (Object[]) row.getArray(7).getArray()) {
+                        values.add((Long) value);
+                    }
+                    groups.add(new OffsetGroup(row.getObject(1, LocalDate.class), row.getObject(2, UUID.class),
+                            row.getInt(3), row.getInt(4), row.getInt(5), row.getString(6), values));
                 }
-                return observations;
+                return groups;
             }
         }
     }
@@ -294,6 +463,72 @@ public final class JdbcMetricStore implements MetricStore {
         }
     }
 
+    /** Marks a day for a rebuild. The row lock is held until the caller's transaction ends (see {@link #lockDirtyDay}). */
+    private static void markDirty(Connection connection, LocalDate day) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "insert into menura.metric_rollup_dirty (day) values (?) on conflict (day) do update set day = excluded.day")) {
+            statement.setObject(1, day);
+            statement.executeUpdate();
+        }
+    }
+
+    private static void insertRollups(Connection connection, String table, String periodColumn, List<Rollup> rows)
+            throws SQLException {
+        if (rows.isEmpty()) {
+            return;
+        }
+        try (PreparedStatement insert = connection.prepareStatement(
+                "insert into " + table + " (" + periodColumn + ", channel_id, format, publish_hour, series_id, "
+                        + "layout_template, brand_kit_version, source, estimate, metric, posts, values_count, total) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+            for (Rollup rollup : rows) {
+                Grain grain = rollup.grain();
+                insert.setObject(1, rollup.period());
+                insert.setObject(2, grain.channelId());
+                insert.setString(3, grain.format());
+                setNullableInt(insert, 4, grain.publishHour());
+                insert.setObject(5, grain.seriesId());
+                insert.setString(6, grain.layoutTemplate());
+                setNullableInt(insert, 7, grain.brandKitVersion());
+                insert.setString(8, grain.source());
+                insert.setBoolean(9, grain.estimate());
+                insert.setString(10, rollup.metric());
+                insert.setInt(11, rollup.posts());
+                insert.setInt(12, rollup.valuesCount());
+                insert.setLong(13, rollup.total());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
+    private static List<Rollup> rollupRows(Connection connection, String table, String periodColumn, LocalDate from,
+                                           LocalDate to, Set<String> roles) throws SQLException {
+        String sql = "select r." + periodColumn + ", r.channel_id, r.format, r.publish_hour, r.series_id, r.layout_template, "
+                + "r.brand_kit_version, r.source, r.estimate, r.metric, r.posts, r.values_count, r.total from " + table
+                + " r left join menura.content_series cs on cs.id = r.series_id "
+                + "where r." + periodColumn + " >= ? and r." + periodColumn + " <= ?"
+                + (roles == null ? "" : " and (cs.id is null or cs.visible_to && ?)");
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setObject(1, from);
+            statement.setObject(2, to);
+            if (roles != null) {
+                statement.setArray(3, connection.createArrayOf("text", roles.stream().sorted().toArray()));
+            }
+            try (ResultSet row = statement.executeQuery()) {
+                List<Rollup> rows = new ArrayList<>();
+                while (row.next()) {
+                    Grain grain = new Grain(row.getObject(2, UUID.class), row.getString(3), nullableInt(row, 4),
+                            row.getObject(5, UUID.class), row.getString(6), nullableInt(row, 7), row.getString(8),
+                            row.getBoolean(9));
+                    rows.add(new Rollup(row.getObject(1, LocalDate.class), grain, row.getString(10), row.getInt(11),
+                            row.getInt(12), row.getLong(13)));
+                }
+                return rows;
+            }
+        }
+    }
+
     private List<CollectionStatus> statusRows(Connection connection, String where, UUID channelId) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "select channel_id, outcome, last_success_at, last_failure_at, failure_reason "
@@ -322,10 +557,17 @@ public final class JdbcMetricStore implements MetricStore {
         }
     }
 
-    private static Observation observation(ResultSet row) throws SQLException {
-        return new Observation(row.getObject(1, UUID.class), row.getObject(4, UUID.class), row.getString(5),
-                row.getString(6), row.getObject(7, UUID.class), row.getTimestamp(8).toInstant(), row.getString(2),
-                row.getLong(3));
+    private static void setNullableInt(PreparedStatement statement, int index, Integer value) throws SQLException {
+        if (value == null) {
+            statement.setNull(index, java.sql.Types.INTEGER);
+        } else {
+            statement.setInt(index, value);
+        }
+    }
+
+    private static Integer nullableInt(ResultSet row, int column) throws SQLException {
+        int value = row.getInt(column);
+        return row.wasNull() ? null : value;
     }
 
     private static Long nullableLong(ResultSet row, int column) throws SQLException {

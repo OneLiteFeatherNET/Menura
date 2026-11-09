@@ -145,27 +145,58 @@ class JdbcMetricStoreIntegrationTest {
     }
 
     @Test
-    void theAggregateReadsReturnTheLatestValuesAndTheSnapshotsOfThePeriod() throws Exception {
+    void theDailyRollupIsRebuiltFromTheLatestValuesOfThePostsPublishedThatDay() throws Exception {
         World world = new World();
         ExternalPost post = world.post("v5");
+        world.inTransaction(c -> {
+            world.metrics.ensurePartitions(c, T0);
+            world.metrics.storeReading(c, new Reading(post, Map.of(Metrics.VIEWS, 70L), null, T0));
+            return null;
+        });
+
+        world.rollups.rebuild();
+
+        assertEquals(70L, world.dailyRow(Metrics.VIEWS).total(), "the daily views are the latest value of the post");
+    }
+
+    @Test
+    void aCorrectedDayIsRebuiltWithTheCorrectedValueAndKeepsBothRawPoints() throws Exception {
+        World world = new World();
+        ExternalPost post = world.post("v6");
+        world.inTransaction(c -> {
+            world.metrics.ensurePartitions(c, T0);
+            world.metrics.storeReading(c, new Reading(post, Map.of(Metrics.VIEWS, 100L), null, T0));
+            return null;
+        });
+        world.rollups.rebuild();
+
+        world.inTransaction(c -> {
+            world.metrics.storeReading(c, new Reading(post, Map.of(Metrics.VIEWS, 150L), null, T0.plusSeconds(60)));
+            return null;
+        });
+        world.rollups.rebuild();
+
+        assertEquals(150L, world.dailyRow(Metrics.VIEWS).total(), "the corrected day holds the corrected value");
+        assertEquals(2, count("select count(*) from menura.metric_point where external_post_id = '" + post.id() + "'"),
+                "the raw points keep both collected values");
+    }
+
+    @Test
+    void theEqualAgeGroupOfThePostHoldsItsSnapshotAtTheOffset() throws Exception {
+        World world = new World();
+        ExternalPost post = world.post("v7");
         world.inTransaction(c -> {
             world.metrics.ensurePartitions(c, T0);
             world.metrics.storeReading(c, new Reading(post, Map.of(Metrics.VIEWS, 70L), null, T0));
             world.metrics.storeSnapshots(c, List.of(new SnapshotValue(post.id(), 60, Metrics.VIEWS, 40L, T0, 60)));
             return null;
         });
+        world.rollups.rebuild();
 
-        List<Observation> latest = world.inTransaction(c -> world.metrics.latest(c,
-                T0.minus(Duration.ofDays(1)), T0.plus(Duration.ofDays(1)), Set.of("viewer")));
-        List<Observation> snapshots = world.inTransaction(c -> world.metrics.snapshots(c, Duration.ofHours(1),
-                Metrics.VIEWS, channelOf(world)));
+        List<Rollups.OffsetGroup> groups = world.inTransaction(c -> world.metrics.offsetGroups(c, Duration.ofHours(1),
+                Metrics.VIEWS, world.channel));
 
-        assertEquals(70L, latest.get(0).value(), "the period read returns the latest value of the post");
-        assertEquals(40L, snapshots.get(0).value(), "the snapshot read returns the snapshot of the offset");
-    }
-
-    private static UUID channelOf(World world) {
-        return world.channel;
+        assertEquals(List.of(40L), groups.get(0).values(), "the group of the post holds the snapshot at the offset");
     }
 
     private int count(String sql) throws SQLException {
@@ -194,10 +225,12 @@ class JdbcMetricStoreIntegrationTest {
         final JdbcMetricStore metrics = new JdbcMetricStore(new IdentifierGenerator(new SecureRandom()),
             new PublishSlot(ZoneId.of("Europe/Berlin")));
         final UUID channel = UUID.nameUUIDFromBytes("channel-metrics".getBytes(StandardCharsets.UTF_8));
+        final MetricRollups rollups;
 
         World() throws SQLException {
             Migrations.migrate(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
             transactions = new DataSourceTransactions(dataSource());
+            rollups = new MetricRollups(transactions, metrics);
             channels = new JdbcChannelStore(TokenCipher.of(KEY, null, new SecureRandom()));
             transactions.inTransaction(c -> {
                 channels.insertChannel(c, new Channel(channel, "metrics", "UC-metrics", "Channel metrics",
@@ -219,6 +252,14 @@ class JdbcMetricStoreIntegrationTest {
 
         <T> T inTransaction(net.onelitefeather.menura.core.db.Work<T> work) throws SQLException {
             return transactions.inTransaction(work);
+        }
+
+        /** The daily platform row of one metric for the day the test posts were published on. */
+        Rollups.Rollup dailyRow(String metric) throws SQLException {
+            LocalDate day = new PublishSlot(ZoneId.of("Europe/Berlin")).day(T0.minus(Duration.ofHours(5)));
+            return inTransaction(c -> metrics.dailyRows(c, day, day, null)).stream()
+                    .filter(row -> row.grain().platformValue() && row.metric().equals(metric))
+                    .findFirst().orElseThrow();
         }
     }
 }

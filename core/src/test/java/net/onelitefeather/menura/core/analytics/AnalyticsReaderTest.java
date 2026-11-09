@@ -35,6 +35,7 @@ class AnalyticsReaderTest {
         publishAndReport(world, channel, "b", MONDAY_EVENING, 200L);
         publishAndReport(world, channel, "c", MONDAY_EVENING, 900L);
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.EqualAge comparison = world.reader.equalAge(Metrics.VIEWS, Duration.ofHours(24), By.HOUR, null);
 
@@ -50,6 +51,7 @@ class AnalyticsReaderTest {
         world.channels.clock.advance(Duration.ofHours(10));
         publishAndReport(world, channel, "young", world.channels.clock.instant().minus(Duration.ofHours(10)), 500L);
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.EqualAge comparison = world.reader.equalAge(Metrics.VIEWS, Duration.ofHours(24), By.HOUR, null);
 
@@ -64,6 +66,7 @@ class AnalyticsReaderTest {
         world.channels.clock.advance(Duration.between(world.now(), MONDAY_EVENING.plus(Duration.ofDays(2))));
         publishAndReport(world, channel, "a", MONDAY_EVENING, 100L);
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.EqualAge watch = world.reader.equalAge(Metrics.WATCH_TIME, Duration.ofHours(24), By.HOUR, null);
 
@@ -87,9 +90,11 @@ class AnalyticsReaderTest {
         UUID channel = world.connectedChannel("UC4");
         publishAndReport(world, channel, "a", world.now().minus(Duration.ofHours(5)), 100L);
         world.collector.collect();
+        world.rollUp();
         world.advance(Duration.ofHours(4));
         world.platform.report("a", Map.of(Metrics.VIEWS, 130L));
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.Overview overview = world.reader.overview(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 12, 31),
                 Set.of(Role.VIEWER));
@@ -111,6 +116,7 @@ class AnalyticsReaderTest {
         world.platform.report("a", Map.of(Metrics.VIEWS, 1000L, Metrics.ENGAGED_VIEWS, 10L));
         world.platform.report("b", Map.of(Metrics.VIEWS, 100L, Metrics.ENGAGED_VIEWS, 90L));
         world.collector.collect();
+        world.rollUp();
 
         AnalyticsReader.SeriesComparison comparison = world.reader.series(LocalDate.of(2026, 10, 1),
                 LocalDate.of(2026, 12, 31), Set.of(Role.VIEWER));
@@ -123,7 +129,7 @@ class AnalyticsReaderTest {
         AnalyticsFixture world = new AnalyticsFixture(true);
 
         ProblemException missing = assertThrows(ProblemException.class,
-                () -> world.reader.post(UUID.nameUUIDFromBytes("missing".getBytes())));
+                () -> world.reader.post(UUID.nameUUIDFromBytes("missing".getBytes()), Set.of(Role.VIEWER)));
 
         assertEquals(404, missing.status(), "a post that does not exist answers 404");
     }

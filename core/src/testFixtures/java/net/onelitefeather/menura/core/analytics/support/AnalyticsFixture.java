@@ -2,6 +2,7 @@ package net.onelitefeather.menura.core.analytics.support;
 
 import net.onelitefeather.menura.core.analytics.AnalyticsReader;
 import net.onelitefeather.menura.core.analytics.MetricCollector;
+import net.onelitefeather.menura.core.analytics.MetricRollups;
 import net.onelitefeather.menura.core.analytics.PublishSlot;
 import net.onelitefeather.menura.core.channel.Channel;
 import net.onelitefeather.menura.core.channel.ChannelGrant;
@@ -38,6 +39,7 @@ public final class AnalyticsFixture {
     public final ConnectionService connections;
     public final MetricCollector collector;
     public final AnalyticsReader reader;
+    public final MetricRollups rollups;
 
     /** A world whose platform reports metrics when {@code metricsSupported} is true. */
     public AnalyticsFixture(boolean metricsSupported) {
@@ -48,6 +50,12 @@ public final class AnalyticsFixture {
                 connections, registry);
         this.reader = new AnalyticsReader(new DirectTransactions(), channels.clock,
                 new PublishSlot(ZoneId.of("Europe/Berlin")), metrics, posts, channels.store, series);
+        this.rollups = new MetricRollups(new DirectTransactions(), metrics);
+    }
+
+    /** Runs the rollup job once: rebuilds every day the collections marked, as the job does on its schedule. */
+    public void rollUp() throws java.sql.SQLException {
+        rollups.rebuild();
     }
 
     /** Stores a connected channel of the metrics platform with a grant that does not expire during the test. */
