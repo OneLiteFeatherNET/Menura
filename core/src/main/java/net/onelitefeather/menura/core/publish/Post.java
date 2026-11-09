@@ -165,6 +165,17 @@ public record Post(UUID id, UUID channelId, UUID assetId, UUID coverAssetId, UUI
                 publishedAt, failureReason, attempts + 1, nextAttemptAt, leaseOwner, leaseUntil, revision, createdAt, at);
     }
 
+    /**
+     * A run that only waits (the platform still processes the video, or the quota is used up) is not an attempt: the attempt
+     * counter goes back by one, never below zero.
+     */
+    public Post attemptRevoked(Instant at) {
+        return new Post(id, channelId, assetId, coverAssetId, seriesId, sourcePostId, authorId, status, title, description,
+                hashtags, visibility, playlistId, scheduledAt, approvedBy, approvedAt, handedOverAt, externalId, externalUrl,
+                publishedAt, failureReason, Math.max(0, attempts - 1), nextAttemptAt, leaseOwner, leaseUntil, revision,
+                createdAt, at);
+    }
+
     /** The same post with the revision the store gave it when it was written. */
     public Post withRevision(int stored) {
         return new Post(id, channelId, assetId, coverAssetId, seriesId, sourcePostId, authorId, status, title, description,

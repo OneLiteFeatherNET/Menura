@@ -271,6 +271,16 @@ public final class JdbcPostStore implements PostStore {
     }
 
     @Override
+    public void deleteAttempt(Connection connection, UUID postId, int attempt) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "delete from menura.post_attempt where post_id = ? and attempt = ?")) {
+            statement.setObject(1, postId);
+            statement.setInt(2, attempt);
+            statement.executeUpdate();
+        }
+    }
+
+    @Override
     public Optional<PostRevision> findRevision(Connection connection, UUID postId, UUID revisionId) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("select " + REVISION_COLUMNS
                 + " from menura.post_revision where post_id = ? and id = ?")) {

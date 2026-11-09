@@ -65,6 +65,9 @@ public interface PostStore {
     /** Writes one attempt row, replacing the earlier row of that attempt number (its outcome is set afterwards). */
     void putAttempt(Connection connection, AttemptRecord attempt) throws SQLException;
 
+    /** Removes the row of one attempt, used when the attempt only waited and does not count. */
+    void deleteAttempt(Connection connection, UUID postId, int attempt) throws SQLException;
+
     Optional<PostRevision> findRevision(Connection connection, UUID postId, UUID revisionId) throws SQLException;
 
     List<PostRevision> revisions(Connection connection, UUID postId) throws SQLException;

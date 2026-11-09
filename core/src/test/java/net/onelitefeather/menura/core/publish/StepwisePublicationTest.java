@@ -4,6 +4,7 @@ import net.onelitefeather.menura.core.channel.PlatformAdapter.Visibility;
 import net.onelitefeather.menura.core.channel.PlatformException;
 import net.onelitefeather.menura.core.channel.StepwisePublisher.UploadStart;
 import net.onelitefeather.menura.core.publish.PostService.DraftCommand;
+import net.onelitefeather.menura.core.publish.PostService.PostDetail;
 import net.onelitefeather.menura.core.publish.PublicationRunner.Report;
 import net.onelitefeather.menura.core.publish.support.PublishFixture;
 import net.onelitefeather.menura.core.publish.support.ScriptedStepwise;
@@ -134,6 +135,43 @@ class StepwisePublicationTest {
 
         world.clock.advance(Duration.between(SLOT, QuotaBudget.nextReset(SLOT)));
         assertEquals(1, world.runner.runOnce().published(), "the delayed publication is attempted after the reset");
+    }
+
+    @Test
+    void repeatedProcessingWaitsNeverUseUpAnAttempt() throws Exception {
+        PublishFixture world = new PublishFixture(false, PublishSettings.from(Map.of(PublishSettings.MAX_ATTEMPTS, "1")), true);
+        world.stepwise.processing("processing");
+        UUID post = planned(world, world.connectChannel("main"), world.storedVideo(MIB), world.storedCover(), Visibility.PRIVATE,
+                SLOT);
+        world.clock.advance(Duration.between(PublishFixture.NOW, SLOT));
+
+        for (int run = 0; run < 5; run++) {
+            assertEquals(1, world.runner.runOnce().waiting(), "run " + run + " waits for the platform to process the video");
+            world.clock.advance(Duration.ofMinutes(1));
+        }
+
+        PostDetail detail = world.service.get(post);
+        assertEquals(PostStatus.SCHEDULED, detail.post().status(), "waiting never fails the post, even with one attempt allowed");
+        assertEquals(0, detail.post().attempts(), "a processing wait is not an attempt");
+    }
+
+    @Test
+    void repeatedQuotaDeferralsNeverUseUpAnAttempt() throws Exception {
+        PublishFixture world = new PublishFixture(false, PublishSettings.from(Map.of(PublishSettings.MAX_ATTEMPTS, "1")), true);
+        UUID channel = world.connectChannel("main");
+        UUID post = planned(world, channel, world.storedVideo(MIB), null, Visibility.PRIVATE, SLOT);
+        world.clock.advance(Duration.between(PublishFixture.NOW, SLOT));
+
+        for (int day = 0; day < 3; day++) {
+            Instant now = world.clock.instant();
+            world.quotaUsage.save(null, channel, QuotaBudget.day(now), new QuotaLedger.Usage(9_990, 0));
+            assertEquals(1, world.runner.runOnce().retried(), "day " + day + " is deferred by the quota");
+            Post stored = world.posts.stored(post).orElseThrow();
+            assertEquals(PostStatus.SCHEDULED, stored.status(), "a deferral keeps the post scheduled");
+            assertEquals(0, stored.attempts(), "a deferral by the quota is not an attempt");
+            world.clock.advance(Duration.between(now, QuotaBudget.nextReset(now)));
+        }
+        assertTrue(world.stepwise.starts().isEmpty(), "the platform is never called while the quota is used up");
     }
 
     @Test

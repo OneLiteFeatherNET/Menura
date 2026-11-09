@@ -451,8 +451,8 @@ public final class PublicationRunner {
         if (waiting) {
             return transactions.inTransaction(c -> {
                 Post current = posts.find(c, started.id()).orElseThrow();
-                posts.update(c, current.released(now));
-                endAttempt(c, current.id(), AttemptRecord.RETRY_SCHEDULED, WAITING_PROCESSING, now);
+                revokeAttempt(c, current);
+                posts.update(c, current.attemptRevoked(now).released(now));
                 return Outcome.WAITING;
             });
         }
@@ -469,8 +469,8 @@ public final class PublicationRunner {
         return transactions.inTransaction(c -> {
             Post current = posts.find(c, started.id()).orElseThrow();
             if (stop.deferUntil() != null) {
-                posts.update(c, current.retryAt(stop.reason(), stop.deferUntil(), now).released(now));
-                endAttempt(c, current.id(), AttemptRecord.RETRY_SCHEDULED, stop.reason(), now);
+                revokeAttempt(c, current);
+                posts.update(c, current.attemptRevoked(now).retryAt(stop.reason(), stop.deferUntil(), now).released(now));
                 return Outcome.RETRY;
             }
             writeStep(c, current.id(), stop.step(), StepState.FAILED, now, stop.reason());
@@ -798,6 +798,11 @@ public final class PublicationRunner {
         externalPosts.insert(c, external);
         listener.imported(c, external, item);
         posts.insertOrigin(c, external.id(), published.id(), posts.lastAcceptedRevision(c, published.id()).orElse(null));
+    }
+
+    /** The row of the attempt that only waited is removed, so the history shows the attempts that counted. */
+    private void revokeAttempt(Connection c, Post current) throws SQLException {
+        posts.deleteAttempt(c, current.id(), current.attempts());
     }
 
     private void endAttempt(Connection c, java.util.UUID postId, String outcome, String reason, Instant now)

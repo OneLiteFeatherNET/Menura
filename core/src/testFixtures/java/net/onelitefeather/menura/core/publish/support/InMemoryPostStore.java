@@ -176,6 +176,11 @@ public final class InMemoryPostStore implements PostStore {
     }
 
     @Override
+    public void deleteAttempt(Connection connection, UUID postId, int attempt) {
+        attempts.remove(postId + "/" + attempt);
+    }
+
+    @Override
     public Optional<PostRevision> findRevision(Connection connection, UUID postId, UUID revisionId) {
         PostRevision revision = revisions.get(revisionId);
         return revision == null || !revision.postId().equals(postId) ? Optional.empty() : Optional.of(revision);
