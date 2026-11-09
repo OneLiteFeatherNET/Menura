@@ -11,7 +11,7 @@ OneLiteFeather's shorts are the first thing most viewers see of the organisation
 ## What Changes
 
 - Add one central brand kit, versioned: named colour tokens with light and dark roles, a tonal palette derived from seed colours, contrast checks for text roles against WCAG AA, typography (font files and roles), logos and marks with variants and safe areas, voice and tone rules, and hashtags and end-card texts per language.
-- Seed the first published version from the colour roles of the stream overlay theme and from the feather mark, so the look the stream already shows becomes the authoritative kit.
+- Seed the first published version from the colour roles of the stream overlay theme, so the look the stream already shows becomes the authoritative kit; the feather mark follows in a later version once the logo is uploaded as a library asset.
 - Add layout templates for short 9:16, long 16:9 intro and outro, thumbnail, social post image, end card and overlay theme. Templates reference brand tokens only, never raw colours, and declare their parameters (title, subtitle, image slot). The short 9:16 template declares the slots badge, title, captions, session tiles and call to action with their timing, and keeps badge, title, captions and logo out of the safe zone.
 - Make the kit and templates readable over REST, by the overlay (theme) and by the OBS plugin (scene sync). Until `add-local-editing-mcp` (Phase 5) ships, shorts are rendered by an external renderer outside Menura, which reads a JSON render bundle of a named kit version; the bundle is also exported as CSS custom properties.
 - Any change creates a new version; consumers can pin a version; a new published version notifies subscribers over Server-Sent Events.

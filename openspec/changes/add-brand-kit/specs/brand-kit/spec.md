@@ -172,12 +172,17 @@ Keeps one central, versioned brand identity for OneLiteFeather: colours, typogra
 
 ### Requirement: Initial kit from the overlay theme
 
-(Must) The system SHALL seed the first published brand kit version from the colour roles of the stream overlay theme and from the feather mark, and SHALL NOT take any colour value from another source, such as a colour hard-coded in a renderer.
+(Must) The system SHALL seed the first published brand kit version from the colour roles of the stream overlay theme, SHALL NOT take any colour value from another source, such as a colour hard-coded in a renderer, and SHALL leave the marks of the first version empty; the feather mark is added by publishing a later version once the logo is a verified library asset.
 
 #### Scenario: Seeded from the overlay theme
-- **GIVEN** the stream overlay theme defines its colour roles and the feather mark is supplied
+- **GIVEN** the stream overlay theme defines its colour roles
 - **WHEN** the first brand kit version is published
-- **THEN** the colour tokens carry the overlay theme's role values and the mark is the feather mark
+- **THEN** the colour tokens carry the overlay theme's role values and the version has no mark
+
+#### Scenario: Feather mark added in a later version
+- **GIVEN** the feather logo was uploaded as a verified library asset
+- **WHEN** an editor publishes a new brand kit version with the feather mark
+- **THEN** that version carries the feather mark and the first version stays unchanged
 
 #### Scenario: No colour outside the kit
 - **GIVEN** the first kit version was seeded from the overlay theme

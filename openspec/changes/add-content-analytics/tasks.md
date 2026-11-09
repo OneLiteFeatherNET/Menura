@@ -46,8 +46,8 @@ Requirements marked "Where ... is available" in the spec are built by the change
 
 - [ ] 7.1 Write failing tests with an injected clock and a fake channel client that the due offsets of a post are +1, +2, +4, +8, +24 and +48 hours and +7 days, then daily, that each snapshot is taken by the first run at or after its offset and stores its as-of time and age, and that a metric the channel does not provide is stored as absent; verify they fail
 - [ ] 7.2 Implement the snapshot table and the offset scheduling in the collection job; verify the tests from 7.1 pass
-- [ ] 7.3 Write failing tests that a revised value for an offset overwrites that snapshot while the raw points keep both collected values; verify they fail
-- [ ] 7.4 Implement the overwrite of a snapshot on revision; verify the tests from 7.3 pass
+- [ ] 7.3 Write failing tests that a later collection leaves a taken snapshot unchanged while the raw points keep both collected values; verify they fail
+- [ ] 7.4 Implement the write of a snapshot once per offset; verify the tests from 7.3 pass
 
 ## 8. Comparison at equal age
 

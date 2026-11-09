@@ -54,7 +54,7 @@
 - [ ] 5.2 Implement the JSON render bundle export; verify the 5.1 tests pass.
 - [ ] 5.3 Write failing unit tests that a request for a pinned version returns exactly that version's bundle and not the newest one, and that the CSS custom property export lists every colour token with its light and dark values; verify they fail.
 - [ ] 5.4 Implement the pinned bundle request and the CSS custom property export; verify the 5.3 tests pass.
-- [ ] 5.5 Write failing unit tests that the first published version takes its colour roles from the overlay theme and its mark from the feather logo, and that the render bundle and CSS export contain no colour value outside the kit; verify they fail.
+- [ ] 5.5 Write failing unit tests that the first published version takes its colour roles from the overlay theme and carries no mark, and that the render bundle and CSS export contain no colour value outside the kit; verify they fail.
 - [ ] 5.6 Implement the seeding of the initial version from the overlay theme; verify the 5.5 tests pass.
 - [ ] 5.7 Write failing unit tests for the template preview with sample parameters in the web app, and that the preview uses the template's own parameter declarations; verify they fail.
 - [ ] 5.8 Implement the template preview in the web app; verify the 5.7 tests pass and a component test renders the short 9:16 template with sample parameters.
