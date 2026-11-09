@@ -65,6 +65,31 @@ export interface Post {
   problems: DryRunProblem[];
   createdAt: string;
   updatedAt: string;
+  /** The YouTube made-for-kids answer; null when none was given or the platform is not YouTube. */
+  madeForKids: boolean | null;
+  /** Whether a person chose the visibility; a YouTube post cannot be scheduled without it. */
+  visibilityDeclared: boolean;
+  /** Whether the post is planned as a YouTube Short (checked by the dry run). */
+  plannedShort: boolean;
+  /** The visibility the platform applied after the upload; null before it completed. */
+  appliedVisibility: PostVisibility | null;
+  /** The mismatch between the requested and the applied visibility; null when they agree. */
+  visibilityProblem: string | null;
+}
+
+/** The made-for-kids answer and the Short flag of a YouTube post (PUT youtube-declaration). */
+export interface YouTubeDeclarationRequest {
+  madeForKids: boolean;
+  planShort?: boolean;
+}
+
+/** The remaining daily quota of a YouTube channel on the current Pacific day. */
+export interface ChannelQuota {
+  unitsPerDay: number;
+  unitsRemaining: number;
+  uploadsPerDay: number;
+  uploadsRemaining: number;
+  resetsAt: string;
 }
 
 /** A post on the calendar: its local date and time in the installation zone come from the server. */
@@ -160,6 +185,17 @@ export async function fetchCalendar(query: string, fetcher?: Fetcher): Promise<C
 /** One post with its steps, attempts and problems. */
 export async function fetchPost(id: string, fetcher?: Fetcher): Promise<Post> {
   return (await apiRequest<Post>(`/posts/${encodeURIComponent(id)}`, {}, fetcher)) as Post;
+}
+
+/** Sets the visibility of a draft or a post in review; the server records that a person declared it. */
+export async function updatePostVisibility(id: string, visibility: PostVisibility, fetcher?: Fetcher): Promise<Post> {
+  return (await apiRequest<Post>(`/posts/${encodeURIComponent(id)}`, { method: 'PATCH', body: { visibility } }, fetcher)) as Post;
+}
+
+/** Declares whether a YouTube post is made for kids, and optionally whether it is planned as a Short. */
+export async function setYouTubeDeclaration(id: string, request: YouTubeDeclarationRequest, fetcher?: Fetcher): Promise<Post> {
+  const body = request.planShort === undefined ? { madeForKids: request.madeForKids } : request;
+  return (await apiRequest<Post>(`/posts/${encodeURIComponent(id)}/youtube-declaration`, { method: 'PUT', body }, fetcher)) as Post;
 }
 
 /** An editor sends a draft to review. */

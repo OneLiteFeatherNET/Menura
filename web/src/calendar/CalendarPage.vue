@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { listChannels, startReconnection, type Channel } from '../api/channels';
+import { fetchChannelQuota, listChannels, startReconnection, type Channel } from '../api/channels';
 import { ApiError } from '../api/client';
 import { listFinishedAssets } from '../api/assets';
 import {
   acceptRevision,
   approvePost,
+  setYouTubeDeclaration,
+  updatePostVisibility,
   fetchCalendar,
+  fetchPost,
   feedUrl as buildFeedUrl,
   issueFeedToken,
   listRevisions,
@@ -18,8 +21,11 @@ import {
   submitPost,
   type CalendarItem,
   type CalendarPage,
+  type ChannelQuota,
   type DryRunProblem,
+  type Post,
   type PostRevision,
+  type PostVisibility,
 } from '../api/posts';
 import { listSeries, type Series } from '../api/series';
 import LoadState from '../components/ui/LoadState.vue';
@@ -38,6 +44,8 @@ import {
   actionErrorText,
   calendarQuery,
   canPlan as mayPlan,
+  canDeclare as mayDeclare,
+  isYouTube,
   listGroups,
   monthWeeks,
   periodLabel,
@@ -81,6 +89,9 @@ const revisionsStatus = ref<'loading' | 'error' | 'ready'>('ready');
 const panelBusy = ref(false);
 const panelNotice = ref<string | undefined>(undefined);
 const refusal = ref<ScheduleRefusal | null>(null);
+const quota = ref<ChannelQuota | null>(null);
+const detail = ref<Post | null>(null);
+const declarationError = ref<string | undefined>(undefined);
 
 const planOpen = ref(false);
 const planBusy = ref(false);
@@ -92,7 +103,14 @@ const feedError = ref<string | undefined>(undefined);
 
 const canPlan = computed(() => mayPlan(props.roles) && page.value !== null);
 const selectedItem = computed<CalendarItem | null>(() => page.value?.items.find((item) => item.id === selectedId.value) ?? null);
-const actions = computed(() => (selectedItem.value ? postActions(selectedItem.value, props.roles) : null));
+// The panel shows the post as the single-post read gives it: the calendar item does not carry the YouTube declaration, so
+// the panel waits for that read and then merges it over the calendar item. Until then no panel is shown.
+const panelItem = computed<CalendarItem | null>(() => {
+  const item = selectedItem.value;
+  if (!item || !detail.value || detail.value.id !== item.id) return null;
+  return { ...item, ...detail.value } as CalendarItem;
+});
+const actions = computed(() => (panelItem.value ? postActions(panelItem.value, props.roles) : null));
 const label = computed(() => (page.value ? periodLabel(view.value, page.value.firstDay, page.value.lastDay) : ''));
 const weeks = computed(() => {
   if (!page.value) return [];
@@ -166,11 +184,58 @@ function openPost(id: string) {
   selectedId.value = id;
   refusal.value = null;
   panelNotice.value = undefined;
+  declarationError.value = undefined;
+  quota.value = null;
+  detail.value = null;
   void loadRevisions();
+  void loadQuota();
+  void loadDetail(id);
+}
+
+async function loadDetail(id: string) {
+  try {
+    const post = await fetchPost(id);
+    if (selectedId.value === id) detail.value = post;
+  } catch {
+    if (selectedId.value === id) detail.value = null;
+  }
+}
+
+// The remaining quota of a YouTube channel is shown next to its post; any failure leaves it out instead of blocking.
+async function loadQuota() {
+  const item = selectedItem.value;
+  if (!item || !isYouTube(item.platform)) return;
+  try {
+    quota.value = await fetchChannelQuota(item.channelId);
+  } catch {
+    quota.value = null;
+  }
+}
+
+// The declaration is saved in two steps: the visibility (the post records that a person chose it), then the made-for-kids
+// answer and the Short flag. The server refuses both once the post is scheduled.
+async function saveDeclaration(declaration: { visibility: PostVisibility; madeForKids: boolean; planShort: boolean }) {
+  const item = selectedItem.value;
+  if (!item) return;
+  panelBusy.value = true;
+  declarationError.value = undefined;
+  panelNotice.value = undefined;
+  try {
+    await updatePostVisibility(item.id, declaration.visibility);
+    await setYouTubeDeclaration(item.id, { madeForKids: declaration.madeForKids, planShort: declaration.planShort });
+    panelNotice.value = 'Die Angaben zur Veröffentlichung wurden gespeichert.';
+    await load();
+    await loadDetail(item.id);
+  } catch (failure) {
+    declarationError.value = actionErrorText(failure, 'Die Angaben konnten nicht gespeichert werden.');
+  } finally {
+    panelBusy.value = false;
+  }
 }
 
 function closePost() {
   selectedId.value = null;
+  detail.value = null;
   revisions.value = [];
   refusal.value = null;
   panelNotice.value = undefined;
@@ -189,6 +254,7 @@ async function runAction(run: (id: string) => Promise<unknown>, done: string) {
     panelNotice.value = done;
     await load();
     await loadRevisions();
+    await loadDetail(item.id);
   } catch (failure) {
     const problems = failure instanceof ApiError ? (failure.problems as DryRunProblem[]) : [];
     refusal.value = {
@@ -355,8 +421,8 @@ onMounted(() => {
         </div>
         <aside class="calendar-page__side" aria-label="Beitrag und Kalender-Abo">
           <PostPanel
-            v-if="selectedItem && actions"
-            :item="selectedItem"
+            v-if="panelItem && actions"
+            :item="panelItem"
             :actions="actions"
             :busy="panelBusy"
             :refusal="refusal"
@@ -371,6 +437,11 @@ onMounted(() => {
             @accept="acceptSelectedRevision"
             @reject="rejectSelectedRevision"
             @retry-revisions="loadRevisions"
+            @declare="saveDeclaration"
+            :quota="quota"
+            :time-zone="page?.timeZone ?? 'Europe/Berlin'"
+            :can-declare="mayDeclare(panelItem.status, props.roles)"
+            :declaration-error="declarationError"
           />
           <FeedPanel :feed-url="feedAddress" :busy="feedBusy" :error="feedError" @issue="issueFeed" @revoke="revokeFeed" />
         </aside>

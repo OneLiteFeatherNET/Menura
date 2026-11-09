@@ -43,6 +43,11 @@ export function sampleItem(overrides: Partial<CalendarItem> = {}): CalendarItem 
     startsAt: '2026-11-09T17:00:00Z',
     localDate: '2026-11-09',
     localTime: '18:00',
+    madeForKids: null,
+    visibilityDeclared: false,
+    plannedShort: false,
+    appliedVisibility: null,
+    visibilityProblem: null,
     ...overrides,
   };
 }

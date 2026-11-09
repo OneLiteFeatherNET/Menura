@@ -1,7 +1,8 @@
 // Typed calls of the Channels and Platforms endpoints (contracts/openapi/menura.yaml). The types are aliases so that
 // rows built from them satisfy the shared table's row type.
 import type { Fetcher } from '../auth/session';
-import { apiRequest } from './client';
+import { ApiError, apiRequest } from './client';
+import type { ChannelQuota } from './posts';
 
 export type ChannelState = 'connected' | 'needs_reconnection' | 'disconnected';
 export type AuditStatusValue = 'unknown' | 'unaudited' | 'audited';
@@ -196,4 +197,19 @@ function requireBody<T>(body: T | undefined): T {
     throw new Error('The API answered without a body.');
   }
   return body;
+}
+
+/**
+ * The remaining daily quota of a YouTube channel. A platform without a daily quota answers 404, which gives null; any other
+ * failure is thrown, so the caller can show that the quota is unknown.
+ */
+export async function fetchChannelQuota(channelId: string, fetcher?: Fetcher): Promise<ChannelQuota | null> {
+  try {
+    return (await apiRequest<ChannelQuota>(`/channels/${encodeURIComponent(channelId)}/quota`, {}, fetcher)) ?? null;
+  } catch (failure) {
+    if (failure instanceof ApiError && failure.status === 404) {
+      return null;
+    }
+    throw failure;
+  }
 }

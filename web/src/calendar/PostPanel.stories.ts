@@ -23,6 +23,7 @@ const meta = {
     onAccept: fn(),
     onReject: fn(),
     'onRetry-revisions': fn(),
+    onDeclare: fn(),
   },
 } satisfies Meta<typeof PostPanel>;
 export default meta;
@@ -120,6 +121,91 @@ export const FailedWithAttempts: Story = {
     expect(canvas.getByRole('alert')).toHaveTextContent('Die Plattform hat den Upload abgelehnt.');
     expect(canvas.getByText('Veröffentlichung: Fehlgeschlagen', { exact: false })).toBeVisible();
     expect(canvas.getByText('Versuch 2:', { exact: false })).toHaveTextContent('Ergebnis unbekannt');
+  },
+};
+
+const YOUTUBE_QUOTA = {
+  unitsPerDay: 10000,
+  unitsRemaining: 9800,
+  uploadsPerDay: 6,
+  uploadsRemaining: 5,
+  resetsAt: '2026-11-09T08:00:00Z',
+};
+
+export const YouTubeDeclarationOpen: Story = {
+  args: {
+    item: sampleItem({ status: 'draft', platform: 'youtube', visibilityDeclared: false }),
+    actions: { submit: true, approve: false, schedule: false, decideRevisions: false },
+    canDeclare: true,
+    quota: YOUTUBE_QUOTA,
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByText('noch nicht gewählt')).toBeVisible();
+    expect(canvas.getByText('9800 von 10000 Einheiten · 5 von 6 Uploads frei', { exact: false })).toBeVisible();
+
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Sichtbarkeit' }));
+    await userEvent.click(canvas.getByRole('option', { name: 'Privat' }));
+    await userEvent.click(canvas.getByRole('radio', { name: /Nein, das Video ist nicht für Kinder bestimmt/ }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Angaben speichern' }));
+
+    expect(args.onDeclare).toHaveBeenCalledWith({ visibility: 'private', madeForKids: false, planShort: false });
+  },
+};
+
+export const YouTubeDeclarationReadOnlyWhenScheduled: Story = {
+  args: {
+    item: sampleItem({ status: 'scheduled', platform: 'youtube', visibilityDeclared: true, visibility: 'private', madeForKids: false }),
+    actions: NONE,
+    canDeclare: false,
+    quota: null,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.queryByRole('button', { name: 'Angaben speichern' }), 'a scheduled post takes no declaration').toBeNull();
+    // Made for kids is no, and the post is not planned as a Short.
+    expect(canvas.getAllByText('Nein')).toHaveLength(2);
+  },
+};
+
+export const AppliedVisibilityMismatch: Story = {
+  args: {
+    item: sampleItem({
+      status: 'scheduled',
+      platform: 'youtube',
+      visibilityDeclared: true,
+      visibility: 'public',
+      appliedVisibility: 'private',
+      visibilityProblem: 'The platform applies private instead of public.',
+    }),
+    actions: NONE,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByRole('alert')).toHaveTextContent('Angewendet: Privat, gewählt: Öffentlich.');
+    expect(canvas.queryByText(/platform applies/), 'the server text is not shown').toBeNull();
+  },
+};
+
+export const DeclarationProblemsInGerman: Story = {
+  args: {
+    item: sampleItem({ status: 'approved', platform: 'youtube', problems: [] }),
+    actions: { submit: false, approve: false, schedule: true, decideRevisions: false },
+    refusal: {
+      message: 'Die Prüfung hat Probleme gefunden. Der Beitrag wurde nicht eingeplant.',
+      problems: [
+        { code: 'visibility_undeclared', severity: 'error', message: 'Choose the visibility', action: null },
+        { code: 'made_for_kids_missing', severity: 'error', message: 'Declare made for kids', action: null },
+        { code: 'short_too_long', severity: 'error', message: 'Too long', action: null },
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByText('Wählen Sie die Sichtbarkeit des Beitrags, bevor er eingeplant wird.')).toBeVisible();
+    expect(canvas.getByText('Beantworten Sie, ob das Video für Kinder bestimmt ist, bevor es eingeplant wird.')).toBeVisible();
+    expect(canvas.getByText('Ein Short darf höchstens drei Minuten lang sein.')).toBeVisible();
+    expect(canvas.queryByText('Choose the visibility')).toBeNull();
   },
 };
 

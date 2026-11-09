@@ -7,7 +7,9 @@ import type { ChannelState } from '../api/channels';
 import type {
   CalendarItem,
   CalendarPage,
+  ChannelQuota,
   DryRunProblem,
+  Post,
   EpisodePlanRequest,
   PostPlanRequest,
   PostAttempt,
@@ -385,6 +387,83 @@ export const VISIBILITY_LABELS: Record<PostVisibility, string> = {
   unlisted: 'Nicht gelistet',
   public: 'Öffentlich',
 };
+
+/** The German texts of the dry-run problem codes. A code not listed here is shown with the server's own message. */
+export const PROBLEM_TEXTS: Record<string, string> = {
+  asset_missing: 'Dem Beitrag fehlt der fertige Clip.',
+  format_not_allowed: 'Die Plattform nimmt diese Art von Datei für diesen Kanal nicht an.',
+  title_too_long: 'Der Titel ist für diesen Kanal zu lang.',
+  description_too_long: 'Der Text ist für diesen Kanal zu lang.',
+  too_many_hashtags: 'Der Kanal nimmt nicht so viele Hashtags.',
+  connection_unusable: 'Der Kanal muss neu verbunden werden, bevor der Beitrag hinausgeht.',
+  audit_restricted: 'Die Plattform-App ist nicht geprüft, daher ist die öffentliche Sichtbarkeit nicht erlaubt.',
+  missing_time: 'Der Beitrag hat noch keinen Termin.',
+  collision: 'Ein anderer Beitrag desselben Kanals ist zur selben Zeit geplant.',
+  visibility_undeclared: 'Wählen Sie die Sichtbarkeit des Beitrags, bevor er eingeplant wird.',
+  made_for_kids_missing: 'Beantworten Sie, ob das Video für Kinder bestimmt ist, bevor es eingeplant wird.',
+  short_not_vertical: 'Ein Short muss hochkant oder quadratisch sein.',
+  short_too_long: 'Ein Short darf höchstens drei Minuten lang sein.',
+  short_unverified: 'Die Größe oder Dauer des Clips ist nicht erfasst, daher lässt sich nicht prüfen, ob er ein Short ist.',
+};
+
+/** The German text of one dry-run problem; a code without a German text keeps the server's message. */
+export function problemText(problem: DryRunProblem): string {
+  return PROBLEM_TEXTS[problem.code] ?? problem.message;
+}
+
+/** The made-for-kids and visibility fields of the declaration form, as the person has filled them. */
+export interface DeclarationForm {
+  visibility: string;
+  madeForKids: boolean | null;
+  plannedShort: boolean;
+}
+
+/** The German reason the declaration cannot be saved yet, or null when it is complete. */
+export function declarationError(form: DeclarationForm): string | null {
+  if (!form.visibility) {
+    return 'Wählen Sie die Sichtbarkeit.';
+  }
+  if (form.madeForKids === null) {
+    return 'Beantworten Sie, ob das Video für Kinder bestimmt ist.';
+  }
+  return null;
+}
+
+/** Whether a post goes to YouTube, the platform with the declarations of this change. */
+export function isYouTube(platform: string): boolean {
+  return platform === 'youtube';
+}
+
+/** The visibility declaration can be changed while the post is a draft or in review, as on the server. */
+export function canDeclare(status: PostStatus, roles: readonly string[]): boolean {
+  return (roles.includes('EDITOR') || roles.includes('PUBLISHER')) && (status === 'draft' || status === 'in_review');
+}
+
+/** The German note of a platform's applied visibility that differs from the requested one, or null when they agree. */
+export function visibilityMismatchText(post: Pick<Post, 'visibility' | 'appliedVisibility'>): string | null {
+  if (!post.appliedVisibility || post.appliedVisibility === post.visibility) {
+    return null;
+  }
+  return `Angewendet: ${VISIBILITY_LABELS[post.appliedVisibility]}, gewählt: ${VISIBILITY_LABELS[post.visibility]}.`;
+}
+
+/** The remaining quota in words: units and uploads of the day that are still left. */
+export function quotaLine(quota: Pick<ChannelQuota, 'unitsPerDay' | 'unitsRemaining' | 'uploadsPerDay' | 'uploadsRemaining'>): string {
+  return `${quota.unitsRemaining} von ${quota.unitsPerDay} Einheiten · ${quota.uploadsRemaining} von ${quota.uploadsPerDay} Uploads frei`;
+}
+
+/** The moment the quota starts over, in the installation zone the API names (for example 09.11.2026, 09:00). */
+export function resetLabel(resetsAt: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('de-DE', {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(resetsAt));
+}
 
 /** The German text of a failed calendar action. The status decides the text; the server's English detail is not shown. */
 export function actionErrorText(error: unknown, fallback: string): string {

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { CalendarItem, DryRunProblem, PostRevision } from '../api/posts';
+import type { CalendarItem, ChannelQuota, DryRunProblem, PostRevision, PostVisibility } from '../api/posts';
 import MetaList from '../components/ui/MetaList.vue';
 import StatusBadge from '../components/ui/StatusBadge.vue';
 import PostRevisions from './PostRevisions.vue';
+import YouTubeDeclarationForm from './YouTubeDeclarationForm.vue';
 import {
   CHANNEL_STATE_LABELS,
   OUTCOME_LABELS,
@@ -12,6 +13,11 @@ import {
   STEP_STATE_LABELS,
   VISIBILITY_LABELS,
   dayLabel,
+  isYouTube,
+  problemText,
+  quotaLine,
+  resetLabel,
+  visibilityMismatchText,
   type PostActions,
   type ScheduleRefusal,
 } from './model';
@@ -19,15 +25,25 @@ import {
 // One post of the calendar: its status, the dry-run problems, the publication steps and attempts, and the actions the
 // person may take. The actions come from the role and the status (postActions); the server checks them again. A refused
 // schedule shows the problems of the refusal next to the action.
-const props = defineProps<{
-  item: CalendarItem;
-  actions: PostActions;
-  busy: boolean;
-  refusal: ScheduleRefusal | null;
-  revisions: PostRevision[];
-  revisionsStatus: 'loading' | 'error' | 'ready';
-  notice?: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    item: CalendarItem;
+    actions: PostActions;
+    busy: boolean;
+    refusal: ScheduleRefusal | null;
+    revisions: PostRevision[];
+    revisionsStatus: 'loading' | 'error' | 'ready';
+    notice?: string;
+    /** The remaining daily quota of the post's YouTube channel; null when unknown or not a YouTube channel. */
+    quota?: ChannelQuota | null;
+    /** The installation zone the API names, for the reset time of the quota. */
+    timeZone?: string;
+    /** Whether the person may change the declaration (editor or publisher, post still a draft or in review). */
+    canDeclare?: boolean;
+    declarationError?: string;
+  }>(),
+  { notice: undefined, quota: null, timeZone: 'Europe/Berlin', canDeclare: false, declarationError: undefined },
+);
 
 const emit = defineEmits<{
   close: [];
@@ -38,15 +54,33 @@ const emit = defineEmits<{
   accept: [revisionId: string];
   reject: [revisionId: string];
   'retry-revisions': [];
+  declare: [declaration: { visibility: PostVisibility; madeForKids: boolean; planShort: boolean }];
 }>();
 
 const SEVERITY_LABELS = { error: 'Fehler', warning: 'Hinweis' } as const;
+const youTube = computed(() => isYouTube(props.item.platform));
+const declarationOpen = computed(() => youTube.value && props.canDeclare);
+const mismatch = computed(() => visibilityMismatchText(props.item));
+const quotaText = computed(() => (props.quota ? quotaLine(props.quota) : null));
+const quotaReset = computed(() => (props.quota ? resetLabel(props.quota.resetsAt, props.timeZone) : null));
 
 const facts = computed(() => [
   { label: 'Kanal', value: `${props.item.channelName} (${props.item.platform})` },
   { label: 'Kanalstatus', value: CHANNEL_STATE_LABELS[props.item.channelState] },
   { label: 'Termin', value: `${dayLabel(props.item.localDate)}, ${props.item.localTime} Uhr` },
-  { label: 'Sichtbarkeit', value: VISIBILITY_LABELS[props.item.visibility] },
+  {
+    label: 'Sichtbarkeit',
+    value: props.item.visibilityDeclared ? VISIBILITY_LABELS[props.item.visibility] : 'noch nicht gewählt',
+  },
+  ...(youTube.value
+    ? [
+        { label: 'Für Kinder', value: props.item.madeForKids === null ? 'noch nicht beantwortet' : props.item.madeForKids ? 'Ja' : 'Nein' },
+        { label: 'Als Short', value: props.item.plannedShort ? 'Ja' : 'Nein' },
+      ]
+    : []),
+  ...(props.item.appliedVisibility
+    ? [{ label: 'Angewendet', value: VISIBILITY_LABELS[props.item.appliedVisibility] }]
+    : []),
   { label: 'Versuche', value: String(props.item.attempts) },
 ]);
 
@@ -74,6 +108,23 @@ const hasAnyAction = computed(() => props.actions.submit || props.actions.approv
 
     <MetaList :items="facts" />
 
+    <p v-if="mismatch" class="post-panel__alert" role="alert">{{ mismatch }}</p>
+
+    <p v-if="quotaText" class="post-panel__muted">
+      Kontingent heute: {{ quotaText }}. Zurückgesetzt am {{ quotaReset }}.
+    </p>
+
+    <YouTubeDeclarationForm
+      v-if="declarationOpen"
+      :key="item.id"
+      :visibility="item.visibilityDeclared ? item.visibility : null"
+      :made-for-kids="item.madeForKids"
+      :planned-short="item.plannedShort"
+      :busy="busy"
+      :error="declarationError"
+      @save="(declaration: { visibility: PostVisibility; madeForKids: boolean; planShort: boolean }) => emit('declare', declaration)"
+    />
+
     <p v-if="item.url" class="post-panel__link">
       <a :href="item.url" target="_blank" rel="noopener noreferrer">Beitrag auf der Plattform öffnen</a>
     </p>
@@ -95,7 +146,7 @@ const hasAnyAction = computed(() => props.actions.submit || props.actions.approv
             :label="SEVERITY_LABELS[problem.severity]"
             :tone="problem.severity === 'error' ? 'error' : 'warning'"
           />
-          <span>{{ problem.message }}</span>
+          <span>{{ problemText(problem) }}</span>
         </li>
       </ul>
       <button v-if="needsReconnect" type="button" class="post-panel__button" :disabled="busy" @click="emit('reconnect')">
