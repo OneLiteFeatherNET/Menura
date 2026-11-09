@@ -33,7 +33,8 @@ database:
 # Object storage of the library (finished assets and raw material): the OLF Ceph RGW through its S3 API, on the public
 # host (principle 14). The bucket is private and the browser sends parts straight to the endpoint, so its CORS rule
 # allows the web app origin only. Credentials are not values: they come from an existing Secret with the keys
-# MENURA_S3_ACCESS_KEY_ID and MENURA_S3_SECRET_ACCESS_KEY, injected into the server pods and the publication job only.
+# MENURA_S3_ACCESS_KEY_ID and MENURA_S3_SECRET_ACCESS_KEY, injected into the server pods, the publication job and the
+# retention job only.
 storage:
   endpoint: https://s3.onelitefeather.net
   region: default

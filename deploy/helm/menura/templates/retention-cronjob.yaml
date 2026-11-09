@@ -1,7 +1,8 @@
 {{- if .Values.jobs.retention.enabled }}
 # Moves raw recordings older than the retention policy to the cold storage class and records the new media state
-# (change add-content-library). Off by default; the policy switch is jobs.retention.policyEnabled. The run prints
-# counts only.
+# (change add-content-library). Off by default; the policy switch is jobs.retention.policyEnabled. It reads the object
+# storage credentials from storage.existingSecret through envFrom, like the publication job (the server reads them too).
+# The run prints counts only.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -44,7 +45,7 @@ spec:
                   value: {{ .Values.jobs.retention.rawMaxAge | quote }}
                 - name: MENURA_RETENTION_BATCH_SIZE
                   value: {{ int .Values.jobs.retention.batchSize | quote }}
-              {{- include "menura.secretEnvFrom" . | nindent 14 }}
+              {{- include "menura.storageJobSecretEnvFrom" . | nindent 14 }}
               {{- include "menura.containerSecurity" . | nindent 14 }}
               {{- with .Values.jobs.resources }}
               resources:
