@@ -995,9 +995,16 @@ paths:
       operationId: getBrandKitTemplate
       summary: The layout template of one format, with its declared parameters.
       description: |
-        Formats: short-9x16 (1080 by 1920), long-16x9-intro, long-16x9-outro, thumbnail, social-post-image, end-card and
-        overlay-theme. Each template declares its parameters (title, subtitle, image, and join_domain for the short's
-        call to action); a renderer rejects an undeclared or missing parameter.
+        Formats and the parameters each one declares. A renderer rejects an undeclared parameter and a missing required one.
+        - short-9x16 (1080 by 1920): title (required, text), subtitle (text), image (image), join_domain (required, text;
+          the installation-wide join domain of the call to action, the same for every channel). Slots: badge for the whole
+          duration, title from 0 to 3 seconds, captions, session-tiles, and cta only during the last 2 seconds. No end card.
+        - long-16x9-intro (1920 by 1080): title (required, text), subtitle (text), image (image).
+        - long-16x9-outro (1920 by 1080): title (required, text), subtitle (text), image (image).
+        - thumbnail (1280 by 720): title (required, text), subtitle (text), image (image).
+        - social-post-image (1080 by 1080): title (required, text), subtitle (text), image (image).
+        - end-card (1920 by 1080): title (required, text), subtitle (text), image (image).
+        - overlay-theme (1920 by 1080): no parameters.
       security:
         - sessionCookie: []
       parameters:
