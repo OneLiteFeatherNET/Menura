@@ -34,17 +34,17 @@ Content analytics keeps the performance history of every external post, whether 
 - **THEN** the job records the failure for that channel and keeps the points collected before the failure
 
 ### Requirement: Snapshots at fixed offsets
-(Must) The hub SHALL record the cumulative metrics of every external post at +1 hour, +2 hours, +4 hours, +8 hours, +24 hours, +48 hours and +7 days after its publication, and daily after that; SHALL take each snapshot in the first collection run at or after its offset and store it with its as-of time; and SHALL overwrite the snapshot of an offset when the platform later reports a revised value for it.
+(Must) The hub SHALL record the cumulative metrics of every external post at +1 hour, +2 hours, +4 hours, +8 hours, +24 hours, +48 hours and +7 days after its publication, and daily after that; SHALL take each snapshot in the first collection run at or after its offset and store it with its as-of time; and SHALL keep a taken snapshot unchanged, while the raw points keep every later collected value.
 
 #### Scenario: Snapshot taken at its offset
 - **GIVEN** an external post published at 10:00 and a collection run at 11:05, the first run at or after 11:00
 - **WHEN** that run collects the post
 - **THEN** the +1 hour snapshot holds the cumulative values with the as-of time 11:05
 
-#### Scenario: Late platform revision overwrites the snapshot
+#### Scenario: A taken snapshot stays unchanged
 - **GIVEN** a stored +24 hour snapshot with 100 views
-- **WHEN** a later collection receives 120 views for the same offset from the platform
-- **THEN** the snapshot holds 120 views with the new as-of time, and the raw points keep both collected values
+- **WHEN** a later collection receives 120 views for the post
+- **THEN** the +24 hour snapshot still holds 100 views with its original as-of time, and the raw points keep both collected values
 
 #### Scenario: Daily snapshots after seven days
 - **GIVEN** an external post published nine days earlier

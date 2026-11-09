@@ -28,7 +28,7 @@ Constraints from the project context: the cluster runs no ffmpeg and no renderin
 - Rejected: Menura renders in Phase 1. That would pull ingest and the media job queue forward from Phase 4 into Phase 1.
 - Rejected: keep the look in the renderer's code. It has already drifted from the overlay, and a second copy of the palette would drift again.
 
-**Seed from the overlay theme.** The first version takes its colour roles from the stream overlay theme (its Material Design 3 CSS custom properties) and its mark from the feather logo, because the overlay is what viewers already see on stream.
+**Seed from the overlay theme.** The first version takes its colour roles from the stream overlay theme (its Material Design 3 CSS custom properties) because the overlay is what viewers already see on stream. The first version has no mark: a mark must reference a verified library asset, and the feather logo is not one at first start. After the rollout the logo is uploaded and a new version with the feather mark is published (decided 2026-11-09).
 - Rejected: the hex values hard-coded in the cut tool. They drifted from the overlay, and seeding from them would make the first version a copy of the wrong look.
 
 **No end card, call to action within two seconds.** The short 9:16 template follows the house editing rules: no end card, a call to action only in the last 2 s, and a title only in the first 3 s.
@@ -69,7 +69,7 @@ Constraints from the project context: the cluster runs no ffmpeg and no renderin
 
 ## Migration Plan
 
-First release of the brand kit: the initial version is seeded from the colour roles of the stream overlay theme and the feather mark (see Decisions), and the typography (font files and roles) is supplied by the marketing owner. The external renderer switches to reading the render bundle of the pinned version. No consumer exists in production before this change, so nothing else is migrated. Rollback leaves the stored versions in place and stops publication of new versions.
+First release of the brand kit: the initial version is seeded from the colour roles of the stream overlay theme (see Decisions); the feather mark is published as a later version once the logo is uploaded, and the typography (font files and roles) is supplied by the marketing owner. The external renderer switches to reading the render bundle of the pinned version. No consumer exists in production before this change, so nothing else is migrated. Rollback leaves the stored versions in place and stops publication of new versions.
 
 ## Open Questions
 
