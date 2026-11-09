@@ -12,6 +12,7 @@ import jakarta.inject.Inject;
 import net.onelitefeather.menura.core.attribution.AttributablePost;
 import net.onelitefeather.menura.core.attribution.support.InMemoryJoinStore;
 import net.onelitefeather.menura.core.auth.Role;
+import net.onelitefeather.menura.core.problem.ProblemDetails;
 import net.onelitefeather.menura.server.security.HeaderIdentityFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ class JoinHttpTest {
     private static final String PROXY = "Bearer test-join-proxy-credential";
     private static final String PSEUDONYM = "e".repeat(64);
     private static final String ADMIN = "admin-1";
+    private static final String RAW_TOKEN = "rawTokenFromClient42";
     private static final String VIEWER = "viewer-1";
 
     @Inject
@@ -184,6 +186,47 @@ class JoinHttpTest {
         Reply hidden = send(as(HttpRequest.GET("/join-attribution/posts/" + post), "VIEWER"));
 
         assertEquals(404, hidden.status(), "a post of a series the viewer may not see is not found");
+    }
+
+    @Test
+    void aMalformedJoinEventBodyAnswers400ProblemDetailsWithoutTheRawInput() {
+        String malformed = "{\"eventId\":\"" + UUID.randomUUID() + "\",\"firstJoin\":true,\"username\":" + RAW_TOKEN + "}";
+
+        HttpClientResponseException refused = refusal(proxy(HttpRequest.POST("/join-events", malformed)));
+
+        assertProblemWithoutRawInput(refused);
+    }
+
+    @Test
+    void aMalformedSourceAnswerBodyAnswers400ProblemDetailsWithoutTheRawInput() {
+        UUID id = UUID.fromString("c09e8b1a-2d3f-4e5a-9b6c-7d8e9f0a1b2c");
+        send(proxy(HttpRequest.POST("/join-events", event(id, true, clock.instant()))));
+        String malformed = "{\"source\":" + RAW_TOKEN + "}";
+
+        HttpClientResponseException refused = refusal(proxy(HttpRequest.POST("/join-events/" + id + "/source-answer",
+                malformed)));
+
+        assertProblemWithoutRawInput(refused);
+    }
+
+    private void assertProblemWithoutRawInput(HttpClientResponseException refused) {
+        String body = refused.getResponse().getBody(String.class).orElse("");
+        String contentType = refused.getResponse().getContentType().map(Object::toString).orElse("");
+
+        assertEquals(400, refused.getStatus().getCode(), "a body that is not JSON is refused as a bad request");
+        assertTrue(contentType.startsWith(ProblemDetails.MEDIA_TYPE), "the refusal is Problem Details: " + contentType);
+        assertTrue(body.contains("\"status\":400"), "the Problem Details body names its status");
+        assertFalse(body.contains(RAW_TOKEN), "the raw input is not echoed in the refusal");
+    }
+
+    private HttpClientResponseException refusal(MutableHttpRequest<?> request) {
+        request.contentType(MediaType.APPLICATION_JSON_TYPE);
+        try {
+            client.toBlocking().exchange(request, String.class);
+        } catch (HttpClientResponseException refused) {
+            return refused;
+        }
+        throw new AssertionError("the request was accepted but a refusal was expected");
     }
 
     private String event(UUID id, boolean firstJoin, Instant joinedAt) {
