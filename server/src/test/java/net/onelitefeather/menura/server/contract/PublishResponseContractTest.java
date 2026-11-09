@@ -99,6 +99,15 @@ class PublishResponseContractTest {
     }
 
     @Test
+    void theRemainingDailyQuotaOfAYouTubeChannelConformsToTheContract() throws Exception {
+        JsonNode quota = send(HttpRequest.GET("/channels/" + CHANNEL + "/quota"));
+
+        assertConforms("ChannelQuota", quota);
+        assertEquals(10_000, quota.get("unitsRemaining").asInt(), "a channel that used no quota has all units left");
+        assertEquals(100, quota.get("uploadsRemaining").asInt(), "a channel that used no quota has all uploads left");
+    }
+
+    @Test
     void theCalendarPageAndEveryItemConformToTheContract() throws Exception {
         send(HttpRequest.POST("/posts", Map.of("channelId", CHANNEL.toString(), "assetId", VIDEO.toString(), "title",
                 "Calendar item", "scheduledAt", "2026-11-09T17:00:00Z")));

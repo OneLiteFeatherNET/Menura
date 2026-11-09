@@ -88,6 +88,11 @@ public final class QuotaLedger {
         store.save(connection, channelId, day, new Usage(used.units() + cost, used.uploads() + (upload ? 1 : 0)));
     }
 
+    /** The daily budget the ledger accounts against. */
+    public QuotaBudget budget() {
+        return budget;
+    }
+
     /** What is left for the channel on the day of {@code now}. */
     public Remaining remaining(Connection connection, UUID channelId, Instant now) throws SQLException {
         Usage used = store.usage(connection, channelId, QuotaBudget.day(now));

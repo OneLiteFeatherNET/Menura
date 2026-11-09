@@ -112,7 +112,8 @@ class RouteTableTest {
             "GET /join-attribution/new-players",
             "GET /join-attribution/posts/{id}",
             "GET /join-attribution/series",
-            "PUT /posts/{id}/youtube-declaration");
+            "PUT /posts/{id}/youtube-declaration",
+            "GET /channels/{id}/quota");
 
     private static final Set<Class<?>> BINARY_BODIES = Set.of(byte[].class, InputStream.class, ByteBuffer.class,
             StreamingFileUpload.class, CompletedFileUpload.class);

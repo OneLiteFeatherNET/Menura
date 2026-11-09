@@ -6,10 +6,14 @@ import net.onelitefeather.menura.core.channel.ChannelStore;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
 import net.onelitefeather.menura.core.db.Transactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
+import net.onelitefeather.menura.core.publish.ChannelQuotaService;
 import net.onelitefeather.menura.core.publish.JdbcPostStore;
+import net.onelitefeather.menura.core.publish.JdbcQuotaStore;
 import net.onelitefeather.menura.core.publish.PostService;
 import net.onelitefeather.menura.core.publish.PostStore;
 import net.onelitefeather.menura.core.publish.PublishSettings;
+import net.onelitefeather.menura.core.publish.QuotaBudget;
+import net.onelitefeather.menura.core.publish.QuotaLedger;
 import net.onelitefeather.menura.core.series.SeriesService;
 
 import java.time.Clock;
@@ -24,6 +28,18 @@ public class PublishBeans {
     @Singleton
     PostStore postStore() {
         return new JdbcPostStore();
+    }
+
+    @Singleton
+    QuotaLedger.Store quotaStore() {
+        return new JdbcQuotaStore();
+    }
+
+    /** The remaining daily quota of a YouTube channel (change add-youtube-integration). */
+    @Singleton
+    ChannelQuotaService channelQuotaService(Transactions transactions, Clock clock, ChannelStore channels,
+                                            QuotaLedger.Store store) {
+        return new ChannelQuotaService(transactions, clock, channels, new QuotaLedger(QuotaBudget.youtubeDefaults(), store));
     }
 
     @Singleton

@@ -7,7 +7,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/** PostgreSQL implementation of the quota usage store over the table {@code menura.youtube_quota_usage} (migration V13). */
+/** PostgreSQL implementation of the quota usage store over the table {@code menura.youtube_quota_usage} (migration V14). */
 public final class JdbcQuotaStore implements QuotaLedger.Store {
 
     @Override

@@ -2654,6 +2654,35 @@ paths:
           $ref: "#/components/responses/Problem"
         "409":
           $ref: "#/components/responses/Problem"
+  /channels/{id}/quota:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The channel identifier.
+        schema:
+          $ref: "#/components/schemas/Identifier"
+    get:
+      tags:
+        - Channels
+      operationId: getChannelQuota
+      summary: The remaining daily quota of a YouTube channel.
+      description: |
+        The units and the videos.insert calls of the current Pacific day that are still left for the channel, and when the
+        figures start over. Only a YouTube channel has a daily quota in this build; another platform answers 404.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The remaining quota.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelQuota"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
 
 
 components:
@@ -6087,3 +6116,28 @@ components:
         planShort:
           type: boolean
           description: Omitted or null keeps the current answer.
+    ChannelQuota:
+      type: object
+      description: The remaining daily quota of a YouTube channel on the current Pacific day.
+      required:
+        - unitsPerDay
+        - unitsRemaining
+        - uploadsPerDay
+        - uploadsRemaining
+        - resetsAt
+      properties:
+        unitsPerDay:
+          type: integer
+          minimum: 0
+        unitsRemaining:
+          type: integer
+          minimum: 0
+        uploadsPerDay:
+          type: integer
+          minimum: 0
+        uploadsRemaining:
+          type: integer
+          minimum: 0
+        resetsAt:
+          type: string
+          format: date-time
