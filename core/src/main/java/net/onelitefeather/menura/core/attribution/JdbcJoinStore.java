@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-/** PostgreSQL implementation of {@link JoinStore} over the tables of migration V14 and the external posts of V7 and V9. */
+/** PostgreSQL implementation of {@link JoinStore} over the tables of migration V13 and the external posts of V7 and V9. */
 public final class JdbcJoinStore implements JoinStore {
 
     private static final String POST_SELECT = "select p.id, p.platform, p.published_at, s.id, s.name, s.visible_to "
