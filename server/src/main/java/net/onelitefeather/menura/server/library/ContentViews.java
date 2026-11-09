@@ -1,5 +1,6 @@
 package net.onelitefeather.menura.server.library;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.micronaut.serde.annotation.Serdeable;
 
 import java.time.Instant;
@@ -28,6 +29,7 @@ public final class ContentViews {
      * finished asset is a clip at stage rendered with its {@code assetId} set. {@code usage} is set for clips only.
      */
     @Serdeable
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record PoolItemView(UUID id, String kind, String stage, String status, UUID uploaderId, String title,
                                UUID rawItemId, UUID assetId, Integer startSeconds, Integer endSeconds, String usage,
                                List<UUID> personTags, List<String> freeTags, Instant createdAt) {
