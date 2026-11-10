@@ -6,6 +6,8 @@ import net.onelitefeather.menura.core.channel.ConnectionService;
 import net.onelitefeather.menura.core.channel.JdbcChannelStore;
 import net.onelitefeather.menura.core.channel.JdkHttpTransport;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
+import net.onelitefeather.menura.core.channel.PlatformAdapter;
+import net.onelitefeather.menura.core.channel.youtube.YouTubeAdapters;
 import net.onelitefeather.menura.core.channel.youtube.YouTubeAdapter;
 import net.onelitefeather.menura.core.config.ChannelSettings;
 import net.onelitefeather.menura.core.config.MenuraSettings;
@@ -65,10 +67,10 @@ public final class ExternalPostSyncJob implements Job {
         dataSource.setUser(database.databaseUser());
         dataSource.setPassword(database.databasePassword());
 
-        YouTubeAdapter youtube = new YouTubeAdapter(clock,
+        PlatformAdapter youtube = YouTubeAdapters.create(clock,
                 new YouTubeAdapter.Settings(channels.youtubeClientId(), channels.youtubeClientSecret(),
                         channels.youtubeRedirectUri()),
-                new JdkHttpTransport());
+                channels.youtubeMode(), new JdkHttpTransport());
         PlatformRegistry registry = new PlatformRegistry(List.of(youtube));
         SecureRandom random = new SecureRandom();
         DataSourceTransactions transactions = new DataSourceTransactions(dataSource);

@@ -1,5 +1,7 @@
 package net.onelitefeather.menura.core.config;
 
+import net.onelitefeather.menura.core.channel.youtube.YouTubeMode;
+
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
@@ -9,7 +11,8 @@ import java.util.Objects;
  * server reads through its configuration. The token key has no default: a job started without it fails at once.
  */
 public record ChannelSettings(String tokenKey, String previousTokenKey, Duration refreshMargin,
-                              String youtubeClientId, String youtubeClientSecret, String youtubeRedirectUri) {
+                              String youtubeClientId, String youtubeClientSecret, String youtubeRedirectUri,
+                              YouTubeMode youtubeMode) {
 
     public static final String TOKEN_KEY_VARIABLE = "MENURA_TOKEN_ENCRYPTION_KEY";
     public static final String PREVIOUS_TOKEN_KEY_VARIABLE = "MENURA_TOKEN_ENCRYPTION_KEY_PREVIOUS";
@@ -17,6 +20,7 @@ public record ChannelSettings(String tokenKey, String previousTokenKey, Duration
     public static final String YOUTUBE_CLIENT_ID_VARIABLE = "MENURA_YOUTUBE_CLIENT_ID";
     public static final String YOUTUBE_CLIENT_SECRET_VARIABLE = "MENURA_YOUTUBE_CLIENT_SECRET";
     public static final String YOUTUBE_REDIRECT_URI_VARIABLE = "MENURA_YOUTUBE_REDIRECT_URI";
+    public static final String YOUTUBE_MODE_VARIABLE = YouTubeMode.VARIABLE;
 
     static final String DEFAULT_REFRESH_MARGIN = "PT10M";
     static final String DEFAULT_YOUTUBE_REDIRECT_URI = "http://localhost:8080/channel-connections/callback";
@@ -27,6 +31,7 @@ public record ChannelSettings(String tokenKey, String previousTokenKey, Duration
         Objects.requireNonNull(youtubeClientId, "youtubeClientId");
         Objects.requireNonNull(youtubeClientSecret, "youtubeClientSecret");
         Objects.requireNonNull(youtubeRedirectUri, "youtubeRedirectUri");
+        Objects.requireNonNull(youtubeMode, "youtubeMode");
     }
 
     /** Reads the settings from an environment map, normally {@code System.getenv()}. */
@@ -37,7 +42,8 @@ public record ChannelSettings(String tokenKey, String previousTokenKey, Duration
                 Duration.parse(environment.getOrDefault(REFRESH_MARGIN_VARIABLE, DEFAULT_REFRESH_MARGIN)),
                 environment.getOrDefault(YOUTUBE_CLIENT_ID_VARIABLE, ""),
                 environment.getOrDefault(YOUTUBE_CLIENT_SECRET_VARIABLE, ""),
-                environment.getOrDefault(YOUTUBE_REDIRECT_URI_VARIABLE, DEFAULT_YOUTUBE_REDIRECT_URI));
+                environment.getOrDefault(YOUTUBE_REDIRECT_URI_VARIABLE, DEFAULT_YOUTUBE_REDIRECT_URI),
+                YouTubeMode.parse(environment.get(YOUTUBE_MODE_VARIABLE)));
     }
 
     /** The text form never shows the keys or the secret. */
@@ -45,6 +51,6 @@ public record ChannelSettings(String tokenKey, String previousTokenKey, Duration
     public String toString() {
         return "ChannelSettings[tokenKey=redacted, previousTokenKey=redacted, refreshMargin=" + refreshMargin
                 + ", youtubeClientId=" + youtubeClientId + ", youtubeClientSecret=redacted, youtubeRedirectUri="
-                + youtubeRedirectUri + "]";
+                + youtubeRedirectUri + ", youtubeMode=" + youtubeMode + "]";
     }
 }
