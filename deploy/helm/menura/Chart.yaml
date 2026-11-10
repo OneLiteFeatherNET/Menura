@@ -4,8 +4,8 @@ description: Menura hub - server (REST, OAuth, MCP), web app and jobs from one r
 type: application
 # Both markers are rewritten by release-please, so the chart version and the
 # images it deploys come from the same release.
-version: "0.2.1" # x-release-please-version
-appVersion: "0.2.1" # x-release-please-version
+version: "0.3.0" # x-release-please-version
+appVersion: "0.3.0" # x-release-please-version
 home: https://github.com/OneLiteFeatherNET/Menura
 sources:
   - https://github.com/OneLiteFeatherNET/Menura
