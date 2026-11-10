@@ -97,3 +97,5 @@ menura:
       client-id: ${MENURA_YOUTUBE_CLIENT_ID:}
       client-secret: ${MENURA_YOUTUBE_CLIENT_SECRET:}
       redirect-uri: ${MENURA_YOUTUBE_REDIRECT_URI:`http://localhost:8080/channel-connections/callback`}
+      # simulated generates data locally and never calls YouTube; for development only
+      mode: ${MENURA_YOUTUBE_MODE:live}

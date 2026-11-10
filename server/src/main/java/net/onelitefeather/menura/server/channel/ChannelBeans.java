@@ -10,8 +10,11 @@ import net.onelitefeather.menura.core.channel.ConnectionService;
 import net.onelitefeather.menura.core.channel.HttpTransport;
 import net.onelitefeather.menura.core.channel.JdbcChannelStore;
 import net.onelitefeather.menura.core.channel.JdkHttpTransport;
+import net.onelitefeather.menura.core.channel.PlatformAdapter;
 import net.onelitefeather.menura.core.channel.PlatformRegistry;
 import net.onelitefeather.menura.core.channel.youtube.YouTubeAdapter;
+import net.onelitefeather.menura.core.channel.youtube.YouTubeAdapters;
+import net.onelitefeather.menura.core.channel.youtube.YouTubeMode;
 import net.onelitefeather.menura.core.db.Transactions;
 import net.onelitefeather.menura.core.id.IdentifierGenerator;
 import net.onelitefeather.menura.core.secret.SecretGenerator;
@@ -47,16 +50,19 @@ public class ChannelBeans {
         return new JdkHttpTransport();
     }
 
+    /** Live by default; {@code simulated} runs YouTube locally, and an unknown mode stops the startup. */
     @Singleton
-    YouTubeAdapter youTubeAdapter(Clock clock, HttpTransport http,
-                                  @Value("${menura.channels.youtube.client-id:}") String clientId,
-                                  @Value("${menura.channels.youtube.client-secret:}") String clientSecret,
-                                  @Value("${menura.channels.youtube.redirect-uri}") String redirectUri) {
-        return new YouTubeAdapter(clock, new YouTubeAdapter.Settings(clientId, clientSecret, redirectUri), http);
+    PlatformAdapter youTubeAdapter(Clock clock, HttpTransport http,
+                                   @Value("${menura.channels.youtube.client-id:}") String clientId,
+                                   @Value("${menura.channels.youtube.client-secret:}") String clientSecret,
+                                   @Value("${menura.channels.youtube.redirect-uri}") String redirectUri,
+                                   @Value("${menura.channels.youtube.mode:live}") String mode) {
+        return YouTubeAdapters.create(clock, new YouTubeAdapter.Settings(clientId, clientSecret, redirectUri),
+                YouTubeMode.parse(mode), http);
     }
 
     @Singleton
-    PlatformRegistry platformRegistry(YouTubeAdapter youtube) {
+    PlatformRegistry platformRegistry(PlatformAdapter youtube) {
         return new PlatformRegistry(java.util.List.of(youtube));
     }
 
