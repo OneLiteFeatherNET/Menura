@@ -59,7 +59,7 @@ micronaut {
 // The base image is pinned here; the plugin default is a moving `eclipse-temurin:25-jre` tag.
 // The image runs as an unprivileged user (uid 10001), so the chart can enforce runAsNonRoot.
 tasks.named<io.micronaut.gradle.docker.MicronautDockerfile>("dockerfile") {
-    getBaseImage().set("eclipse-temurin:25.0.5_8-jre-noble")
+    getBaseImage().set("eclipse-temurin:25.0.5.1_1-jre-noble")
     instruction("RUN groupadd --system --gid 10001 menura && useradd --system --uid 10001 --gid menura --no-create-home menura")
     instruction("USER 10001:10001")
 }
