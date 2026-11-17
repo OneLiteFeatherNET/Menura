@@ -144,6 +144,7 @@ jobs:
     with:
       project-name: "Menura"
       project-version: ${{ needs.release-please.outputs.version }}
+      parent-uuid: "cfe81287-d973-4929-b3bf-973f10aeaf6a"
       artifact-name: "sbom-cyclonedx"
       sbom-path: "bom.json"
       is-latest: true
