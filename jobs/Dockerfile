@@ -5,7 +5,7 @@
 #   ./gradlew :jobs:installDist
 #   docker build -f jobs/Dockerfile -t menura/jobs jobs/build/install/jobs
 
-FROM eclipse-temurin:25.0.5_8-jre-noble
+FROM eclipse-temurin:25.0.5.1_1-jre-noble
 
 # The noble base already has a user with uid 1000, so the job runner gets 10001.
 RUN groupadd --system --gid 10001 menura \
